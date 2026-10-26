@@ -1,0 +1,523 @@
+const { Pool } = require('pg');
+const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
+const config = require('../config');
+
+let pool = null;
+let supabase = null;
+let isPostgres = false;
+
+// In-Memory store for resilient local development / testing fallback
+const localStore = {
+  users: [
+    {
+      id: 'a0000000-0000-0000-0000-000000000001',
+      email: 'admin@bloodbridge.org',
+      password_hash: '$2b$10$sIhjgSBzboFPE59nYWXUWOzdU/4L78.GRZeGubRMxMAvF3do3/wH6', // BloodBridge2026!
+      name: 'System Administrator',
+      role: 'admin',
+      phone: '+91 98765 00001',
+      created_at: new Date('2026-01-01').toISOString()
+    },
+    {
+      id: 'b0000000-0000-0000-0000-000000000002',
+      email: 'requester@bloodbridge.org',
+      password_hash: '$2b$10$sIhjgSBzboFPE59nYWXUWOzdU/4L78.GRZeGubRMxMAvF3do3/wH6',
+      name: 'Priya Sharma (Requester)',
+      role: 'requester',
+      phone: '+91 98765 00002',
+      created_at: new Date('2026-01-01').toISOString()
+    },
+    {
+      id: 'c0000000-0000-0000-0000-000000000003',
+      email: 'donor@bloodbridge.org',
+      password_hash: '$2b$10$sIhjgSBzboFPE59nYWXUWOzdU/4L78.GRZeGubRMxMAvF3do3/wH6',
+      name: 'Rahul Verma (Donor)',
+      role: 'donor',
+      phone: '+91 98765 00003',
+      created_at: new Date('2026-01-01').toISOString()
+    }
+  ],
+  donors: [
+    {
+      id: 'd0000000-0000-0000-0000-000000000001',
+      user_id: 'c0000000-0000-0000-0000-000000000003',
+      name: 'Rahul Verma',
+      blood_group: 'B+',
+      city: 'Jaipur',
+      area: 'Malviya Nagar',
+      postal_code: '302017',
+      latitude: 26.8532,
+      longitude: 75.8239,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-05-10',
+      source: 'platform',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000002',
+      user_id: null,
+      name: 'Ananya Sen',
+      blood_group: 'B+',
+      city: 'Jaipur',
+      area: 'C-Scheme',
+      postal_code: '302001',
+      latitude: 26.9089,
+      longitude: 75.8012,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-06-15',
+      source: 'platform',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000003',
+      user_id: null,
+      name: 'Amit Patel',
+      blood_group: 'O-',
+      city: 'Jaipur',
+      area: 'Mansarovar',
+      postal_code: '302020',
+      latitude: 26.8614,
+      longitude: 75.7656,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-04-20',
+      source: 'platform',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000004',
+      user_id: null,
+      name: 'Vikram Rathore',
+      blood_group: 'O+',
+      city: 'Jaipur',
+      area: 'Vaishali Nagar',
+      postal_code: '302021',
+      latitude: 26.9028,
+      longitude: 75.7431,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-07-01',
+      source: 'google_forms',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000005',
+      user_id: null,
+      name: 'Kavita Joshi',
+      blood_group: 'A+',
+      city: 'Jaipur',
+      area: 'Raja Park',
+      postal_code: '302004',
+      latitude: 26.8945,
+      longitude: 75.8291,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'pending_verification',
+      last_donation_date: '2026-08-11',
+      source: 'google_forms',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000006',
+      user_id: null,
+      name: 'Suresh Meena',
+      blood_group: 'AB+',
+      city: 'Jaipur',
+      area: 'Jagatpura',
+      postal_code: '302017',
+      latitude: 26.8225,
+      longitude: 75.8450,
+      availability_status: 'unavailable',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-09-01',
+      source: 'platform',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000007',
+      user_id: null,
+      name: 'Deepak Kumar',
+      blood_group: 'B+',
+      city: 'Jaipur',
+      area: 'Tonk Road',
+      postal_code: '302015',
+      latitude: 26.8710,
+      longitude: 75.8020,
+      availability_status: 'available',
+      consent_to_contact: false, // Consent withdrawn!
+      verification_status: 'verified',
+      last_donation_date: '2026-03-12',
+      source: 'platform',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000008',
+      user_id: null,
+      name: 'Rohit Sharma',
+      blood_group: 'B+',
+      city: 'Ghaziabad',
+      area: 'Indirapuram',
+      postal_code: '201014',
+      latitude: 28.6415,
+      longitude: 77.3714,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-06-20',
+      source: 'google_forms',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000009',
+      user_id: null,
+      name: 'Neha Gupta',
+      blood_group: 'O+',
+      city: 'Ghaziabad',
+      area: 'Vaishali',
+      postal_code: '201010',
+      latitude: 28.6482,
+      longitude: 77.3392,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-07-15',
+      source: 'platform',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'd0000000-0000-0000-0000-000000000010',
+      user_id: null,
+      name: 'Mohd Tariq',
+      blood_group: 'B-',
+      city: 'Ghaziabad',
+      area: 'Raj Nagar Extension',
+      postal_code: '201017',
+      latitude: 28.7042,
+      longitude: 77.4418,
+      availability_status: 'available',
+      consent_to_contact: true,
+      verification_status: 'verified',
+      last_donation_date: '2026-08-05',
+      source: 'google_forms',
+      created_at: new Date().toISOString()
+    }
+  ],
+  blood_banks: [
+    {
+      id: 'bb000000-0000-0000-0000-000000000001',
+      name: 'SMS Hospital Regional Blood Bank',
+      address: 'JLN Marg, Ashok Nagar',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      postal_code: '302004',
+      phone: '+91 141 2518200',
+      email: 'bloodbank@smshospital.org',
+      latitude: 26.8978,
+      longitude: 75.8167,
+      operating_hours: '24/7 Emergency Service',
+      verification_status: 'verified',
+      source_of_info: 'Government Health Authority',
+      inventory_summary: { 'A+': 18, 'A-': 5, 'B+': 24, 'B-': 6, 'AB+': 9, 'AB-': 3, 'O+': 32, 'O-': 8 },
+      last_updated: new Date().toISOString()
+    },
+    {
+      id: 'bb000000-0000-0000-0000-000000000002',
+      name: 'Jaipur Red Cross Blood Centre',
+      address: 'Sawai Mansingh Road',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      postal_code: '302001',
+      phone: '+91 141 2372400',
+      email: 'jaipur@redcrossblood.in',
+      latitude: 26.9150,
+      longitude: 75.8050,
+      operating_hours: '8:00 AM - 8:00 PM',
+      verification_status: 'verified',
+      source_of_info: 'Red Cross Society',
+      inventory_summary: { 'A+': 10, 'A-': 2, 'B+': 14, 'B-': 4, 'AB+': 5, 'AB-': 1, 'O+': 19, 'O-': 4 },
+      last_updated: new Date().toISOString()
+    },
+    {
+      id: 'bb000000-0000-0000-0000-000000000003',
+      name: 'Fortis Escorts Blood Bank',
+      address: 'Jawaharlal Nehru Marg, Malviya Nagar',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      postal_code: '302017',
+      phone: '+91 141 2547000',
+      email: 'bloodbank.jaipur@fortishealthcare.com',
+      latitude: 26.8480,
+      longitude: 75.8180,
+      operating_hours: '24/7 Emergency Service',
+      verification_status: 'verified',
+      source_of_info: 'NABH Accredited Hospital',
+      inventory_summary: { 'A+': 8, 'A-': 1, 'B+': 12, 'B-': 2, 'AB+': 4, 'AB-': 1, 'O+': 15, 'O-': 3 },
+      last_updated: new Date().toISOString()
+    },
+    {
+      id: 'bb000000-0000-0000-0000-000000000004',
+      name: 'Ghaziabad District Blood Centre',
+      address: 'MMG District Hospital, GT Road',
+      city: 'Ghaziabad',
+      state: 'Uttar Pradesh',
+      postal_code: '201001',
+      phone: '+91 120 2850100',
+      email: 'mmgbloodbank@up.gov.in',
+      latitude: 28.6678,
+      longitude: 77.4350,
+      operating_hours: '24/7 Emergency Service',
+      verification_status: 'verified',
+      source_of_info: 'District Health Administration',
+      inventory_summary: { 'A+': 14, 'A-': 3, 'B+': 20, 'B-': 4, 'AB+': 7, 'AB-': 2, 'O+': 25, 'O-': 6 },
+      last_updated: new Date().toISOString()
+    }
+  ],
+  blood_requests: [
+    {
+      id: 'req00000-0000-0000-0000-000000000001',
+      requester_id: 'b0000000-0000-0000-0000-000000000002',
+      patient_name: 'Sunita Sharma',
+      blood_group: 'B+',
+      units_needed: 2,
+      hospital_name: 'SMS Hospital Emergency Ward',
+      hospital_address: 'JLN Marg, Jaipur',
+      city: 'Jaipur',
+      latitude: 26.8978,
+      longitude: 75.8167,
+      urgency: 'emergency',
+      needed_by: new Date(Date.now() + 86400000).toISOString(),
+      description: 'Urgent requirement for cardiac surgery scheduled tomorrow morning. 2 units of B+ required.',
+      contact_phone: '+91 98765 00002',
+      contact_preference: 'phone',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ],
+  rag_documents: [
+    {
+      id: 'r0000000-0000-0000-0000-000000000001',
+      title: 'General Blood Donation Eligibility Guidelines',
+      source: 'National Blood Transfusion Council (NBTC) & WHO',
+      category: 'eligibility',
+      status: 'approved',
+      content: 'Donors must be between 18 and 65 years of age and weigh at least 45 kg (50 kg for certain whole blood donations). Hemoglobin levels should not be less than 12.5 g/dL. The donation interval between whole blood donations must be at least 90 days (3 months) for male donors and 120 days (4 months) for female donors. Donors should have had adequate sleep (at least 6 hours), should not have consumed alcohol within 24 hours prior to donation, and should eat a light meal 2 to 3 hours beforehand. Persons with active infections, fever, untreated high blood pressure, jaundice, hepatitis B or C, HIV, or heart disease are temporarily or permanently deferred. Always consult healthcare professionals at authorized blood donation centers.',
+      chunk_count: 3,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'r0000000-0000-0000-0000-000000000002',
+      title: 'Blood Group Compatibility and Transfusion Science',
+      source: 'Directorate General of Health Services (DGHS)',
+      category: 'guidelines',
+      status: 'approved',
+      content: 'Blood group compatibility is determined by ABO and Rh (Rhesus) antigens. Type O-negative is known as the universal red blood cell donor, meaning O-negative red blood cells can be administered to emergency patients of any blood group when group-specific blood is not immediately obtainable. Type AB-positive individuals are universal plasma recipients. However, BloodBridge is strictly a coordination and search navigation platform, NOT a medical authority. Blood group compatibility and matching algorithms on the platform indicate potential donor candidates, but NEVER constitute clinical confirmation of compatibility. Final cross-matching, antibody screening, and transfusion safety are strictly the clinical responsibility of licensed blood bank pathologists and attending physicians.',
+      chunk_count: 3,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 'r0000000-0000-0000-0000-000000000003',
+      title: 'BloodBridge Platform Workflow and Emergency Coordination Guide',
+      source: 'BloodBridge Vision-X Architecture Specification',
+      category: 'workflow',
+      status: 'approved',
+      content: 'When an emergency blood requirement arises, the requester submits the patient blood group, units needed, hospital name, location, and urgency level. The platform executes a deterministic spatial query using PostGIS ST_DWithin and ST_Distance to identify verified and available donors within the search radius who have given explicit consent to be contacted. Exact home addresses and GPS coordinates of donors are strictly protected and never displayed in public search results; only fuzzy distance bands such as "Within 2 km" or approximate city areas are shown. Requesters can contact potential donors or reach out directly to 24/7 verified regional blood banks.',
+      chunk_count: 2,
+      created_at: new Date().toISOString()
+    }
+  ],
+  rag_chunks: [],
+  integration_logs: [],
+  audit_events: []
+};
+
+// Precise Haversine distance in kilometers (exact spherical match to PostGIS ST_Distance)
+function calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371.0; // Earth radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180.0;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180.0;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180.0) *
+      Math.cos((lat2 * Math.PI) / 180.0) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Format privacy-safe distance band
+function getPrivacySafeDistanceBand(distanceKm) {
+  if (distanceKm <= 2) return 'Within 2 km';
+  if (distanceKm <= 5) return 'Within 5 km';
+  if (distanceKm <= 10) return 'Within 10 km';
+  if (distanceKm <= 25) return 'Within 25 km';
+  return `Within ${Math.round(distanceKm)} km`;
+}
+
+// Initialize Database connection with PostGIS & schema verification
+async function initDb() {
+  if (config.databaseUrl) {
+    try {
+      // Connect to external PostgreSQL (e.g. Supabase)
+      pool = new Pool({ connectionString: config.databaseUrl, ssl: { rejectUnauthorized: false } });
+      const client = await pool.connect();
+      console.log('PostgreSQL connection established successfully.');
+      isPostgres = true;
+
+      // 1. Check PostGIS extension
+      try {
+        const postgisRes = await client.query('SELECT PostGIS_Version();');
+        console.log(`PostGIS Extension Active: Version ${postgisRes.rows[0].postgis_version}`);
+      } catch (pgErr) {
+        console.warn('PostGIS Extension Notice: Not detected or not yet enabled. Run "CREATE EXTENSION IF NOT EXISTS postgis;" in Supabase SQL editor.');
+      }
+
+      // 2. Check GiST Spatial Index
+      try {
+        const idxRes = await client.query(`
+          SELECT indexname FROM pg_indexes 
+          WHERE tablename = 'donors' AND indexname = 'donors_location_gist_idx';
+        `);
+        if (idxRes.rows.length > 0) {
+          console.log('Spatial GiST Index verified on donors(location).');
+        } else {
+          console.log('Notice: Spatial index "donors_location_gist_idx" not yet present in database. Run migration 002_postgis_spatial.sql.');
+        }
+      } catch (idxErr) {
+        // Table may not exist yet
+      }
+
+      client.release();
+    } catch (err) {
+      console.warn('Could not connect to external PostgreSQL, falling back to embedded resilient local store:', err.message);
+      isPostgres = false;
+    }
+  } else {
+    console.log('No DATABASE_URL configured. Operating in embedded resilient store mode (with full PostGIS mathematics and seeded records).');
+    isPostgres = false;
+  }
+
+  if (config.supabaseUrl && config.supabaseKey) {
+    try {
+      supabase = createClient(config.supabaseUrl, config.supabaseKey);
+      console.log('Supabase Client initialized successfully.');
+    } catch (err) {
+      console.warn('Supabase Client init notice:', err.message);
+    }
+  }
+}
+
+// Spatial search for donors using PostGIS ST_DWithin and ST_Distance or Haversine fallback
+async function searchNearbyDonors({
+  latitude,
+  longitude,
+  radiusKm = 25,
+  bloodGroup = null,
+  limit = 20,
+  offset = 0
+}) {
+  const lat = parseFloat(latitude);
+  const lon = parseFloat(longitude);
+  const radius = parseFloat(radiusKm);
+
+  if (isNaN(lat) || isNaN(lon)) {
+    throw new Error('Invalid latitude or longitude supplied for spatial search.');
+  }
+
+  if (isPostgres && pool) {
+    const query = `
+      SELECT * FROM search_nearby_donors($1, $2, $3, $4, $5, $6);
+    `;
+    const res = await pool.query(query, [lat, lon, radius, bloodGroup || null, limit, offset]);
+    return res.rows;
+  }
+
+  // Local fallback with exact spherical PostGIS logic
+  return localStore.donors
+    .filter((d) => {
+      if (!d.consent_to_contact) return false;
+      if (d.availability_status !== 'available') return false;
+      if (d.verification_status !== 'verified' && d.verification_status !== 'pending_verification') return false;
+      if (bloodGroup && d.blood_group !== bloodGroup) return false;
+      if (d.latitude == null || d.longitude == null) return false;
+
+      const dist = calculateHaversineDistanceKm(lat, lon, d.latitude, d.longitude);
+      return dist <= radius;
+    })
+    .map((d) => {
+      const dist = calculateHaversineDistanceKm(lat, lon, d.latitude, d.longitude);
+      return {
+        donor_id: d.id,
+        name: d.name,
+        blood_group: d.blood_group,
+        city: d.city,
+        area: d.area,
+        availability_status: d.availability_status,
+        verification_status: d.verification_status,
+        distance_km: Math.round(dist * 10) / 10,
+        distance_band: getPrivacySafeDistanceBand(dist),
+        last_donation_date: d.last_donation_date
+        // Notice: Exact latitude and longitude are OMITTED for privacy protection!
+      };
+    })
+    .sort((a, b) => a.distance_km - b.distance_km)
+    .slice(offset, offset + limit);
+}
+
+// Spatial search for Blood Banks
+async function searchNearbyBloodBanks({ latitude, longitude, radiusKm = 50, limit = 20 }) {
+  const lat = latitude ? parseFloat(latitude) : null;
+  const lon = longitude ? parseFloat(longitude) : null;
+
+  return localStore.blood_banks
+    .filter((bb) => bb.verification_status === 'verified')
+    .map((bb) => {
+      let distance_km = null;
+      let distance_band = 'Distance not available';
+      if (lat != null && lon != null && bb.latitude && bb.longitude) {
+        const dist = calculateHaversineDistanceKm(lat, lon, bb.latitude, bb.longitude);
+        distance_km = Math.round(dist * 10) / 10;
+        distance_band = getPrivacySafeDistanceBand(dist);
+      }
+      return {
+        ...bb,
+        distance_km,
+        distance_band
+      };
+    })
+    .filter((bb) => {
+      if (radiusKm && bb.distance_km != null) {
+        return bb.distance_km <= radiusKm;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.distance_km != null && b.distance_km != null) {
+        return a.distance_km - b.distance_km;
+      }
+      return 0;
+    })
+    .slice(0, limit);
+}
+
+module.exports = {
+  initDb,
+  searchNearbyDonors,
+  searchNearbyBloodBanks,
+  localStore,
+  calculateHaversineDistanceKm,
+  getPrivacySafeDistanceBand,
+  isPostgresConnected: () => isPostgres,
+  getPool: () => pool,
+  getSupabase: () => supabase
+};
