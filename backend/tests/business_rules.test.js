@@ -8,6 +8,7 @@ const { processGoogleFormSubmission, validateGoogleFormPayload } = require('../s
 const { dispatchRequestNotifications, handleDonorActionToken, generateManualWhatsAppLink } = require('../src/services/whatsappService');
 const { parseRequestDeterministically } = require('../src/services/groqService');
 const config = require('../src/config');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 
 // Helper to make lightweight in-memory HTTP requests to Express app
@@ -391,4 +392,151 @@ test('Rule 15: Natural language parser succeeds without Groq API key', async () 
   assert.strictEqual(parsed.units_needed, 3);
   assert.strictEqual(parsed.urgency, 'emergency');
   assert.ok(parsed.hospital_name.toLowerCase().includes('medical college') || parsed.hospital_name.toLowerCase().includes('s.n.'));
+});
+
+// 16. Accepted Donors Only and Privacy Masking
+test('Rule 16: Accepted donors only appear to requester with contact masking until selected', async () => {
+  const reqId = uuidv4();
+  const donor1Id = uuidv4();
+  const donor2Id = uuidv4();
+
+  const requesterUser = localStore.users.find((u) => u.role === 'requester');
+  const token = jwt.sign({ id: requesterUser.id, role: requesterUser.role }, config.jwtSecret);
+
+  // Setup request
+  localStore.blood_requests.push({
+    id: reqId,
+    requester_id: requesterUser.id,
+    patient_name: 'Patient Acceptance Test',
+    blood_group: 'A+',
+    status: 'notifications_queued'
+  });
+
+  // Setup 2 donors
+  localStore.donors.push({
+    id: donor1Id,
+    name: 'Accepting Donor One',
+    blood_group: 'A+',
+    phone: '9876500001',
+    city: 'Lucknow'
+  });
+
+  localStore.donors.push({
+    id: donor2Id,
+    name: 'Declining Donor Two',
+    blood_group: 'A+',
+    phone: '9876500002',
+    city: 'Lucknow'
+  });
+
+  // Add 2 notification jobs
+  const token1 = `token_accept_${Date.now()}`;
+  const token2 = `token_decline_${Date.now()}`;
+
+  localStore.whatsapp_notifications.push({
+    id: uuidv4(),
+    request_id: reqId,
+    donor_id: donor1Id,
+    donor_name: 'Accepting Donor One',
+    action_token: token1,
+    status: 'sent'
+  });
+
+  localStore.whatsapp_notifications.push({
+    id: uuidv4(),
+    request_id: reqId,
+    donor_id: donor2Id,
+    donor_name: 'Declining Donor Two',
+    action_token: token2,
+    status: 'sent'
+  });
+
+  // Donor 1 accepts, Donor 2 declines
+  handleDonorActionToken(token1, 'accepted');
+  handleDonorActionToken(token2, 'declined');
+
+  // Query accepted donors
+  const getRes = await testRequest('GET', `/api/requests/${reqId}/accepted-donors`, null, {
+    authorization: `Bearer ${token}`
+  });
+
+  assert.strictEqual(getRes.status, 200);
+  assert.strictEqual(getRes.body.count, 1);
+  assert.strictEqual(getRes.body.donors[0].donor_id, donor1Id);
+  // Privacy rule: phone is masked (undefined) before selection
+  assert.strictEqual(getRes.body.donors[0].phone, undefined);
+
+  // Attempting to select unaccepted Donor 2 should be rejected with 400
+  const badSelect = await testRequest('POST', `/api/requests/${reqId}/select-donor`, { donor_id: donor2Id }, {
+    authorization: `Bearer ${token}`
+  });
+  assert.strictEqual(badSelect.status, 400);
+});
+
+// 17. Donor Selection reveals phone and fulfillment triggers cooldown
+test('Rule 17: Selecting accepted donor reveals contact info and fulfillment triggers cooldown', async () => {
+  const reqId = uuidv4();
+  const donorId = uuidv4();
+
+  const requesterUser = localStore.users.find((u) => u.role === 'requester');
+  const token = jwt.sign({ id: requesterUser.id, role: requesterUser.role }, config.jwtSecret);
+
+  localStore.blood_requests.push({
+    id: reqId,
+    requester_id: requesterUser.id,
+    patient_name: 'Coordination Test',
+    blood_group: 'B+',
+    status: 'responses_received'
+  });
+
+  const testDonor = {
+    id: donorId,
+    name: 'Matched Hero',
+    blood_group: 'B+',
+    phone: '9876512345',
+    city: 'Kanpur',
+    availability_status: 'available',
+    consent_to_contact: true,
+    verification_status: 'verified'
+  };
+  localStore.donors.push(testDonor);
+
+  const actionToken = `token_select_${Date.now()}`;
+  localStore.whatsapp_notifications.push({
+    id: uuidv4(),
+    request_id: reqId,
+    donor_id: donorId,
+    donor_name: 'Matched Hero',
+    action_token: actionToken,
+    donor_response: 'accepted',
+    status: 'sent'
+  });
+
+  // 1. Select the donor
+  const selectRes = await testRequest('POST', `/api/requests/${reqId}/select-donor`, { donor_id: donorId }, {
+    authorization: `Bearer ${token}`
+  });
+  assert.strictEqual(selectRes.status, 200);
+  assert.strictEqual(selectRes.body.request.status, 'donor_selected');
+  assert.strictEqual(selectRes.body.selected_donor.phone, '9876512345'); // Contact action enabled!
+
+  // 2. Query accepted donors - phone is now revealed for selected donor
+  const getRes = await testRequest('GET', `/api/requests/${reqId}/accepted-donors`, null, {
+    authorization: `Bearer ${token}`
+  });
+  assert.strictEqual(getRes.status, 200);
+  assert.strictEqual(getRes.body.donors[0].is_selected, true);
+  assert.strictEqual(getRes.body.donors[0].phone, '9876512345');
+
+  // 3. Mark request fulfilled
+  const fulfillRes = await testRequest('PATCH', `/api/requests/${reqId}/status`, { status: 'fulfilled' }, {
+    authorization: `Bearer ${token}`
+  });
+  assert.strictEqual(fulfillRes.status, 200);
+  assert.strictEqual(fulfillRes.body.request.status, 'fulfilled');
+
+  // 4. Check that 3-month cooldown was automatically triggered on the selected donor
+  assert.strictEqual(testDonor.donated_last_3_months, true);
+  assert.strictEqual(testDonor.availability_status, 'recently_donated');
+  assert.ok(testDonor.cooldown_until);
 });

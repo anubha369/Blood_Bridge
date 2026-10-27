@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { localStore } = require('../db/db');
+const { localStore, calculateHaversineDistanceKm, getPrivacySafeDistanceBand } = require('../db/db');
 const { authenticateUser, optionalAuth } = require('../middleware/auth');
 const { rankCandidateDonors } = require('../services/matchingService');
 const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatialService');
+const { recordCompletedDonation } = require('../services/cooldownService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const VALID_STATUSES = [
@@ -14,6 +15,7 @@ const VALID_STATUSES = [
   'searching',
   'notifications_queued',
   'responses_received',
+  'donor_selected',
   'coordination_in_progress',
   'active',
   'pending',
@@ -87,6 +89,8 @@ router.post('/', authenticateUser, async (req, res, next) => {
       contact_phone: contact_phone ? contact_phone.trim() : req.user.phone || null,
       contact_preference,
       status: 'active',
+      selected_donor_id: null,
+      selected_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -113,7 +117,6 @@ router.get('/', optionalAuth, (req, res) => {
   if (own_only === 'true' && req.user) {
     requests = requests.filter((r) => r.requester_id === req.user.id);
   } else if (!req.user || req.user.role !== 'admin') {
-    // If not admin, hide sensitive requester IDs or allow public active requests
     if (req.user && own_only !== 'false') {
       requests = requests.filter((r) => r.requester_id === req.user.id || r.status === 'active');
     } else {
@@ -169,19 +172,17 @@ router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
     }
 
     const radiusKm = parseFloat(req.query.radius_km || 30);
-    const searchLat = request.latitude || 26.9124;
-    const searchLon = request.longitude || 75.7873;
+    const searchLat = request.latitude || 26.8467;
+    const searchLon = request.longitude || 80.9462;
 
-    // Fetch spatially nearby donors
     const nearbyDonors = await findNearbyDonors({
       latitude: searchLat,
       longitude: searchLon,
       radiusKm,
-      bloodGroup: null, // Don't filter to single group here so compatible groups (e.g. O- for B+) can be ranked!
+      bloodGroup: null,
       limit: 50
     });
 
-    // Run deterministic ranking algorithm
     const candidates = rankCandidateDonors(nearbyDonors, request, radiusKm);
 
     return res.json({
@@ -197,6 +198,151 @@ router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// GET /api/requests/:id/accepted-donors
+// Returns ONLY donors who explicitly accepted this specific request
+// Contact phone is revealed ONLY for the selected donor (Sections 8 & 9)
+router.get('/:id/accepted-donors', authenticateUser, (req, res) => {
+  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+  }
+
+  // Only requester of this request or an admin can access accepted donors
+  if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to view accepted donors for this request.' });
+  }
+
+  // Find notification jobs for this request that have donor_response === 'accepted'
+  const acceptedJobs = (localStore.whatsapp_notifications || []).filter(
+    (j) => j.request_id === request.id && j.donor_response === 'accepted'
+  );
+
+  const acceptedDonors = acceptedJobs.map((job) => {
+    const donor = (localStore.donors || []).find((d) => d.id === job.donor_id);
+    const isSelected = request.selected_donor_id === job.donor_id;
+
+    let distanceBand = 'Proximity verified';
+    if (donor && donor.latitude && donor.longitude && request.latitude && request.longitude) {
+      const dist = calculateHaversineDistanceKm(request.latitude, request.longitude, donor.latitude, donor.longitude);
+      distanceBand = getPrivacySafeDistanceBand(dist);
+    }
+
+    return {
+      donor_id: job.donor_id,
+      name: job.donor_name || (donor ? donor.name : 'Voluntary Donor'),
+      blood_group: donor ? donor.blood_group : request.blood_group,
+      city: donor ? donor.city : request.city,
+      area: donor ? donor.area : null,
+      distance_band: distanceBand,
+      responded_at: job.responded_at,
+      action_token: job.action_token,
+      is_selected: isSelected,
+      // CRITICAL PRIVACY RULE: phone number is ONLY exposed if this donor is selected!
+      phone: isSelected && donor ? donor.phone : undefined
+    };
+  });
+
+  return res.json({
+    success: true,
+    request_id: request.id,
+    request_status: request.status,
+    selected_donor_id: request.selected_donor_id || null,
+    selected_at: request.selected_at || null,
+    count: acceptedDonors.length,
+    donors: acceptedDonors
+  });
+});
+
+// POST /api/requests/:id/select-donor
+// Select one accepting donor for coordination and reveal contact info
+router.post('/:id/select-donor', authenticateUser, (req, res) => {
+  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+  }
+
+  if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to select a donor for this request.' });
+  }
+
+  const { donor_id } = req.body;
+  if (!donor_id) {
+    return res.status(400).json({ success: false, error: 'donor_id is required.' });
+  }
+
+  // Validate that this donor actually accepted this specific request!
+  const acceptedJob = (localStore.whatsapp_notifications || []).find(
+    (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
+  );
+
+  if (!acceptedJob) {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot select donor: This donor has not accepted this emergency request.'
+    });
+  }
+
+  const donor = (localStore.donors || []).find((d) => d.id === donor_id);
+  if (!donor) {
+    return res.status(404).json({ success: false, error: 'Donor record not found.' });
+  }
+
+  request.selected_donor_id = donor_id;
+  request.selected_at = new Date().toISOString();
+  request.status = 'donor_selected';
+  request.updated_at = new Date().toISOString();
+
+  // Audit event
+  localStore.audit_events.push({
+    id: String(Date.now()),
+    actor_id: req.user.id,
+    actor_role: req.user.role,
+    action: 'donor_selected',
+    entity_type: 'blood_request',
+    entity_id: request.id,
+    metadata: { donor_id, patient_name: request.patient_name },
+    timestamp: new Date().toISOString()
+  });
+
+  return res.json({
+    success: true,
+    message: `Donor ${donor.name} selected for coordination. Contact details are now enabled.`,
+    request,
+    selected_donor: {
+      id: donor.id,
+      name: donor.name,
+      blood_group: donor.blood_group,
+      phone: donor.phone,
+      city: donor.city,
+      area: donor.area
+    }
+  });
+});
+
+// POST /api/requests/:id/reselect-donor
+// Clear selection and allow picking another accepting donor
+router.post('/:id/reselect-donor', authenticateUser, (req, res) => {
+  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+  }
+
+  if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to reselect for this request.' });
+  }
+
+  request.selected_donor_id = null;
+  request.selected_at = null;
+  request.status = 'responses_received';
+  request.updated_at = new Date().toISOString();
+
+  return res.json({
+    success: true,
+    message: 'Donor selection cleared. You may select another accepting donor.',
+    request
+  });
 });
 
 // PATCH /api/requests/:id/status
@@ -218,6 +364,11 @@ router.patch('/:id/status', authenticateUser, (req, res) => {
 
   request.status = status;
   request.updated_at = new Date().toISOString();
+
+  // If request is marked fulfilled and a donor was selected, record completed donation & trigger cooldown
+  if (status === 'fulfilled' && request.selected_donor_id) {
+    recordCompletedDonation(request.selected_donor_id, new Date().toISOString().split('T')[0], 'request_fulfilled');
+  }
 
   return res.json({
     success: true,

@@ -29,6 +29,7 @@ import DonorDashboard from './pages/DonorDashboard';
 import DonorRegistration from './pages/DonorRegistration';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminRAGManagement from './pages/AdminRAGManagement';
+import DonorResponse from './pages/DonorResponse';
 import NotFound from './pages/NotFound';
 
 export default function App() {
@@ -58,6 +59,8 @@ export default function App() {
               <Route path="/donors/nearby" element={<NearbyDonors />} />
               <Route path="/blood-banks" element={<BloodBanks />} />
               <Route path="/requests/:id" element={<RequestDetails />} />
+              <Route path="/action/:token" element={<DonorResponse />} />
+              <Route path="/donor/response/:token" element={<DonorResponse />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/signup" element={<Signup />} />

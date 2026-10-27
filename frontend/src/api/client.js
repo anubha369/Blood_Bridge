@@ -81,6 +81,9 @@ export const api = {
     },
     getById: (id) => request(`/requests/${id}`),
     getCandidates: (id, radiusKm = 30) => request(`/requests/${id}/candidates?radius_km=${radiusKm}`),
+    getAcceptedDonors: (id) => request(`/requests/${id}/accepted-donors`),
+    selectDonor: (id, donorId) => request(`/requests/${id}/select-donor`, { method: 'POST', body: JSON.stringify({ donor_id: donorId }) }),
+    reselectDonor: (id) => request(`/requests/${id}/reselect-donor`, { method: 'POST' }),
     updateStatus: (id, status) => request(`/requests/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
   },
 

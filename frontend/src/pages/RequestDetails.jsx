@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Activity, MapPin, Heart, Clock, Shield, CheckCircle2, Phone, AlertCircle, Building2, User, ChevronRight, MessageSquare } from 'lucide-react';
+import {
+  Activity,
+  MapPin,
+  Heart,
+  Clock,
+  Shield,
+  CheckCircle2,
+  Phone,
+  AlertCircle,
+  Building2,
+  User,
+  ChevronRight,
+  MessageSquare,
+  RefreshCw,
+  UserCheck,
+  Send,
+  ArrowRight
+} from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,12 +27,15 @@ export default function RequestDetails() {
   const navigate = useNavigate();
 
   const [request, setRequest] = useState(null);
+  const [acceptedDonors, setAcceptedDonors] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [radiusKm, setRadiusKm] = useState(30);
   const [loading, setLoading] = useState(true);
+  const [acceptedLoading, setAcceptedLoading] = useState(false);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [selectingDonorId, setSelectingDonorId] = useState(null);
   const [selectedDonorForContact, setSelectedDonorForContact] = useState(null);
 
   const fetchRequest = async () => {
@@ -32,6 +52,21 @@ export default function RequestDetails() {
       setError(err.message || 'Failed to fetch blood request.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAcceptedDonors = async () => {
+    try {
+      setAcceptedLoading(true);
+      const res = await api.requests.getAcceptedDonors(id);
+      if (res.success) {
+        setAcceptedDonors(res.donors || []);
+      }
+    } catch (err) {
+      // Non-fatal if unauthorized or no notifications yet
+      console.warn('Accepted donors fetch notice:', err.message);
+    } finally {
+      setAcceptedLoading(false);
     }
   };
 
@@ -52,9 +87,41 @@ export default function RequestDetails() {
   useEffect(() => {
     if (id) {
       fetchRequest();
+      fetchAcceptedDonors();
       fetchCandidates();
     }
   }, [id]);
+
+  const handleSelectDonor = async (donorId) => {
+    setSelectingDonorId(donorId);
+    try {
+      const res = await api.requests.selectDonor(id, donorId);
+      if (res.success) {
+        setRequest(res.request);
+        await fetchAcceptedDonors();
+        alert(res.message);
+      } else {
+        alert(res.error || 'Failed to select donor.');
+      }
+    } catch (err) {
+      alert(`Selection error: ${err.message}`);
+    } finally {
+      setSelectingDonorId(null);
+    }
+  };
+
+  const handleReselectDonor = async () => {
+    if (!window.confirm('Are you sure you want to change the selected donor? You will be able to select another accepting donor.')) return;
+    try {
+      const res = await api.requests.reselectDonor(id);
+      if (res.success) {
+        setRequest(res.request);
+        await fetchAcceptedDonors();
+      }
+    } catch (err) {
+      alert(`Reselection error: ${err.message}`);
+    }
+  };
 
   const handleStatusChange = async (newStatus) => {
     try {
@@ -62,6 +129,7 @@ export default function RequestDetails() {
       const res = await api.requests.updateStatus(id, newStatus);
       if (res.success && res.request) {
         setRequest(res.request);
+        await fetchAcceptedDonors();
       }
     } catch (err) {
       alert(err.message || 'Failed to update request status.');
@@ -72,7 +140,7 @@ export default function RequestDetails() {
 
   const handleOpenWhatsAppForDonor = (donor) => {
     if (!donor || !donor.phone) {
-      alert('Donor contact phone number is missing or protected.');
+      alert('Donor contact phone number is missing or protected. You must select this donor first.');
       return;
     }
     const cleanDigits = String(donor.phone).replace(/[^0-9]/g, '');
@@ -85,8 +153,8 @@ export default function RequestDetails() {
       `*BloodBridge Emergency Blood Coordination*\n\n` +
       `Hello ${donor.name},\n` +
       `We urgently need ${request?.units_needed || 1} unit(s) of ${request?.blood_group || donor.blood_group} blood for patient ${request?.patient_name || 'an emergency patient'} at ${request?.hospital_name || 'hospital'}, ${request?.city || donor.city}.\n\n` +
-      `You are registered as a willing donor in ${donor.city}.\n` +
-      `Please let us know if you are available to donate or call us at: ${request?.contact_phone || '+91 98765 00000'}.\n\n` +
+      `You accepted our coordination request on BloodBridge.\n` +
+      `Please let us know your current availability or call us directly at: ${request?.contact_phone || '+91 98765 00000'}.\n\n` +
       `_This coordination request is sent via BloodBridge Vision-X._`;
 
     const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(emergencyMsg)}`;
@@ -97,7 +165,7 @@ export default function RequestDetails() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center text-xs text-slate-500">
         <div className="w-8 h-8 border-2 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        Loading request details...
+        Loading request details and verified donor responses...
       </div>
     );
   }
@@ -119,119 +187,93 @@ export default function RequestDetails() {
 
   // Status journey stages
   const stages = [
-    { key: 'created', label: '1. Registered' },
-    { key: 'active', label: '2. Active Search' },
-    { key: 'matched', label: '3. Candidates Found' },
-    { key: 'fulfilled', label: '4. Fulfilled' }
+    { key: 'submitted', label: '1. Registered' },
+    { key: 'notifications_queued', label: '2. Alerting Donors' },
+    { key: 'responses_received', label: '3. Donors Responded' },
+    { key: 'donor_selected', label: '4. Donor Selected' },
+    { key: 'fulfilled', label: '5. Fulfilled' }
   ];
 
   let currentStageIndex = 0;
-  if (request.status === 'active') {
-    currentStageIndex = candidates.length > 0 ? 2 : 1;
-  } else if (request.status === 'fulfilled') {
-    currentStageIndex = 3;
-  } else if (request.status === 'cancelled') {
-    currentStageIndex = -1;
-  }
+  if (request.status === 'submitted' || request.status === 'searching') currentStageIndex = 0;
+  else if (request.status === 'notifications_queued') currentStageIndex = 1;
+  else if (request.status === 'responses_received') currentStageIndex = 2;
+  else if (request.status === 'donor_selected') currentStageIndex = 3;
+  else if (request.status === 'fulfilled') currentStageIndex = 4;
+  else if (request.status === 'cancelled') currentStageIndex = -1;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Link to="/" className="hover:text-slate-900">Home</Link>
-        <ChevronRight className="w-3.5 h-3.5" />
-        <Link to="/requester/dashboard" className="hover:text-slate-900">Requests</Link>
-        <ChevronRight className="w-3.5 h-3.5" />
-        <span className="font-semibold text-slate-800">{request.patient_name} ({request.blood_group})</span>
-      </div>
-
-      {/* Header Banner */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-rose-600 text-white font-extrabold text-sm rounded-xl">
+      {/* Top Breadcrumb & Status */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+            <Link to="/requester/dashboard" className="hover:text-rose-600">Requester Dashboard</Link>
+            <ChevronRight className="w-3 h-3" />
+            <span className="font-mono text-slate-700">Req #{request.id.substring(0, 8)}</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-rose-600 text-white font-black flex items-center justify-center text-sm shadow-sm">
               {request.blood_group}
             </span>
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              request.urgency === 'emergency'
-                ? 'bg-red-100 text-red-800 animate-pulse'
-                : 'bg-amber-100 text-amber-800'
-            }`}>
-              {request.urgency}
-            </span>
-            <span className="text-xs text-slate-400">
-              ID: <span className="font-mono text-slate-600">{request.id.slice(0, 8)}</span>
-            </span>
-          </div>
-
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Blood Requirement for {request.patient_name}
+            <span>Blood Requirement for {request.patient_name}</span>
           </h1>
-
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
-            <span className="flex items-center gap-1">
-              <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              {request.hospital_name}, {request.city}
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              Needed: {request.units_needed} units
-            </span>
-          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {request.units_needed} units required at <strong className="text-slate-700">{request.hospital_name}</strong>, {request.city}
+          </p>
         </div>
 
-        {/* Status controls */}
-        {isOwner && (
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1.5 min-w-[200px]">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-              Manage Request Status
-            </span>
-            <div className="flex gap-2">
-              {request.status !== 'fulfilled' && (
-                <button
-                  onClick={() => handleStatusChange('fulfilled')}
-                  disabled={statusUpdating}
-                  className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all"
-                >
-                  Mark Fulfilled
-                </button>
-              )}
-              {request.status === 'active' && (
-                <button
-                  onClick={() => handleStatusChange('cancelled')}
-                  disabled={statusUpdating}
-                  className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg transition-all"
-                >
-                  Cancel
-                </button>
-              )}
-              {request.status !== 'active' && (
-                <button
-                  onClick={() => handleStatusChange('active')}
-                  disabled={statusUpdating}
-                  className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-all"
-                >
-                  Reactivate
-                </button>
-              )}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => {
+              fetchRequest();
+              fetchAcceptedDonors();
+            }}
+            className="p-2 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 shadow-sm"
+            title="Refresh Live Responses"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+
+          {isOwner && request.status !== 'fulfilled' && request.status !== 'cancelled' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleStatusChange('fulfilled')}
+                disabled={statusUpdating}
+                className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-all"
+              >
+                Mark Fulfilled
+              </button>
+              <button
+                onClick={() => handleStatusChange('cancelled')}
+                disabled={statusUpdating}
+                className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200"
+              >
+                Cancel Request
+              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Progress Journey Bar */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Request Coordination Journey
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
+            Lifecycle Coordination Progress
+          </h3>
+          <span className="text-xs font-bold text-rose-600 uppercase bg-rose-50 px-2.5 py-0.5 rounded-full">
+            Status: {request.status}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
           {stages.map((stg, idx) => {
             const isDone = currentStageIndex >= idx;
             const isCurrent = currentStageIndex === idx;
             return (
               <div
                 key={stg.key}
-                className={`p-3 rounded-2xl border text-xs font-bold transition-all ${
+                className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${
                   isCurrent
                     ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm ring-2 ring-rose-500/20'
                     : isDone
@@ -246,249 +288,216 @@ export default function RequestDetails() {
         </div>
       </div>
 
-      {/* Main Grid: Matched Donors & Hospital Directory */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Cols: Matched Donors */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-rose-600" />
-                  Matched Candidate Donors ({candidates.length})
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Sorted deterministically by ABO/Rh compatibility, proximity band, and verification status.
-                </p>
-              </div>
+      {/* CORE SECTION (Section 8 & 9): ACCEPTED DONORS ONLY */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-emerald-600" />
+              <span>Accepted Donors for This Request ({acceptedDonors.length})</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Only voluntary donors who explicitly tapped &quot;Accept&quot; on their WhatsApp notification appear here.
+            </p>
+          </div>
 
-              {/* Radius filter */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-500">Radius:</span>
-                <select
-                  value={radiusKm}
-                  onChange={(e) => {
-                    const r = parseInt(e.target.value, 10);
-                    setRadiusKm(r);
-                    fetchCandidates(r);
-                  }}
-                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-rose-600 text-xs"
-                >
-                  <option value={10}>10 km</option>
-                  <option value={20}>20 km</option>
-                  <option value={30}>30 km</option>
-                  <option value={50}>50 km</option>
-                  <option value={100}>100 km</option>
-                </select>
-              </div>
+          <button
+            onClick={fetchAcceptedDonors}
+            disabled={acceptedLoading}
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 self-start sm:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${acceptedLoading ? 'animate-spin' : ''}`} />
+            <span>Check for New Responses</span>
+          </button>
+        </div>
+
+        {acceptedDonors.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4 shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <Clock className="w-6 h-6 animate-pulse" />
             </div>
+            <div className="max-w-md mx-auto space-y-1">
+              <h3 className="font-extrabold text-slate-900 text-sm">
+                Awaiting Voluntary Donor Responses
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Emergency notifications have been sent to eligible nearby donors. To maintain strict medical privacy, donor contact details appear here only after a donor explicitly taps &quot;Accept&quot;.
+              </p>
+            </div>
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                onClick={fetchAcceptedDonors}
+                className="py-2 px-4 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all"
+              >
+                Refresh Responses
+              </button>
+              <Link
+                to="/blood-banks"
+                className="py-2 px-4 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all"
+              >
+                Contact Hospital Blood Centres
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {acceptedDonors.map((donor) => {
+              const isSelected = donor.is_selected;
 
-            {/* Candidate list */}
-            {candidatesLoading ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                <div className="w-6 h-6 border-2 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                Matching available donors...
-              </div>
-            ) : candidates.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-500 space-y-3">
-                <p>No available voluntary donors matching ABO/Rh criteria within {radiusKm} km.</p>
-                <div className="flex justify-center gap-3">
-                  <button
-                    onClick={() => {
-                      setRadiusKm(50);
-                      fetchCandidates(50);
-                    }}
-                    className="px-4 py-2 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl"
-                  >
-                    Expand Radius to 50 km
-                  </button>
-                  <Link
-                    to="/blood-banks"
-                    className="px-4 py-2 text-xs font-bold text-white bg-slate-800 rounded-xl"
-                  >
-                    View Blood Banks
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {candidates.map((cand, idx) => (
-                  <div
-                    key={cand.id || idx}
-                    className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-xl bg-rose-600 text-white font-bold flex items-center justify-center text-xs">
-                          {cand.blood_group}
-                        </span>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">{cand.name}</div>
-                          <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                            <span>{cand.city} ({cand.area || 'General Area'})</span>
-                            <span>•</span>
-                            <span className="font-semibold text-rose-600">{cand.distance_band}</span>
-                          </div>
+              return (
+                <div
+                  key={donor.donor_id}
+                  className={`p-5 rounded-3xl border transition-all space-y-4 ${
+                    isSelected
+                      ? 'bg-emerald-50/60 border-emerald-400 ring-2 ring-emerald-500/30 shadow-md'
+                      : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 h-10 rounded-2xl bg-rose-600 text-white font-black flex items-center justify-center text-sm shadow-sm">
+                        {donor.blood_group}
+                      </span>
+                      <div>
+                        <div className="font-black text-slate-900 text-sm flex items-center gap-1.5">
+                          <span>{donor.name}</span>
+                          {isSelected && (
+                            <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white rounded-full">
+                              Selected Donor
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                          <span>{donor.city} {donor.area ? `(${donor.area})` : ''}</span>
+                          <span>•</span>
+                          <span className="font-bold text-rose-600">{donor.distance_band}</span>
                         </div>
                       </div>
-
-                      {/* Matching reasons */}
-                      {cand.match_reasons && cand.match_reasons.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {cand.match_reasons.map((r, rIdx) => (
-                            <span key={rIdx} className="text-[10px] bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded">
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Accepted
+                    </span>
+                  </div>
+
+                  {/* Actions & Revealed Contact details */}
+                  {isSelected ? (
+                    <div className="p-4 bg-white rounded-2xl border border-emerald-200 space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-semibold">Verified Contact Phone:</span>
+                        <span className="font-mono font-bold text-slate-900 text-sm">{donor.phone || 'Available'}</span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWhatsAppForDonor(donor)}
+                          className="flex-1 py-2 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Open WhatsApp to Send Request</span>
+                        </button>
+
+                        <a
+                          href={`tel:${donor.phone}`}
+                          className="py-2 px-4 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 text-center"
+                        >
+                          Call
+                        </a>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={handleReselectDonor}
+                          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline"
+                        >
+                          Change Selected Donor
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange('fulfilled')}
+                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
+                        >
+                          Mark Donated & Fulfilled &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <span className="text-[11px] text-slate-400 italic">
+                        Phone protected until selected
+                      </span>
                       <button
-                        onClick={() => setSelectedDonorForContact(cand)}
-                        className="px-3.5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                        onClick={() => handleSelectDonor(donor.donor_id)}
+                        disabled={selectingDonorId === donor.donor_id}
+                        className="py-2 px-4 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-sm disabled:opacity-50"
                       >
-                        <Phone className="w-3.5 h-3.5" />
-                        Contact Donor
+                        {selectingDonorId === donor.donor_id ? 'Selecting...' : 'Select This Donor'}
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
-
-        {/* Right Col: Details Summary & Helplines */}
-        <div className="space-y-6">
-          {/* Request Info Card */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
-              Request Details
-            </h3>
-            <ul className="space-y-3 text-xs text-slate-600">
-              <li className="flex justify-between">
-                <span className="text-slate-400">Patient:</span>
-                <span className="font-semibold text-slate-900">{request.patient_name}</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-slate-400">Hospital:</span>
-                <span className="font-semibold text-slate-900 text-right">{request.hospital_name}</span>
-              </li>
-              {request.hospital_address && (
-                <li className="flex justify-between">
-                  <span className="text-slate-400">Address:</span>
-                  <span className="text-slate-700 text-right">{request.hospital_address}</span>
-                </li>
-              )}
-              <li className="flex justify-between">
-                <span className="text-slate-400">Location:</span>
-                <span className="font-semibold text-slate-900">{request.city}</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-slate-400">Contact Phone:</span>
-                <span className="font-semibold text-slate-900">{request.contact_phone || 'Protected'}</span>
-              </li>
-              {request.description && (
-                <li className="pt-2 border-t border-slate-100 text-slate-600 leading-relaxed">
-                  <strong className="block text-slate-800 mb-1">Requester Notes:</strong>
-                  {request.description}
-                </li>
-              )}
-            </ul>
-          </div>
-
-          {/* Regional Blood Bank Referral */}
-          <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-rose-400">
-              <Building2 className="w-4 h-4" />
-              <h4 className="text-xs font-bold uppercase tracking-wider">
-                Need Blood Immediately?
-              </h4>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Contact 24/7 certified hospital blood centres in {request.city} or call Uttar Pradesh state helpline <strong className="text-white">104</strong>.
-            </p>
-            <Link
-              to="/blood-banks"
-              className="inline-block text-xs font-bold text-rose-400 hover:text-rose-300 underline"
-            >
-              Browse verified blood centres &rarr;
-            </Link>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Contact Donor Modal */}
-      {selectedDonorForContact && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in duration-150">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
-                  Consent-Gated Contact
-                </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">
-                  Contact {selectedDonorForContact.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedDonorForContact(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Blood Group:</span>
-                <span className="font-bold text-rose-600">{selectedDonorForContact.blood_group}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Proximity:</span>
-                <span className="font-medium text-slate-800">{selectedDonorForContact.distance_band}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Phone:</span>
-                <span className="font-mono font-bold text-slate-900">{selectedDonorForContact.phone || '+91 98765 00000'}</span>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-[11px] text-amber-800">
-              <strong>Coordination etiquette:</strong> Please introduce yourself politely, state patient details and hospital name, and verify the donor's current wellness before scheduling travel.
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={() => handleOpenWhatsAppForDonor(selectedDonorForContact)}
-                className="flex-1 py-2.5 px-3 text-xs font-bold text-center text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Open WhatsApp to Send Request</span>
-              </button>
-              <a
-                href={`tel:${selectedDonorForContact.phone}`}
-                className="py-2.5 px-4 text-xs font-bold text-center text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all border border-rose-200"
-              >
-                Call
-              </a>
-              <button
-                type="button"
-                onClick={() => setSelectedDonorForContact(null)}
-                className="py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
-              >
-                Close
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 text-center leading-normal">
-              Notice: Click-to-chat opens your WhatsApp app with a prefilled request. You must tap &quot;Send&quot; inside WhatsApp to dispatch the message.
+      {/* Secondary Section: Matched Candidates Directory */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Heart className="w-4 h-4 text-rose-600" />
+              Regional Candidate Donors Filtered by ABO/Rh & Cooldown ({candidates.length})
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Only donors who have granted notification consent and are outside the 3-month cooldown period are surfaced.
             </p>
           </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500">Radius:</span>
+            <select
+              value={radiusKm}
+              onChange={(e) => {
+                const r = parseInt(e.target.value, 10);
+                setRadiusKm(r);
+                fetchCandidates(r);
+              }}
+              className="px-2 py-1 bg-slate-50 border border-slate-300 rounded font-bold text-rose-600 text-xs"
+            >
+              <option value={15}>15 km</option>
+              <option value={30}>30 km</option>
+              <option value={50}>50 km</option>
+            </select>
+          </div>
         </div>
-      )}
+
+        <div className="space-y-2">
+          {candidates.slice(0, 5).map((cand, idx) => (
+            <div
+              key={cand.donor_id || idx}
+              className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg bg-rose-600 text-white font-bold flex items-center justify-center text-xs">
+                  {cand.blood_group}
+                </span>
+                <div>
+                  <div className="font-bold text-slate-800">{cand.name}</div>
+                  <div className="text-[11px] text-slate-500">{cand.city} • <span className="font-semibold text-rose-600">{cand.distance_band}</span></div>
+                </div>
+              </div>
+
+              <span className="text-[10px] font-semibold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+                Awaiting Broadcast Response
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

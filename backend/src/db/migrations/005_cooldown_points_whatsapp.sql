@@ -22,7 +22,13 @@ CREATE INDEX IF NOT EXISTS idx_donors_email ON donors(email);
 CREATE INDEX IF NOT EXISTS idx_donors_gform_sub ON donors(google_form_submission_id);
 CREATE INDEX IF NOT EXISTS idx_donors_cooldown ON donors(cooldown_until, availability_status, consent_status);
 
--- 2. Extend Blood Requests Status Check to include full lifecycle
+-- 2. Extend Blood Requests Status Check and Add Donor Selection Tracking
+ALTER TABLE blood_requests
+ADD COLUMN IF NOT EXISTS selected_donor_id UUID REFERENCES donors(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS selected_at TIMESTAMP WITH TIME ZONE;
+
+CREATE INDEX IF NOT EXISTS idx_requests_selected_donor ON blood_requests(selected_donor_id);
+
 ALTER TABLE blood_requests 
 DROP CONSTRAINT IF EXISTS blood_requests_status_check;
 
@@ -35,7 +41,9 @@ CHECK (status IN (
     'searching', 
     'notifications_queued', 
     'responses_received', 
+    'donor_selected',
     'coordination_in_progress', 
+    'active',
     'fulfilled', 
     'cancelled', 
     'expired', 

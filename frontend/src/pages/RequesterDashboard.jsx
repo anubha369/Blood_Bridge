@@ -170,13 +170,19 @@ export default function RequesterDashboard() {
 
                     {/* Status Badge */}
                     <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                      r.status === 'active'
-                        ? 'bg-emerald-100 text-emerald-800'
+                      r.status === 'donor_selected'
+                        ? 'bg-emerald-600 text-white font-black animate-pulse'
+                        : r.status === 'responses_received'
+                        ? 'bg-emerald-100 text-emerald-800 font-extrabold'
+                        : r.status === 'notifications_queued'
+                        ? 'bg-blue-100 text-blue-800'
                         : r.status === 'fulfilled'
                         ? 'bg-indigo-100 text-indigo-800'
+                        : r.status === 'cancelled'
+                        ? 'bg-red-100 text-red-800'
                         : 'bg-slate-100 text-slate-700'
                     }`}>
-                      {r.status}
+                      {r.status === 'donor_selected' ? 'Donor Selected' : r.status === 'responses_received' ? 'Donors Responded' : r.status}
                     </span>
                   </div>
 
