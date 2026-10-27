@@ -33,12 +33,12 @@ export default function HowItWorks() {
                 1
               </span>
               <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full">
-                Groq AI Parsing
+                Smart Request Parsing
               </span>
             </div>
             <h3 className="font-bold text-slate-900 text-base">Request Formulation</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Users describe what they need in natural language or a structured form (e.g. <em>"Need 2 units of B+ near Ghaziabad tomorrow"</em>). Groq LLM parses the blood group, units, location, and urgency into structured JSON without hallucinating medical facts.
+              Users describe what they need in natural language or a structured form (e.g. <em>"Need 2 units of B+ near Ghaziabad tomorrow"</em>). Our intelligent parser extracts the blood group, units, location, and urgency into structured fields without hallucinating medical facts.
             </p>
           </div>
 

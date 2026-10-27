@@ -131,7 +131,7 @@ export default function Navbar({ onOpenAI }) {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full hover:bg-rose-100 transition-all shadow-sm"
             >
               <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-              <span>Groq AI Assistant</span>
+              <span>BloodBridge Assistant</span>
             </button>
 
             {isAuthenticated ? (
@@ -171,7 +171,7 @@ export default function Navbar({ onOpenAI }) {
             <button
               onClick={onOpenAI}
               className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg"
-              title="Groq AI Assistant"
+              title="BloodBridge Assistant"
             >
               <Sparkles className="w-5 h-5" />
             </button>

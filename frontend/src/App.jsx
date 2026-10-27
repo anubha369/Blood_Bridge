@@ -14,6 +14,13 @@ import Home from './pages/Home';
 import HowItWorks from './pages/HowItWorks';
 import NearbyDonors from './pages/NearbyDonors';
 import BloodBanks from './pages/BloodBanks';
+import About from './pages/About';
+import BloodDonationInfo from './pages/BloodDonationInfo';
+import Contact from './pages/Contact';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfUse from './pages/TermsOfUse';
+import ForgotPassword from './pages/ForgotPassword';
+import RequestDetails from './pages/RequestDetails';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import RequesterDashboard from './pages/RequesterDashboard';
@@ -43,9 +50,16 @@ export default function App() {
               {/* Public Routes */}
               <Route path="/" element={<Home onOpenAI={() => setAiDrawerOpen(true)} />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/blood-donation-info" element={<BloodDonationInfo />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfUse />} />
               <Route path="/donors/nearby" element={<NearbyDonors />} />
               <Route path="/blood-banks" element={<BloodBanks />} />
+              <Route path="/requests/:id" element={<RequestDetails />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/signup" element={<Signup />} />
 
               {/* Requester Protected Routes */}
@@ -107,7 +121,7 @@ export default function App() {
             </Routes>
           </main>
 
-          {/* Interactive Groq + RAG AI Assistant Drawer */}
+          {/* Interactive BloodBridge Assistant Drawer */}
           <ChatDrawer isOpen={aiDrawerOpen} onClose={() => setAiDrawerOpen(false)} />
 
           {/* Global Footer */}

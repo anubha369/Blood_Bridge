@@ -34,7 +34,9 @@ export const api = {
   auth: {
     signup: (payload) => request('/auth/signup', { method: 'POST', body: JSON.stringify(payload) }),
     login: (payload) => request('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
-    getMe: () => request('/auth/me')
+    getMe: () => request('/auth/me'),
+    forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    resetPassword: (token, new_password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, new_password }) })
   },
 
   // Donors
@@ -43,6 +45,7 @@ export const api = {
       const qs = new URLSearchParams(params).toString();
       return request(`/donors/nearby?${qs}`);
     },
+    getLocations: () => request('/donors/locations'),
     register: (payload) => request('/donors/register', { method: 'POST', body: JSON.stringify(payload) }),
     getProfile: () => request('/donors/profile'),
     updateProfile: (payload) => request('/donors/profile', { method: 'PUT', body: JSON.stringify(payload) }),

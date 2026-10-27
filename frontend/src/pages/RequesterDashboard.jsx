@@ -192,6 +192,13 @@ export default function RequesterDashboard() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  <Link
+                    to={`/requests/${r.id}`}
+                    className="py-2 px-3 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl transition-colors"
+                  >
+                    Track Journey
+                  </Link>
+
                   <button
                     onClick={() => handleViewCandidates(r)}
                     className="py-2 px-3 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors flex items-center gap-1.5"

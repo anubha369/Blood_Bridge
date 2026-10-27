@@ -6,7 +6,7 @@ export default function ChatDrawer({ isOpen, onClose }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: "Hello! I am the BloodBridge Vision-X AI Assistant powered by Groq and our approved medical RAG pipeline. How can I help you today? You can ask about donor eligibility, platform workflows, or how to locate verified blood banks.",
+      content: "Hello! I am the BloodBridge Vision-X Assistant. How can I help you today? You can ask about donor eligibility, platform workflows, or how to locate verified blood banks.",
       sources: []
     }
   ]);
@@ -79,9 +79,9 @@ export default function ChatDrawer({ isOpen, onClose }) {
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                BloodBridge Vision-X AI
+                BloodBridge Assistant
                 <span className="text-[10px] font-semibold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full">
-                  Groq + RAG
+                  Approved Medical Guidance
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500">Grounded in approved NBTC, WHO & DGHS guidance</p>
@@ -118,8 +118,8 @@ export default function ChatDrawer({ isOpen, onClose }) {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3 h-3 text-rose-500" />
-                    <span className="font-medium text-rose-700">Groq Assistant</span>
+                    <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+                    <span className="font-medium text-rose-700">BloodBridge Assistant</span>
                   </>
                 )}
               </div>

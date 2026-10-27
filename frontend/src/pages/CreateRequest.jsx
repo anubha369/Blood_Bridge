@@ -19,11 +19,26 @@ export default function CreateRequest() {
   const [unitsNeeded, setUnitsNeeded] = useState(1);
   const [hospitalName, setHospitalName] = useState('');
   const [hospitalAddress, setHospitalAddress] = useState('');
-  const [city, setCity] = useState('Ghaziabad');
+  const [city, setCity] = useState('Lucknow');
   const [urgency, setUrgency] = useState('urgent');
   const [neededBy, setNeededBy] = useState('');
   const [description, setDescription] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [locations, setLocations] = useState([]);
+
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const res = await api.donors.getLocations();
+        if (res.success && res.locations) {
+          setLocations(res.locations);
+        }
+      } catch (err) {
+        // Fallback silently
+      }
+    }
+    loadLocations();
+  }, []);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -82,7 +97,11 @@ export default function CreateRequest() {
 
       const res = await api.requests.create(payload);
       if (res.success) {
-        navigate('/requester/dashboard');
+        if (res.request && res.request.id) {
+          navigate(`/requests/${res.request.id}`);
+        } else {
+          navigate('/requester/dashboard');
+        }
       }
     } catch (err) {
       setError(err.message || 'Failed to create blood request.');
@@ -115,7 +134,7 @@ export default function CreateRequest() {
           }`}
         >
           <Sparkles className="w-4 h-4 text-rose-500" />
-          Natural-Language Input (Groq AI)
+          Natural-Language Smart Assistant
         </button>
 
         <button
@@ -144,15 +163,15 @@ export default function CreateRequest() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-              Groq LLM Request Understanding
+              Smart Request Understanding
             </span>
             <span className="text-[10px] bg-rose-100 text-rose-800 font-semibold px-2 py-0.5 rounded-full">
-              llama-3.3-70b-versatile
+              Intelligent Parser
             </span>
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed">
-            Type or speak your requirement naturally. Groq AI extracts the clinical fields and maps them directly to your request.
+            Type or speak your requirement naturally. Our smart assistant extracts the clinical fields and maps them directly to your request.
           </p>
 
           <form onSubmit={handleParseWithAI} className="space-y-3">
@@ -169,7 +188,7 @@ export default function CreateRequest() {
               disabled={parsingAI || !aiPrompt.trim()}
               className="py-2.5 px-5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all flex items-center gap-2"
             >
-              {parsingAI ? 'Groq Extracting Fields...' : 'Extract Fields with AI'}
+              {parsingAI ? 'Analyzing Request...' : 'Extract Fields with AI'}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>
@@ -291,12 +310,27 @@ export default function CreateRequest() {
               onChange={(e) => setCity(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
             >
-              <option value="Jaipur">Jaipur (Rajasthan)</option>
-              <option value="Ghaziabad">Ghaziabad (Uttar Pradesh)</option>
-              <option value="Delhi">Delhi (NCR)</option>
-              <option value="Noida">Noida (Uttar Pradesh)</option>
-              <option value="Bengaluru">Bengaluru (Karnataka)</option>
-              <option value="Mumbai">Mumbai (Maharashtra)</option>
+              {locations.length > 0 ? (
+                locations.map((loc) => (
+                  <option key={loc.name} value={loc.name}>
+                    {loc.name} {loc.state ? `(${loc.state})` : ''}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="Lucknow">Lucknow (Uttar Pradesh)</option>
+                  <option value="Kanpur">Kanpur (Uttar Pradesh)</option>
+                  <option value="Varanasi">Varanasi (Uttar Pradesh)</option>
+                  <option value="Prayagraj">Prayagraj (Uttar Pradesh)</option>
+                  <option value="Agra">Agra (Uttar Pradesh)</option>
+                  <option value="Noida">Noida (Uttar Pradesh)</option>
+                  <option value="Ghaziabad">Ghaziabad (Uttar Pradesh)</option>
+                  <option value="Bareilly">Bareilly (Uttar Pradesh)</option>
+                  <option value="Gorakhpur">Gorakhpur (Uttar Pradesh)</option>
+                  <option value="Jaipur">Jaipur (Rajasthan)</option>
+                  <option value="Delhi">Delhi (NCR)</option>
+                </>
+              )}
             </select>
           </div>
 

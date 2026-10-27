@@ -116,3 +116,38 @@ test('API: Create Blood Request & Retrieve Matched Candidates', async () => {
   assert.ok(matchRes.body.candidates[0].match_score > 0);
   assert.ok(matchRes.body.candidates[0].match_reasons.length > 0);
 });
+
+test('API: Password Recovery Flow (Forgot Password & Reset Password)', async () => {
+  const testEmail = 'requester@bloodbridge.org';
+  const newSecret = 'NewSecurePass2026!';
+
+  // 1. Request forgot password token
+  const forgotRes = await testRequest('POST', '/api/auth/forgot-password', { email: testEmail });
+  assert.strictEqual(forgotRes.status, 200);
+  assert.strictEqual(forgotRes.body.success, true);
+  assert.ok(forgotRes.body.reset_token);
+  const resetToken = forgotRes.body.reset_token;
+
+  // 2. Reset password with token
+  const resetRes = await testRequest('POST', '/api/auth/reset-password', {
+    token: resetToken,
+    new_password: newSecret
+  });
+  assert.strictEqual(resetRes.status, 200);
+  assert.strictEqual(resetRes.body.success, true);
+
+  // 3. Login with newly set password
+  const newLogin = await testRequest('POST', '/api/auth/login', {
+    email: testEmail,
+    password: newSecret
+  });
+  assert.strictEqual(newLogin.status, 200);
+  assert.ok(newLogin.body.token);
+
+  // 4. Restore original password so subsequent test runs remain idempotent
+  const restoreRes = await testRequest('POST', '/api/auth/forgot-password', { email: testEmail });
+  await testRequest('POST', '/api/auth/reset-password', {
+    token: restoreRes.body.reset_token,
+    new_password: 'BloodBridge2026!'
+  });
+});

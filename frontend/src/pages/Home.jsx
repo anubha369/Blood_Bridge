@@ -36,7 +36,7 @@ export default function Home({ onOpenAI }) {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
-                BloodBridge Vision-X connects urgent blood requirements with verified donors and licensed blood banks using PostGIS spatial indexing, Groq LLM request extraction, and approved medical RAG guidance.
+                BloodBridge Vision-X connects urgent blood requirements with verified donors and licensed blood banks using PostGIS spatial indexing, smart request extraction, and approved medical RAG guidance.
               </p>
 
               <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -171,7 +171,7 @@ export default function Home({ onOpenAI }) {
           </div>
 
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
-            <div className="text-3xl font-extrabold text-slate-900 mb-1">Groq LLM</div>
+            <div className="text-3xl font-extrabold text-slate-900 mb-1">AI Assistant</div>
             <div className="text-xs font-bold uppercase tracking-wider text-rose-600">Natural Language</div>
             <p className="text-[11px] text-slate-500 mt-1">Parses speech & raw requests</p>
           </div>
@@ -212,7 +212,7 @@ export default function Home({ onOpenAI }) {
             <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
               <Sparkles className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-slate-900 text-base">Groq Natural Language AI</h3>
+            <h3 className="font-bold text-slate-900 text-base">Smart Natural Language AI</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
               Extracts patient blood group, units, hospital, and urgency from freeform emergency text without ever using an LLM to hallucinate medical compatibility.
             </p>

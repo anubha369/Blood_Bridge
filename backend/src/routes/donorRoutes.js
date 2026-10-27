@@ -3,9 +3,20 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { localStore } = require('../db/db');
 const { authenticateUser, optionalAuth, requireRole } = require('../middleware/auth');
-const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatialService');
+const { findNearbyDonors, resolveCityCoordinates, getAllSupportedCities } = require('../services/spatialService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// GET /api/donors/locations
+// Returns all supported cities and districts, with Uttar Pradesh prioritized
+router.get('/locations', (req, res) => {
+  const locations = getAllSupportedCities();
+  return res.json({
+    success: true,
+    count: locations.length,
+    locations
+  });
+});
 
 // GET /api/donors/nearby
 // Spatial search using PostGIS ST_DWithin / ST_Distance logic with privacy protection

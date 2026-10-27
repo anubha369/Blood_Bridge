@@ -132,4 +132,82 @@ router.get('/me', authenticateUser, (req, res) => {
   });
 });
 
+// POST /api/auth/forgot-password
+router.post('/forgot-password', authLimiter, async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email address is required.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = localStore.users.find((u) => u.email === normalizedEmail);
+
+    let resetToken = null;
+    if (user) {
+      resetToken = uuidv4();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      localStore.password_resets = (localStore.password_resets || []).filter((r) => r.email !== normalizedEmail);
+      localStore.password_resets.push({
+        token: resetToken,
+        email: normalizedEmail,
+        user_id: user.id,
+        expires_at: expiresAt.toISOString(),
+        created_at: new Date().toISOString()
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'If an account exists with that email address, password reset instructions and a reset token have been generated.',
+      reset_token: resetToken,
+      info: 'In production, this token is securely transmitted via SMS or email service.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', authLimiter, async (req, res, next) => {
+  try {
+    const { token, new_password } = req.body;
+    if (!token || !new_password) {
+      return res.status(400).json({ success: false, error: 'Reset token and new password are required.' });
+    }
+
+    if (new_password.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters long.' });
+    }
+
+    const resetRecord = (localStore.password_resets || []).find((r) => r.token === token);
+    if (!resetRecord) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired password reset token.' });
+    }
+
+    if (new Date(resetRecord.expires_at) < new Date()) {
+      return res.status(400).json({ success: false, error: 'This password reset token has expired. Please request a new one.' });
+    }
+
+    const user = localStore.users.find((u) => u.id === resetRecord.user_id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Associated user account not found.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password_hash = await bcrypt.hash(new_password, salt);
+    user.updated_at = new Date().toISOString();
+
+    // Consume the token
+    localStore.password_resets = localStore.password_resets.filter((r) => r.token !== token);
+
+    return res.json({
+      success: true,
+      message: 'Password has been successfully updated. You can now log in with your new credentials.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const config = require('./config');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
+const { isPostgresConnected } = require('./db/db');
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
@@ -47,6 +48,12 @@ app.get('/api/health', (req, res) => {
     status: 'healthy',
     service: 'BloodBridge Vision-X API',
     version: '1.0.0',
+    uptime_seconds: Math.floor(process.uptime()),
+    environment: config.nodeEnv,
+    database_engine: isPostgresConnected()
+      ? 'PostgreSQL with PostGIS Spatial Extension'
+      : 'Local In-Memory PostGIS-compatible Geo-Engine',
+    groq_configured: !!config.groqApiKey,
     timestamp: new Date().toISOString(),
     clinical_disclaimer: 'BloodBridge coordinates potential blood availability; clinical cross-matching and transfusion compatibility belong exclusively to authorized medical professionals.'
   });

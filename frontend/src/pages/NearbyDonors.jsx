@@ -6,11 +6,12 @@ import { api } from '../api/client';
 export default function NearbyDonors() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [city, setCity] = useState(searchParams.get('city') || 'Jaipur');
+  const [city, setCity] = useState(searchParams.get('city') || 'Lucknow');
   const [bloodGroup, setBloodGroup] = useState(searchParams.get('blood_group') || '');
   const [radiusKm, setRadiusKm] = useState(parseInt(searchParams.get('radius_km') || '25', 10));
   const [latitude, setLatitude] = useState(searchParams.get('latitude') || '');
   const [longitude, setLongitude] = useState(searchParams.get('longitude') || '');
+  const [locations, setLocations] = useState([]);
 
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +50,17 @@ export default function NearbyDonors() {
   };
 
   useEffect(() => {
+    async function loadLocations() {
+      try {
+        const res = await api.donors.getLocations();
+        if (res.success && res.locations) {
+          setLocations(res.locations);
+        }
+      } catch (err) {
+        // Fallback silently to static list
+      }
+    }
+    loadLocations();
     fetchDonors();
   }, []);
 
@@ -98,14 +110,27 @@ export default function NearbyDonors() {
               }}
               className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
             >
-              <option value="Jaipur">Jaipur (Rajasthan)</option>
-              <option value="Ghaziabad">Ghaziabad (Uttar Pradesh)</option>
-              <option value="Delhi">New Delhi (Delhi)</option>
-              <option value="Noida">Noida (Uttar Pradesh)</option>
-              <option value="Bengaluru">Bengaluru (Karnataka)</option>
-              <option value="Mumbai">Mumbai (Maharashtra)</option>
-              <option value="Pune">Pune (Maharashtra)</option>
-              <option value="Lucknow">Lucknow (Uttar Pradesh)</option>
+              {locations.length > 0 ? (
+                locations.map((loc) => (
+                  <option key={loc.name} value={loc.name}>
+                    {loc.name} {loc.state ? `(${loc.state})` : ''}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="Lucknow">Lucknow (Uttar Pradesh)</option>
+                  <option value="Kanpur">Kanpur (Uttar Pradesh)</option>
+                  <option value="Varanasi">Varanasi (Uttar Pradesh)</option>
+                  <option value="Prayagraj">Prayagraj (Uttar Pradesh)</option>
+                  <option value="Agra">Agra (Uttar Pradesh)</option>
+                  <option value="Noida">Noida (Uttar Pradesh)</option>
+                  <option value="Ghaziabad">Ghaziabad (Uttar Pradesh)</option>
+                  <option value="Bareilly">Bareilly (Uttar Pradesh)</option>
+                  <option value="Gorakhpur">Gorakhpur (Uttar Pradesh)</option>
+                  <option value="Jaipur">Jaipur (Rajasthan)</option>
+                  <option value="Delhi">Delhi (NCR)</option>
+                </>
+              )}
             </select>
           </div>
 
