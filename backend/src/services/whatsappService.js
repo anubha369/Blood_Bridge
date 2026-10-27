@@ -1,27 +1,52 @@
 /**
  * BloodBridge Vision-X: WhatsApp Notification Service
  * 
- * Implements Section 8 of Specification:
- * - Official WhatsApp Cloud API integration structure
- * - Explicit development mock/simulator when credentials are not configured
- * - Manual WhatsApp deep-link fallback generator
- * - Unique secure action tokens for Accept / Decline / Unavailable / Consent Withdrawal
- * - Idempotent delivery tracking and provider response capture
+ * Supports:
+ * 1. Click-to-chat manual fallback URLs (https://wa.me/91XXXXXXXXXX?text=...)
+ *    - Strict E.164 phone normalization without plus (e.g. 919876543210)
+ *    - Safe URL encoding of multi-line emergency messages
+ *    - Clear human-review disclaimer (click-to-chat does NOT auto-send)
+ * 2. Official WhatsApp Business Platform / Cloud API integration
+ *    - Server-side credentials only (WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID)
+ *    - Safe simulation mode when credentials not configured (WHATSAPP_API_ENABLED=false)
+ *    - Tokenized donor response links (accept, decline, unavailable, withdraw consent)
+ *    - Provider message ID and delivery status tracking
  */
 
 const { localStore } = require('../db/db');
 const { isDonorEligibleForNotification, recordCompletedDonation } = require('./cooldownService');
+const config = require('../config');
 const { v4: uuidv4 } = require('uuid');
 
 const WHATSAPP_API_VERSION = 'v19.0';
 
 /**
+ * Normalize phone number specifically for WhatsApp URL / Cloud API (E.164 without plus)
+ * India format: 10-digit mobile (e.g. 9876543210) -> 919876543210
+ */
+function normalizePhoneForWhatsApp(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/[^0-9]/g, '');
+  if (digits.length === 10) {
+    return `91${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return `91${digits.slice(1)}`;
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits;
+  }
+  return digits;
+}
+
+/**
  * Generate a prefilled manual WhatsApp deep-link for patient or requester fallback
+ * Generates: https://wa.me/91XXXXXXXXXX?text=URL_ENCODED_MESSAGE
  */
 function generateManualWhatsAppLink(phone, messageText) {
-  const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
-  const encodedMsg = encodeURIComponent(messageText);
-  if (cleanPhone) {
+  const cleanPhone = normalizePhoneForWhatsApp(phone);
+  const encodedMsg = encodeURIComponent(messageText || '');
+  if (cleanPhone && cleanPhone.length >= 10) {
     return `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
   }
   return `https://wa.me/?text=${encodedMsg}`;
@@ -57,7 +82,7 @@ async function dispatchRequestNotifications({ request, eligibleDonors, maxRecipi
     .filter((d) => isDonorEligibleForNotification(d))
     .slice(0, maxRecipients);
 
-  const hasCloudApi = !!(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+  const hasCloudApi = config.whatsappApiEnabled && !!(config.whatsappToken && config.whatsappPhoneNumberId);
 
   for (const donor of selectedDonors) {
     // Check if notification was already sent to this donor for this request
@@ -72,7 +97,7 @@ async function dispatchRequestNotifications({ request, eligibleDonors, maxRecipi
 
     const actionToken = `bb_${uuidv4().replace(/-/g, '').slice(0, 24)}`;
     const messageBody = formatDonorNotificationMessage(request, donor, actionToken);
-    const recipientPhone = donor.phone || '+919876500000';
+    const recipientPhone = normalizePhoneForWhatsApp(donor.phone || '9876500000');
 
     const job = {
       id: uuidv4(),
@@ -203,23 +228,45 @@ function handleDonorActionToken(token, action) {
  * Real WhatsApp Cloud API dispatcher (invoked when credentials are provided)
  */
 async function sendViaWhatsAppCloudApi({ to, message, template }) {
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const token = config.whatsappToken || process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = config.whatsappPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (!token || !phoneNumberId) {
     throw new Error('WhatsApp Cloud API credentials not configured.');
   }
 
-  const cleanPhone = to.replace(/[^0-9]/g, '');
+  const cleanPhone = normalizePhoneForWhatsApp(to);
   const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
 
-  const payload = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to: cleanPhone,
-    type: 'text',
-    text: { preview_url: true, body: message }
-  };
+  let payload;
+  if (config.whatsappUseTemplate && template) {
+    // Official template message
+    payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: cleanPhone,
+      type: 'template',
+      template: {
+        name: template,
+        language: { code: 'en' },
+        components: [
+          {
+            type: 'body',
+            parameters: [{ type: 'text', text: message }]
+          }
+        ]
+      }
+    };
+  } else {
+    // Standard text message
+    payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: cleanPhone,
+      type: 'text',
+      text: { preview_url: true, body: message }
+    };
+  }
 
   const response = await fetch(url, {
     method: 'POST',
@@ -240,8 +287,10 @@ async function sendViaWhatsAppCloudApi({ to, message, template }) {
 }
 
 module.exports = {
+  normalizePhoneForWhatsApp,
   generateManualWhatsAppLink,
   formatDonorNotificationMessage,
   dispatchRequestNotifications,
-  handleDonorActionToken
+  handleDonorActionToken,
+  sendViaWhatsAppCloudApi
 };

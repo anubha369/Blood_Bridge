@@ -21,6 +21,14 @@ const config = {
   // Google Forms / Apps Script Webhook Secret
   googleFormWebhookSecret: process.env.GOOGLE_FORM_WEBHOOK_SECRET || process.env.GOOGLE_SCRIPT_SECRET || 'bb-vision-x-gform-secret-2026',
 
+  // WhatsApp Cloud API Configuration
+  whatsappApiEnabled: process.env.WHATSAPP_API_ENABLED === 'true',
+  whatsappToken: process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN || '',
+  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+  whatsappBusinessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+  whatsappWebhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
+  whatsappUseTemplate: process.env.WHATSAPP_USE_TEMPLATE === 'true',
+
   // Spatial search defaults
   defaultSearchRadiusKm: 25,
   maxSearchRadiusKm: 150,

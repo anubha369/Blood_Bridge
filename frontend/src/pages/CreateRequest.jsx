@@ -195,6 +195,30 @@ export default function CreateRequest() {
     }
   };
 
+  // Open manual WhatsApp click-to-chat link for donor
+  const handleOpenWhatsAppForDonor = (donor) => {
+    if (!donor || !donor.phone) {
+      alert('Donor contact phone number is missing or protected.');
+      return;
+    }
+    const cleanDigits = String(donor.phone).replace(/[^0-9]/g, '');
+    if (cleanDigits.length < 10) {
+      alert('A valid phone number (minimum 10 digits) is required to open WhatsApp.');
+      return;
+    }
+    const normalizedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const emergencyMsg = 
+      `*BloodBridge Emergency Blood Coordination*\n\n` +
+      `Hello ${donor.name},\n` +
+      `We urgently need ${createdRequest?.units_needed || 1} unit(s) of ${createdRequest?.blood_group || donor.blood_group} blood for patient ${createdRequest?.patient_name || 'an emergency patient'} at ${createdRequest?.hospital_name || 'hospital'}, ${createdRequest?.city || donor.city}.\n\n` +
+      `You are registered as a willing donor in ${donor.city}.\n` +
+      `Please let us know if you are available to donate or call us at: ${contactPhone || '+91 98765 00000'}.\n\n` +
+      `_This coordination request is sent via BloodBridge Vision-X._`;
+
+    const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(emergencyMsg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const stepsList = [
     { num: 1, label: 'Blood Requirement' },
     { num: 2, label: 'Patient Details' },
@@ -733,9 +757,12 @@ export default function CreateRequest() {
                 className="inline-flex items-center gap-2 py-2.5 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Open Prefilled WhatsApp Broadcast</span>
+                <span>Open WhatsApp Broadcast (Click-to-Chat)</span>
               </a>
             </div>
+            <p className="text-[11px] text-slate-500 pt-1 leading-normal">
+              <strong>Notice:</strong> Click-to-chat links prefill the message in your personal WhatsApp app. Due to WhatsApp security policies, you must manually tap the green &quot;Send&quot; arrow in WhatsApp to send the message.
+            </p>
           </div>
 
           <div className="pt-2 flex justify-between">
@@ -795,20 +822,32 @@ export default function CreateRequest() {
               <strong>Coordination etiquette:</strong> Please introduce yourself politely, state patient details and hospital name, and verify the donor's current wellness before scheduling travel.
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenWhatsAppForDonor(selectedDonorForCall)}
+                className="flex-1 py-2.5 px-3 text-xs font-bold text-center text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Open WhatsApp to Send Request</span>
+              </button>
               <a
                 href={`tel:${selectedDonorForCall.phone}`}
-                className="flex-1 py-2.5 text-xs font-bold text-center text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all"
+                className="py-2.5 px-4 text-xs font-bold text-center text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all border border-rose-200"
               >
-                Call Now
+                Call
               </a>
               <button
+                type="button"
                 onClick={() => setSelectedDonorForCall(null)}
-                className="px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
               >
                 Close
               </button>
             </div>
+            <p className="text-[10px] text-slate-400 text-center leading-normal">
+              Notice: Click-to-chat opens your WhatsApp app with a prefilled request. You must tap &quot;Send&quot; inside WhatsApp to dispatch the message.
+            </p>
           </div>
         </div>
       )}

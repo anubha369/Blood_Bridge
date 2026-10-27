@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Activity, MapPin, Heart, Clock, Shield, CheckCircle2, Phone, AlertCircle, Building2, User, ChevronRight } from 'lucide-react';
+import { Activity, MapPin, Heart, Clock, Shield, CheckCircle2, Phone, AlertCircle, Building2, User, ChevronRight, MessageSquare } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -68,6 +68,29 @@ export default function RequestDetails() {
     } finally {
       setStatusUpdating(false);
     }
+  };
+
+  const handleOpenWhatsAppForDonor = (donor) => {
+    if (!donor || !donor.phone) {
+      alert('Donor contact phone number is missing or protected.');
+      return;
+    }
+    const cleanDigits = String(donor.phone).replace(/[^0-9]/g, '');
+    if (cleanDigits.length < 10) {
+      alert('A valid phone number (minimum 10 digits) is required to open WhatsApp.');
+      return;
+    }
+    const normalizedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const emergencyMsg = 
+      `*BloodBridge Emergency Blood Coordination*\n\n` +
+      `Hello ${donor.name},\n` +
+      `We urgently need ${request?.units_needed || 1} unit(s) of ${request?.blood_group || donor.blood_group} blood for patient ${request?.patient_name || 'an emergency patient'} at ${request?.hospital_name || 'hospital'}, ${request?.city || donor.city}.\n\n` +
+      `You are registered as a willing donor in ${donor.city}.\n` +
+      `Please let us know if you are available to donate or call us at: ${request?.contact_phone || '+91 98765 00000'}.\n\n` +
+      `_This coordination request is sent via BloodBridge Vision-X._`;
+
+    const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(emergencyMsg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -437,20 +460,32 @@ export default function RequestDetails() {
               <strong>Coordination etiquette:</strong> Please introduce yourself politely, state patient details and hospital name, and verify the donor's current wellness before scheduling travel.
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenWhatsAppForDonor(selectedDonorForContact)}
+                className="flex-1 py-2.5 px-3 text-xs font-bold text-center text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Open WhatsApp to Send Request</span>
+              </button>
               <a
                 href={`tel:${selectedDonorForContact.phone}`}
-                className="flex-1 py-2.5 text-xs font-bold text-center text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all"
+                className="py-2.5 px-4 text-xs font-bold text-center text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all border border-rose-200"
               >
-                Call Now
+                Call
               </a>
               <button
+                type="button"
                 onClick={() => setSelectedDonorForContact(null)}
-                className="px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
               >
                 Close
               </button>
             </div>
+            <p className="text-[10px] text-slate-400 text-center leading-normal">
+              Notice: Click-to-chat opens your WhatsApp app with a prefilled request. You must tap &quot;Send&quot; inside WhatsApp to dispatch the message.
+            </p>
           </div>
         </div>
       )}

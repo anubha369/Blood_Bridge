@@ -1,16 +1,17 @@
 /**
  * BloodBridge Vision-X: Google Forms & Sheets Webhook Service
  * 
- * Implements Section 10:
+ * Implements:
  * Google Form -> Google Sheets -> Apps Script -> Secure Backend API -> Supabase/Database
  * - Secret signature validation
  * - Strict schema validation
- * - Deduplication by email/phone
+ * - Deduplication by email, phone, or submission_id
  * - Default status: 'pending_verification'
- * - Integration audit logging
+ * - Integration audit logging in both localStore and Supabase/PostgreSQL
+ * - Direct sync to Supabase / PostgreSQL when database is connected
  */
 
-const { localStore } = require('../db/db');
+const { localStore, getPool, isPostgresConnected, getSupabase } = require('../db/db');
 const { resolveCityCoordinates } = require('./spatialService');
 const { calculateCooldownDate } = require('./cooldownService');
 const config = require('../config');
@@ -88,13 +89,178 @@ function validateGoogleFormPayload(payload) {
 }
 
 /**
+ * Safely synchronize donor record to Supabase / PostgreSQL if database connection is active
+ */
+async function syncDonorToDatabase(donorData, isUpdate) {
+  const pool = getPool();
+  const supabase = getSupabase();
+
+  if (pool && isPostgresConnected()) {
+    try {
+      // Check existing row in Supabase PostgreSQL
+      const checkRes = await pool.query(
+        `SELECT id FROM donors 
+         WHERE google_form_submission_id = $1 
+            OR (phone IS NOT NULL AND phone = $2)
+            OR (email IS NOT NULL AND email = $3)
+         LIMIT 1;`,
+        [donorData.google_form_submission_id, donorData.phone || '', donorData.email || '']
+      );
+
+      if (checkRes.rows.length > 0) {
+        const existingId = checkRes.rows[0].id;
+        await pool.query(
+          `UPDATE donors
+           SET name = $1,
+               blood_group = $2,
+               city = $3,
+               area = $4,
+               phone = COALESCE($5, phone),
+               email = COALESCE($6, email),
+               latitude = COALESCE($7, latitude),
+               longitude = COALESCE($8, longitude),
+               consent_to_contact = $9,
+               consent_status = $10,
+               donated_last_3_months = $11,
+               donation_history_status = $12,
+               cooldown_until = $13,
+               availability_status = $14,
+               google_form_submission_id = $15,
+               updated_at = NOW()
+           WHERE id = $16;`,
+          [
+            donorData.name,
+            donorData.blood_group,
+            donorData.city,
+            donorData.area,
+            donorData.phone,
+            donorData.email,
+            donorData.latitude,
+            donorData.longitude,
+            donorData.consent_to_contact,
+            donorData.consent_status,
+            donorData.donated_last_3_months,
+            donorData.donation_history_status,
+            donorData.cooldown_until,
+            donorData.availability_status,
+            donorData.google_form_submission_id,
+            existingId
+          ]
+        );
+
+        await pool.query(
+          `INSERT INTO integration_logs (id, source, event_type, status, payload_summary, created_at)
+           VALUES ($1, 'google_forms', 'donor_updated', 'success', $2, NOW());`,
+          [uuidv4(), JSON.stringify({ donor_id: existingId, blood_group: donorData.blood_group, city: donorData.city })]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO donors (
+             id, name, blood_group, city, area, phone, email,
+             latitude, longitude, availability_status, consent_to_contact,
+             consent_status, donated_last_3_months, donation_history_status,
+             cooldown_until, verification_status, source, google_form_submission_id,
+             created_at, updated_at
+           ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7,
+             $8, $9, $10, $11,
+             $12, $13, $14,
+             $15, 'pending_verification', 'google_forms', $16,
+             NOW(), NOW()
+           );`,
+          [
+            donorData.id,
+            donorData.name,
+            donorData.blood_group,
+            donorData.city,
+            donorData.area,
+            donorData.phone,
+            donorData.email,
+            donorData.latitude,
+            donorData.longitude,
+            donorData.availability_status,
+            donorData.consent_to_contact,
+            donorData.consent_status,
+            donorData.donated_last_3_months,
+            donorData.donation_history_status,
+            donorData.cooldown_until,
+            donorData.google_form_submission_id
+          ]
+        );
+
+        await pool.query(
+          `INSERT INTO integration_logs (id, source, event_type, status, payload_summary, created_at)
+           VALUES ($1, 'google_forms', 'donor_registered', 'success', $2, NOW());`,
+          [uuidv4(), JSON.stringify({ donor_id: donorData.id, blood_group: donorData.blood_group, city: donorData.city })]
+        );
+      }
+    } catch (pgErr) {
+      console.warn('PostgreSQL / Supabase sync notice:', pgErr.message);
+    }
+  } else if (supabase) {
+    try {
+      const { data: existingRows } = await supabase
+        .from('donors')
+        .select('id')
+        .or(`google_form_submission_id.eq.${donorData.google_form_submission_id},phone.eq.${donorData.phone || 'none'},email.eq.${donorData.email || 'none'}`)
+        .limit(1);
+
+      if (existingRows && existingRows.length > 0) {
+        await supabase
+          .from('donors')
+          .update({
+            name: donorData.name,
+            blood_group: donorData.blood_group,
+            city: donorData.city,
+            area: donorData.area,
+            consent_to_contact: donorData.consent_to_contact,
+            consent_status: donorData.consent_status,
+            donated_last_3_months: donorData.donated_last_3_months,
+            donation_history_status: donorData.donation_history_status,
+            cooldown_until: donorData.cooldown_until,
+            availability_status: donorData.availability_status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRows[0].id);
+      } else {
+        await supabase
+          .from('donors')
+          .insert({
+            id: donorData.id,
+            name: donorData.name,
+            blood_group: donorData.blood_group,
+            city: donorData.city,
+            area: donorData.area,
+            phone: donorData.phone,
+            email: donorData.email,
+            latitude: donorData.latitude,
+            longitude: donorData.longitude,
+            availability_status: donorData.availability_status,
+            consent_to_contact: donorData.consent_to_contact,
+            consent_status: donorData.consent_status,
+            donated_last_3_months: donorData.donated_last_3_months,
+            donation_history_status: donorData.donation_history_status,
+            cooldown_until: donorData.cooldown_until,
+            verification_status: 'pending_verification',
+            source: 'google_forms',
+            google_form_submission_id: donorData.google_form_submission_id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+      }
+    } catch (sbErr) {
+      console.warn('Supabase client sync notice:', sbErr.message);
+    }
+  }
+}
+
+/**
  * Process verified incoming submission from Google Apps Script
  */
 async function processGoogleFormSubmission(payload, secretHeader) {
   // 1. Verify Secret Header
   const expectedSecret = config.googleFormWebhookSecret;
   if (!secretHeader || secretHeader !== expectedSecret) {
-    // Log unauthorized attempt
     localStore.integration_logs.push({
       id: uuidv4(),
       source: 'google_forms',
@@ -140,14 +306,12 @@ async function processGoogleFormSubmission(payload, secretHeader) {
       lat = coords.lat;
       lon = coords.lon;
     } else {
-      // Default fallback coordinates (Jaipur reference center)
-      lat = 26.9124;
-      lon = 75.7873;
+      lat = 26.8467;
+      lon = 80.9462;
     }
   }
 
   // 4. Deduplication & Idempotent Upsert
-  // Check by submission ID, or existing donor by phone or email
   const existingBySubId = localStore.donors.find((d) => d.google_form_submission_id === data.submission_id);
   if (existingBySubId) {
     return {
@@ -185,7 +349,6 @@ async function processGoogleFormSubmission(payload, secretHeader) {
   });
 
   if (existingDonor) {
-    // Update existing donor without overwriting verified donation history
     existingDonor.blood_group = data.blood_group;
     if (data.city) existingDonor.city = data.city;
     if (data.area) existingDonor.area = data.area;
@@ -194,7 +357,6 @@ async function processGoogleFormSubmission(payload, secretHeader) {
     existingDonor.consent_updated_at = new Date().toISOString();
     existingDonor.donated_last_3_months = data.donated_last_3_months;
 
-    // Only update cooldown if fresh submission reports recent donation
     if (data.donated_last_3_months) {
       existingDonor.availability_status = availabilityStatus;
       existingDonor.donation_history_status = donationHistoryStatus;
@@ -205,6 +367,9 @@ async function processGoogleFormSubmission(payload, secretHeader) {
 
     existingDonor.google_form_submission_id = data.submission_id;
     existingDonor.updated_at = new Date().toISOString();
+
+    // Sync to Supabase/Postgres asynchronously
+    await syncDonorToDatabase({ ...existingDonor, latitude: lat, longitude: lon }, true);
 
     return {
       success: true,
@@ -247,6 +412,9 @@ async function processGoogleFormSubmission(payload, secretHeader) {
 
   localStore.donors.push(newDonor);
 
+  // Sync to Supabase/Postgres asynchronously
+  await syncDonorToDatabase(newDonor, false);
+
   // 6. Log successful integration
   localStore.integration_logs.push({
     id: uuidv4(),
@@ -280,5 +448,6 @@ async function processGoogleFormSubmission(payload, secretHeader) {
 
 module.exports = {
   validateGoogleFormPayload,
-  processGoogleFormSubmission
+  processGoogleFormSubmission,
+  syncDonorToDatabase
 };

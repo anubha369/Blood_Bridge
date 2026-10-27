@@ -4,8 +4,10 @@
 -- Description: Adds 3-month cooldown rules, credit ledger, and WhatsApp notifications
 -- ============================================================================
 
--- 1. Extend Donors Table with Cooldown and Consent Tracking
+-- 1. Extend Donors Table with Contact, Cooldown and Consent Tracking
 ALTER TABLE donors
+ADD COLUMN IF NOT EXISTS phone VARCHAR(30),
+ADD COLUMN IF NOT EXISTS email VARCHAR(255),
 ADD COLUMN IF NOT EXISTS donated_last_3_months BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMP WITH TIME ZONE,
 ADD COLUMN IF NOT EXISTS last_availability_confirmed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -14,7 +16,10 @@ ADD COLUMN IF NOT EXISTS consent_updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW
 ADD COLUMN IF NOT EXISTS donation_history_status VARCHAR(30) DEFAULT 'unconfirmed' CHECK (donation_history_status IN ('unconfirmed', 'reported_recent', 'verified_recent', 'eligible')),
 ADD COLUMN IF NOT EXISTS cooldown_policy_months INTEGER DEFAULT 3;
 
--- Index for cooldown queries
+-- Indexes for fast donor deduplication, lookup and cooldown queries
+CREATE INDEX IF NOT EXISTS idx_donors_phone ON donors(phone);
+CREATE INDEX IF NOT EXISTS idx_donors_email ON donors(email);
+CREATE INDEX IF NOT EXISTS idx_donors_gform_sub ON donors(google_form_submission_id);
 CREATE INDEX IF NOT EXISTS idx_donors_cooldown ON donors(cooldown_until, availability_status, consent_status);
 
 -- 2. Extend Blood Requests Status Check to include full lifecycle

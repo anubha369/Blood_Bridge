@@ -118,6 +118,9 @@ router.post('/action/:token', (req, res) => {
 // Generate a prefilled manual WhatsApp link for requesters
 router.post('/manual-link', (req, res) => {
   const { phone, message } = req.body;
+  if (!message || typeof message !== 'string' || message.trim().length === 0) {
+    return res.status(400).json({ success: false, error: 'Message text is required for manual WhatsApp link.' });
+  }
   const link = generateManualWhatsAppLink(phone, message);
   return res.json({ success: true, url: link });
 });
