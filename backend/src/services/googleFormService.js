@@ -12,6 +12,7 @@
 
 const { localStore } = require('../db/db');
 const { resolveCityCoordinates } = require('./spatialService');
+const { calculateCooldownDate } = require('./cooldownService');
 const config = require('../config');
 const { v4: uuidv4 } = require('uuid');
 
@@ -33,6 +34,7 @@ function validateGoogleFormPayload(payload) {
     phone,
     email,
     consent_to_contact,
+    donated_last_3_months,
     last_donation_date,
     submission_id
   } = payload;
@@ -50,23 +52,35 @@ function validateGoogleFormPayload(payload) {
     return { valid: false, error: `Invalid blood group "${blood_group}". Must be one of: ${VALID_BLOOD_GROUPS.join(', ')}` };
   }
 
-  if (!city || typeof city !== 'string' || city.trim().length < 2) {
+  if (city !== undefined && (typeof city !== 'string' || city.trim().length < 2)) {
     return { valid: false, error: 'City is required for approximate donor location.' };
   }
 
+  // If city is omitted in 4-field initial form, default to state capital pending profile completion
+  const normalizedCity = (city && typeof city === 'string' && city.trim().length >= 2)
+    ? city.trim()
+    : 'Lucknow';
+
   // Contact consent check
   const consentBool = consent_to_contact === true || consent_to_contact === 'true' || consent_to_contact === 'Yes';
+
+  // 3-month cooldown flag check
+  const donatedRecentBool = donated_last_3_months === true ||
+    donated_last_3_months === 'true' ||
+    donated_last_3_months === 'Yes' ||
+    donated_last_3_months === 'yes';
 
   return {
     valid: true,
     data: {
       name: name.trim(),
       blood_group: normalizedGroup,
-      city: city.trim(),
+      city: normalizedCity,
       area: area ? area.trim() : null,
       phone: phone ? phone.trim() : null,
       email: email ? email.trim().toLowerCase() : null,
       consent_to_contact: consentBool,
+      donated_last_3_months: donatedRecentBool,
       last_donation_date: last_donation_date || null,
       submission_id: submission_id || `gform_${Date.now()}`
     }
@@ -132,7 +146,8 @@ async function processGoogleFormSubmission(payload, secretHeader) {
     }
   }
 
-  // 4. Deduplication: Check if donor with same submission_id or email already exists
+  // 4. Deduplication & Idempotent Upsert
+  // Check by submission ID, or existing donor by phone or email
   const existingBySubId = localStore.donors.find((d) => d.google_form_submission_id === data.submission_id);
   if (existingBySubId) {
     return {
@@ -143,7 +158,65 @@ async function processGoogleFormSubmission(payload, secretHeader) {
     };
   }
 
-  // 5. Create new donor with pending_verification status (never pre-verified)
+  // Calculate 3-month cooldown if donor reported donating recently
+  let cooldownUntil = null;
+  let availabilityStatus = 'available';
+  let donationHistoryStatus = 'unconfirmed';
+
+  if (data.donated_last_3_months) {
+    if (data.last_donation_date) {
+      const cooldownDate = calculateCooldownDate(data.last_donation_date, 3);
+      cooldownUntil = cooldownDate ? cooldownDate.toISOString() : null;
+      donationHistoryStatus = 'reported_recent';
+      availabilityStatus = 'recently_donated';
+    } else {
+      // Missing donation date: do not invent a date; flag for review and suppress from notifications
+      cooldownUntil = null;
+      donationHistoryStatus = 'reported_recent';
+      availabilityStatus = 'unavailable';
+    }
+  }
+
+  // Check if donor already exists by phone or email
+  const existingDonor = localStore.donors.find((d) => {
+    if (data.phone && d.phone && d.phone === data.phone) return true;
+    if (data.email && d.email && d.email === data.email) return true;
+    return false;
+  });
+
+  if (existingDonor) {
+    // Update existing donor without overwriting verified donation history
+    existingDonor.blood_group = data.blood_group;
+    if (data.city) existingDonor.city = data.city;
+    if (data.area) existingDonor.area = data.area;
+    existingDonor.consent_to_contact = data.consent_to_contact;
+    existingDonor.consent_status = data.consent_to_contact ? 'consented' : 'withdrawn';
+    existingDonor.consent_updated_at = new Date().toISOString();
+    existingDonor.donated_last_3_months = data.donated_last_3_months;
+
+    // Only update cooldown if fresh submission reports recent donation
+    if (data.donated_last_3_months) {
+      existingDonor.availability_status = availabilityStatus;
+      existingDonor.donation_history_status = donationHistoryStatus;
+      if (cooldownUntil) {
+        existingDonor.cooldown_until = cooldownUntil;
+      }
+    }
+
+    existingDonor.google_form_submission_id = data.submission_id;
+    existingDonor.updated_at = new Date().toISOString();
+
+    return {
+      success: true,
+      action: 'updated',
+      message: 'Existing donor record safely updated with new Google Form submission.',
+      donor_id: existingDonor.id,
+      availability_status: existingDonor.availability_status,
+      cooldown_until: existingDonor.cooldown_until
+    };
+  }
+
+  // 5. Create new donor with pending_verification status
   const newDonor = {
     id: uuidv4(),
     user_id: null,
@@ -151,16 +224,25 @@ async function processGoogleFormSubmission(payload, secretHeader) {
     blood_group: data.blood_group,
     city: data.city,
     area: data.area,
+    phone: data.phone,
+    email: data.email,
     postal_code: payload.postal_code || null,
     latitude: lat,
     longitude: lon,
-    availability_status: 'available',
+    availability_status: availabilityStatus,
     consent_to_contact: data.consent_to_contact,
+    consent_status: data.consent_to_contact ? 'consented' : 'withdrawn',
+    consent_updated_at: new Date().toISOString(),
+    donated_last_3_months: data.donated_last_3_months,
+    donation_history_status: donationHistoryStatus,
+    cooldown_until: cooldownUntil,
+    last_availability_confirmed_at: new Date().toISOString(),
     verification_status: 'pending_verification',
     last_donation_date: data.last_donation_date,
     source: 'google_forms',
     google_form_submission_id: data.submission_id,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   localStore.donors.push(newDonor);
@@ -176,6 +258,9 @@ async function processGoogleFormSubmission(payload, secretHeader) {
       blood_group: newDonor.blood_group,
       city: newDonor.city,
       consent: newDonor.consent_to_contact,
+      donated_last_3_months: newDonor.donated_last_3_months,
+      availability: newDonor.availability_status,
+      cooldown_until: newDonor.cooldown_until,
       verification_status: newDonor.verification_status
     },
     error_message: null,
@@ -187,6 +272,8 @@ async function processGoogleFormSubmission(payload, secretHeader) {
     action: 'created',
     message: 'Donor successfully registered from Google Form with pending verification status.',
     donor_id: newDonor.id,
+    availability_status: newDonor.availability_status,
+    cooldown_until: newDonor.cooldown_until,
     verification_status: newDonor.verification_status
   };
 }

@@ -4,6 +4,8 @@ const { v4: uuidv4 } = require('uuid');
 const { localStore } = require('../db/db');
 const { authenticateUser, optionalAuth, requireRole } = require('../middleware/auth');
 const { findNearbyDonors, resolveCityCoordinates, getAllSupportedCities } = require('../services/spatialService');
+const { calculateCooldownDate, recordCompletedDonation, isDonorEligibleForNotification, checkAndUpdateCooldownExpiry } = require('../services/cooldownService');
+const { awardCreditPoints } = require('../services/creditService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -127,14 +129,33 @@ router.post('/register', authenticateUser, async (req, res, next) => {
       longitude: lon,
       availability_status: 'available',
       consent_to_contact: Boolean(consent_to_contact),
+      consent_status: Boolean(consent_to_contact) ? 'consented' : 'withdrawn',
+      consent_updated_at: new Date().toISOString(),
+      donated_last_3_months: false,
+      cooldown_until: null,
+      last_availability_confirmed_at: new Date().toISOString(),
+      donation_history_status: last_donation_date ? 'reported_recent' : 'unconfirmed',
       verification_status: 'verified', // Platform registered donors verified via verified account
       last_donation_date: last_donation_date || null,
       source: 'platform',
       notification_preferences: notification_preferences || { email: true, in_app: true },
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     localStore.donors.push(newDonor);
+
+    // Award initial profile completion points (50 points)
+    try {
+      awardCreditPoints({
+        userId: req.user.id,
+        donorId: newDonor.id,
+        eventType: 'profile_completion',
+        idempotencyKey: `init_reg_${newDonor.id}`
+      });
+    } catch (e) {
+      // Non-blocking for registration
+    }
 
     // Update user role to donor if not admin
     const userRecord = localStore.users.find((u) => u.id === req.user.id);
@@ -196,6 +217,101 @@ router.put('/profile', authenticateUser, (req, res, next) => {
   }
 });
 
+// POST /api/donors/availability
+// Toggle current availability
+router.post('/availability', authenticateUser, (req, res) => {
+  const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+  if (!donor) {
+    return res.status(404).json({ success: false, error: 'Donor profile not found.' });
+  }
+
+  const { status } = req.body;
+  if (!['available', 'unavailable'].includes(status)) {
+    return res.status(400).json({ success: false, error: 'Status must be "available" or "unavailable".' });
+  }
+
+  donor.availability_status = status;
+  donor.last_availability_confirmed_at = new Date().toISOString();
+  donor.updated_at = new Date().toISOString();
+
+  // Award monthly availability confirmation points (10 pts) idempotently
+  const currentMonthKey = new Date().toISOString().slice(0, 7); // e.g. "2026-10"
+  try {
+    awardCreditPoints({
+      userId: req.user.id,
+      donorId: donor.id,
+      eventType: 'availability_update',
+      idempotencyKey: `avail_${donor.id}_${currentMonthKey}`
+    });
+  } catch (e) {
+    // Ignore duplicate
+  }
+
+  return res.json({
+    success: true,
+    message: `Availability updated to ${status}.`,
+    availability_status: donor.availability_status,
+    last_availability_confirmed_at: donor.last_availability_confirmed_at
+  });
+});
+
+// POST /api/donors/confirm-donation
+// Record a completed donation and activate the 3-month cooldown
+router.post('/confirm-donation', authenticateUser, (req, res) => {
+  const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+  if (!donor) {
+    return res.status(404).json({ success: false, error: 'Donor profile not found.' });
+  }
+
+  const { donation_date = new Date().toISOString().split('T')[0] } = req.body;
+
+  try {
+    const updated = recordCompletedDonation(donor.id, donation_date, 'donor');
+    return res.json({
+      success: true,
+      message: 'Donation confirmed. 3-month cooldown is now active. Emergency request notifications are temporarily paused for your recovery.',
+      donor: updated
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/donors/cooldown-status
+router.get('/cooldown-status', authenticateUser, (req, res) => {
+  const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+  if (!donor) {
+    return res.status(404).json({ success: false, error: 'Donor profile not found.' });
+  }
+
+  // Check if cooldown has elapsed
+  checkAndUpdateCooldownExpiry(donor);
+
+  const now = Date.now();
+  let inCooldown = false;
+  let daysRemaining = 0;
+
+  if (donor.cooldown_until) {
+    const cooldownTime = new Date(donor.cooldown_until).getTime();
+    if (cooldownTime > now) {
+      inCooldown = true;
+      daysRemaining = Math.ceil((cooldownTime - now) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  return res.json({
+    success: true,
+    donor_id: donor.id,
+    in_cooldown: inCooldown,
+    cooldown_until: donor.cooldown_until,
+    days_remaining: daysRemaining,
+    availability_status: donor.availability_status,
+    consent_status: donor.consent_status || 'consented',
+    last_donation_date: donor.last_donation_date,
+    eligible_for_notification: isDonorEligibleForNotification(donor)
+  });
+});
+
 // POST /api/donors/consent/withdraw
 // Quickly withdraw contact consent
 router.post('/consent/withdraw', authenticateUser, (req, res) => {
@@ -205,12 +321,36 @@ router.post('/consent/withdraw', authenticateUser, (req, res) => {
   }
 
   donor.consent_to_contact = false;
+  donor.consent_status = 'withdrawn';
+  donor.consent_updated_at = new Date().toISOString();
   donor.updated_at = new Date().toISOString();
 
   return res.json({
     success: true,
     message: 'Consent to be contacted has been withdrawn. You will no longer appear in public donor coordination searches.',
-    consent_to_contact: false
+    consent_to_contact: false,
+    consent_status: 'withdrawn'
+  });
+});
+
+// POST /api/donors/consent/grant
+// Re-grant contact consent
+router.post('/consent/grant', authenticateUser, (req, res) => {
+  const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+  if (!donor) {
+    return res.status(404).json({ success: false, error: 'Donor profile not found.' });
+  }
+
+  donor.consent_to_contact = true;
+  donor.consent_status = 'consented';
+  donor.consent_updated_at = new Date().toISOString();
+  donor.updated_at = new Date().toISOString();
+
+  return res.json({
+    success: true,
+    message: 'Consent granted. You are now eligible to appear in emergency coordination searches when available.',
+    consent_to_contact: true,
+    consent_status: 'consented'
   });
 });
 

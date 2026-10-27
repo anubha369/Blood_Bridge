@@ -49,17 +49,24 @@ function onFormSubmit(e) {
   var phone = formObject['phone number'] || formObject['phone'] || formObject['contact number'] || '';
   var email = formObject['email address'] || formObject['email'] || '';
   var consent = formObject['consent to be contacted'] || formObject['consent'] || 'Yes';
+  var donatedRecent = formObject['have you donated blood during the previous three months?'] || 
+                      formObject['have you donated blood in the last 3 months?'] ||
+                      formObject['donated in last 3 months'] || 
+                      formObject['donated in previous 3 months'] || 
+                      formObject['donated last 3 months'] || 
+                      '';
   var lastDonation = formObject['last donation date'] || '';
   var timestamp = rowData[0] || new Date().toISOString();
   
   var payload = {
     name: name.toString(),
     blood_group: bloodGroup.toString(),
-    city: city.toString(),
-    area: area.toString(),
-    phone: phone.toString(),
-    email: email.toString(),
+    city: city ? city.toString() : 'Lucknow',
+    area: area ? area.toString() : '',
+    phone: phone ? phone.toString() : '',
+    email: email ? email.toString() : '',
     consent_to_contact: consent.toString().toLowerCase().indexOf('yes') !== -1 || consent === true,
+    donated_last_3_months: donatedRecent.toString().toLowerCase().indexOf('yes') !== -1 || donatedRecent === true,
     last_donation_date: lastDonation ? new Date(lastDonation).toISOString().split('T')[0] : null,
     submission_id: 'gform_' + row + '_' + new Date(timestamp).getTime()
   };

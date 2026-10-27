@@ -26,7 +26,17 @@ This document outlines the setup required to automatically stream donor drive re
 ## Setup Instructions
 
 1. **Create Google Form**:
-   - Add fields: Full Name, Blood Group, City, Area / Locality, Phone Number, Consent to be Contacted (Yes/No), Last Donation Date.
+   - **Initial 4 Required Fields:**
+     - Full Name
+     - Explicit Consent to be Contacted (Yes/No)
+     - Blood Group (A+, A-, B+, B-, AB+, AB-, O+, O-)
+     - Have you donated blood during the previous three months? (Yes/No)
+   - **Optional Coordination Fields (Collected with explicit consent):**
+     - City / District
+     - Area / Locality
+     - Phone Number
+     - Exact Last Donation Date (if known)
+   - *Note:* If a donor answers "Yes" to donating in the past 3 months, BloodBridge automatically suppresses the donor from emergency alerts and activates a 3-month cooldown until eligibility is re-confirmed. Missing dates are flagged for review rather than guessing an expiration date.
 2. **Open Connected Sheet**:
    - In Google Forms, click **Responses** -> **Link to Sheets**.
 3. **Add Google Apps Script**:

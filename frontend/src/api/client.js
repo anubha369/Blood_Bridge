@@ -49,7 +49,27 @@ export const api = {
     register: (payload) => request('/donors/register', { method: 'POST', body: JSON.stringify(payload) }),
     getProfile: () => request('/donors/profile'),
     updateProfile: (payload) => request('/donors/profile', { method: 'PUT', body: JSON.stringify(payload) }),
-    withdrawConsent: () => request('/donors/consent/withdraw', { method: 'POST' })
+    toggleAvailability: (status) => request('/donors/availability', { method: 'POST', body: JSON.stringify({ status }) }),
+    confirmDonation: (payload) => request('/donors/confirm-donation', { method: 'POST', body: JSON.stringify(payload) }),
+    getCooldownStatus: () => request('/donors/cooldown-status'),
+    withdrawConsent: () => request('/donors/consent/withdraw', { method: 'POST' }),
+    grantConsent: () => request('/donors/consent/grant', { method: 'POST' })
+  },
+
+  // Credits & Recognition
+  credits: {
+    getBalance: () => request('/credits/balance'),
+    getHistory: () => request('/credits/history'),
+    earn: (payload) => request('/credits/earn', { method: 'POST', body: JSON.stringify(payload) })
+  },
+
+  // WhatsApp Notifications
+  whatsapp: {
+    sendRequestNotifications: (payload) => request('/whatsapp/send-request-notifications', { method: 'POST', body: JSON.stringify(payload) }),
+    getJobs: (requestId) => request(`/whatsapp/jobs/${requestId}`),
+    getAction: (token) => request(`/whatsapp/action/${token}`),
+    submitAction: (token, action) => request(`/whatsapp/action/${token}`, { method: 'POST', body: JSON.stringify({ action }) }),
+    getManualLink: (payload) => request('/whatsapp/manual-link', { method: 'POST', body: JSON.stringify(payload) })
   },
 
   // Requests
@@ -99,6 +119,9 @@ export const api = {
       return request(`/admin/donors?${qs}`);
     },
     verifyDonor: (id, verification_status) => request(`/admin/donors/${id}/verify`, { method: 'PATCH', body: JSON.stringify({ verification_status }) }),
+    overrideCooldown: (id, payload) => request(`/admin/donors/${id}/cooldown`, { method: 'PATCH', body: JSON.stringify(payload) }),
+    getWhatsappJobs: () => request('/admin/whatsapp-jobs'),
+    getCreditLedger: () => request('/admin/credit-ledger'),
     getAuditLogs: () => request('/admin/audit-logs'),
     getIntegrationLogs: (params = {}) => {
       const qs = new URLSearchParams(params).toString();

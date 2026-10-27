@@ -97,6 +97,10 @@ router.get('/donors', (req, res) => {
       consent_to_contact: d.consent_to_contact,
       verification_status: d.verification_status,
       last_donation_date: d.last_donation_date,
+      cooldown_until: d.cooldown_until,
+      donated_last_3_months: d.donated_last_3_months,
+      donation_history_status: d.donation_history_status,
+      consent_status: d.consent_status || (d.consent_to_contact ? 'consented' : 'withdrawn'),
       source: d.source,
       created_at: d.created_at
     }))
@@ -143,6 +147,62 @@ router.patch('/donors/:id/verify', (req, res) => {
       name: donor.name,
       verification_status: donor.verification_status
     }
+  });
+});
+
+// PATCH /api/admin/donors/:id/cooldown
+// Admin override or reset of cooldown
+router.patch('/donors/:id/cooldown', (req, res) => {
+  const donor = localStore.donors.find((d) => d.id === req.params.id);
+  if (!donor) {
+    return res.status(404).json({ success: false, error: 'Donor record not found.' });
+  }
+
+  const { cooldown_until, availability_status } = req.body;
+
+  donor.cooldown_until = cooldown_until || null;
+  if (availability_status) {
+    donor.availability_status = availability_status;
+  }
+  if (!cooldown_until) {
+    donor.donated_last_3_months = false;
+  }
+  donor.updated_at = new Date().toISOString();
+
+  // Audit event
+  localStore.audit_events.push({
+    id: String(Date.now()),
+    actor_id: req.user.id,
+    actor_role: req.user.role,
+    action: 'admin_cooldown_override',
+    entity_type: 'donor',
+    entity_id: donor.id,
+    metadata: { cooldown_until: donor.cooldown_until, availability_status: donor.availability_status },
+    timestamp: new Date().toISOString()
+  });
+
+  return res.json({
+    success: true,
+    message: 'Donor cooldown updated by administrator.',
+    donor
+  });
+});
+
+// GET /api/admin/whatsapp-jobs
+router.get('/whatsapp-jobs', (req, res) => {
+  return res.json({
+    success: true,
+    count: (localStore.whatsapp_notifications || []).length,
+    jobs: [...(localStore.whatsapp_notifications || [])].reverse().slice(0, 50)
+  });
+});
+
+// GET /api/admin/credit-ledger
+router.get('/credit-ledger', (req, res) => {
+  return res.json({
+    success: true,
+    count: (localStore.credit_ledger || []).length,
+    entries: [...(localStore.credit_ledger || [])].reverse().slice(0, 50)
   });
 });
 

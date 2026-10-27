@@ -66,6 +66,13 @@ function parseRequestDeterministically(text) {
 
   const coords = detectedCity ? resolveCityCoordinates(detectedCity) : null;
 
+  // Extract Hospital Name if mentioned (e.g., "at S.N. Medical College", "at Fortis Hospital")
+  let hospital_name = 'City Emergency Hospital';
+  const hospitalMatch = text.match(/(?:at|in|near)\s+([A-Za-z0-9\.\s]+?(?:Hospital|Medical College|Clinic|Blood Centre|Blood Bank|Ward|Care|Centre|Center|Institute))/i);
+  if (hospitalMatch) {
+    hospital_name = hospitalMatch[1].trim();
+  }
+
   const missing_fields = [];
   if (!blood_group) missing_fields.push('blood_group');
   if (!detectedCity) missing_fields.push('location');
@@ -75,7 +82,7 @@ function parseRequestDeterministically(text) {
     units_needed,
     urgency,
     location: detectedCity ? { city: detectedCity, latitude: coords ? coords.lat : null, longitude: coords ? coords.lon : null } : null,
-    hospital_name: 'City Emergency Hospital',
+    hospital_name,
     needed_by: /tomorrow/i.test(normalized) ? new Date(Date.now() + 86400000).toISOString() : new Date(Date.now() + 14400000).toISOString(),
     confidence: blood_group && detectedCity ? 0.85 : 0.45,
     missing_fields,

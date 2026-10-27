@@ -7,7 +7,22 @@ const { rankCandidateDonors } = require('../services/matchingService');
 const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatialService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const VALID_STATUSES = ['pending', 'active', 'partially_fulfilled', 'fulfilled', 'cancelled', 'expired'];
+const VALID_STATUSES = [
+  'draft',
+  'submitted',
+  'validating',
+  'searching',
+  'notifications_queued',
+  'responses_received',
+  'coordination_in_progress',
+  'active',
+  'pending',
+  'partially_fulfilled',
+  'fulfilled',
+  'cancelled',
+  'expired',
+  'closed'
+];
 
 // POST /api/requests
 // Create a blood request

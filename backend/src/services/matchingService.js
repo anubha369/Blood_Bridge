@@ -8,6 +8,8 @@
  * authorized blood bank pathologists and attending clinicians.
  */
 
+const { isDonorEligibleForNotification } = require('./cooldownService');
+
 // Medically grounded ABO/Rh compatibility rules for whole blood / red blood cells
 const RBC_COMPATIBILITY_MATRIX = {
   'O-': ['O-'],
@@ -122,10 +124,8 @@ function rankCandidateDonors(donorsList, request, maxRadiusKm = 50) {
   const ranked = [];
 
   for (const donor of donorsList) {
-    // Hard consent and availability checks
-    if (!donor.consent_to_contact) continue;
-    if (donor.availability_status !== 'available') continue;
-    if (donor.verification_status === 'rejected' || donor.verification_status === 'inactive') continue;
+    // Hard consent, availability, and 3-month cooldown checks
+    if (!isDonorEligibleForNotification(donor)) continue;
 
     // Check ABO compatibility
     if (!isGroupCompatible(request.blood_group, donor.blood_group)) continue;

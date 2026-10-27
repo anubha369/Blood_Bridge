@@ -568,7 +568,34 @@ const localStore = {
   rag_chunks: [],
   integration_logs: [],
   audit_events: [],
-  password_resets: []
+  password_resets: [],
+  credit_ledger: [
+    {
+      id: 'cl-00000000-0000-0000-0000-000000000001',
+      user_id: 'c0000000-0000-0000-0000-000000000003',
+      donor_id: 'd0000000-0000-0000-0000-000000000001',
+      event_type: 'profile_completion',
+      points: 50,
+      timestamp: new Date('2026-01-02').toISOString(),
+      idempotency_key: 'seed_profile_c00000000003',
+      verification_status: 'verified',
+      reason: 'Profile Completion & Voluntary Consent',
+      metadata: {}
+    },
+    {
+      id: 'cl-00000000-0000-0000-0000-000000000002',
+      user_id: 'c0000000-0000-0000-0000-000000000003',
+      donor_id: 'd0000000-0000-0000-0000-000000000001',
+      event_type: 'availability_update',
+      points: 10,
+      timestamp: new Date('2026-02-01').toISOString(),
+      idempotency_key: 'seed_avail_c00000000003',
+      verification_status: 'verified',
+      reason: 'Monthly Availability Confirmation',
+      metadata: {}
+    }
+  ],
+  whatsapp_notifications: []
 };
 
 // Precise Haversine distance in kilometers (exact spherical match to PostGIS ST_Distance)
