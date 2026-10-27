@@ -160,12 +160,12 @@ BEGIN
         d.availability_status,
         d.verification_status,
         ROUND((ST_Distance(d.location, center_point) / 1000.0)::numeric, 1)::double precision AS distance_km,
-        CASE 
+        (CASE 
             WHEN ST_Distance(d.location, center_point) <= 2000 THEN 'Within 2 km'
             WHEN ST_Distance(d.location, center_point) <= 5000 THEN 'Within 5 km'
             WHEN ST_Distance(d.location, center_point) <= 10000 THEN 'Within 10 km'
             ELSE 'Within ' || ROUND((ST_Distance(d.location, center_point) / 1000.0)::numeric, 0) || ' km'
-        END AS distance_band,
+        END)::varchar(50) AS distance_band,
         d.last_donation_date
     FROM donors d
     WHERE 
