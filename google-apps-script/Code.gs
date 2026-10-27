@@ -3,24 +3,34 @@
  * BloodBridge Vision-X: Google Apps Script Webhook Integration
  * ============================================================================
  * 
- * Workflow:
- * Google Form -> Google Sheet -> Apps Script (onFormSubmit) -> BloodBridge Backend -> Supabase
+ * Connected Form: "CONSENT FORM FOR BLOOD DONATION"
+ * Form URL: https://docs.google.com/forms/d/e/1FAIpQLScl48SOjyH6iCdHg6WcZlFU8RcfnpQeOn2AKrALn3SyQqOpQA/viewform
+ * Sheet URL: https://docs.google.com/spreadsheets/d/1oxe4NxeOTETUoMoO-YyQU_gKJacQZAhj_e7GU-2tVp8/edit
+ * 
+ * Form Questions mapped to Sheet Columns:
+ * 1. Timestamp                                              -> Column A
+ * 2. NAME                                                   -> Column B
+ * 3. WHATSAPP CONTACT NUMBER                                -> Column C
+ * 4. BLOOD GROUP                                            -> Column D
+ * 5. HAVE YOU DONATED BLOOD IN THE PAST THREE MONTHS ?      -> Column E
+ * 6. WOULD BE WILLING TO DONATE A BLOOD AND HELP SAFE A LIFE? -> Column F
+ * 7. BloodBridge Sync Status                                -> Column G (Auto-created)
  * 
  * SETUP INSTRUCTIONS:
- * 1. In your Google Sheet linked to the Google Form, open: Extensions -> Apps Script
- * 2. Paste this entire file into Code.gs
- * 3. Go to Project Settings (Gear Icon) -> Script Properties and add:
- *    - BLOODBRIDGE_WEBHOOK_URL: https://your-domain.com/api/integrations/google-forms/webhook
- *    - BLOODBRIDGE_SECRET_KEY: (same secret as GOOGLE_FORM_WEBHOOK_SECRET in backend .env)
- * 4. Add Trigger: Triggers (Clock Icon) -> Add Trigger:
+ * 1. In your Google Sheet, open: Extensions -> Apps Script
+ * 2. Replace everything in Code.gs with this entire file and click Save (💾).
+ * 3. Open Project Settings (Gear Icon) -> Script Properties and add:
+ *    - BLOODBRIDGE_WEBHOOK_URL: https://<your-server-or-tunnel-url>/api/integrations/google-forms/webhook
+ *    - BLOODBRIDGE_SECRET_KEY: bloodbridge_gform_webhook_secret_2026
+ * 4. Open Triggers (Clock Icon) -> Add Trigger:
  *    - Function: onFormSubmit
  *    - Event source: From spreadsheet
  *    - Event type: On form submit
- * 5. Run testBloodBridgeWebhook() from the toolbar dropdown to verify connectivity!
+ * 5. Select testBloodBridgeWebhook() from the toolbar dropdown and click Run to test!
  */
 
 /**
- * Main trigger function called automatically when a form is submitted
+ * Main trigger function called automatically when a new donor submits the form
  */
 function onFormSubmit(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -32,9 +42,9 @@ function onFormSubmit(e) {
   var secretKey = scriptProperties.getProperty('BLOODBRIDGE_SECRET_KEY');
   
   if (!webhookUrl || !secretKey) {
-    var errorMsg = 'ERROR: Missing BLOODBRIDGE_WEBHOOK_URL or BLOODBRIDGE_SECRET_KEY in Script Properties.';
+    var errorMsg = 'CONFIG_ERROR: Please set BLOODBRIDGE_WEBHOOK_URL and BLOODBRIDGE_SECRET_KEY in Apps Script Project Settings -> Script Properties.';
     Logger.log(errorMsg);
-    recordSyncStatus(sheet, row, 'CONFIG_ERROR: Set Script Properties in Apps Script');
+    recordSyncStatus(sheet, row, errorMsg);
     return;
   }
   
@@ -48,75 +58,90 @@ function onFormSubmit(e) {
     formObject[headerClean] = rowData[i];
   }
   
-  // Extract fields using fuzzy header matching
-  var name = getFieldValue(formObject, ['full name', 'donor name', 'name', 'your name']);
-  var bloodGroup = getFieldValue(formObject, ['blood group', 'blood type', 'group']);
-  var city = getFieldValue(formObject, ['city', 'district', 'town', 'location']);
-  var area = getFieldValue(formObject, ['area / locality', 'area', 'locality', 'tehsil', 'neighborhood']);
-  var phone = getFieldValue(formObject, ['phone number', 'phone', 'contact number', 'mobile', 'whatsapp number']);
-  var email = getFieldValue(formObject, ['email address', 'email']);
-  var consent = getFieldValue(formObject, [
-    'explicit consent to be contacted',
-    'consent to be contacted',
-    'do you consent to be contacted',
-    'consent'
+  // Exact mapping for "CONSENT FORM FOR BLOOD DONATION" questions
+  var name = getFieldValue(formObject, [
+    'name',
+    'full name',
+    'donor name'
   ]);
+  
+  var rawPhone = getFieldValue(formObject, [
+    'whatsapp contact number',
+    'whatsapp contact',
+    'contact number',
+    'phone number',
+    'phone',
+    'mobile'
+  ]);
+  
+  var bloodGroup = getFieldValue(formObject, [
+    'blood group',
+    'blood type',
+    'group'
+  ]);
+  
   var donatedRecent = getFieldValue(formObject, [
+    'have you donated blood in the past three months ?',
+    'have you donated blood in the past three months',
     'have you donated blood during the previous three months?',
     'have you donated blood in the last 3 months?',
     'donated in last 3 months',
-    'donated in previous 3 months',
-    'donated last 3 months',
-    'previous three months'
-  ]);
-  var lastDonation = getFieldValue(formObject, [
-    'approximate date of last donation',
-    'last donation date',
-    'date of last blood donation',
-    'last donation'
+    'past three months'
   ]);
   
+  var consent = getFieldValue(formObject, [
+    'would be willing to donate a blood and help safe a life?',
+    'willing to donate a blood and help safe a life?',
+    'would be willing to donate',
+    'willing to donate',
+    'help safe a life',
+    'explicit consent to be contacted',
+    'consent to be contacted',
+    'consent'
+  ]);
+  
+  // Optional / profile fields with defaults
+  var city = getFieldValue(formObject, ['city', 'district', 'town', 'location']) || 'Lucknow';
+  var area = getFieldValue(formObject, ['area / locality', 'area', 'locality', 'tehsil']) || '';
+  var email = getFieldValue(formObject, ['email address', 'email']) || '';
+  
   var timestamp = rowData[0] ? new Date(rowData[0]).toISOString() : new Date().toISOString();
+  
+  // Normalize Phone Number (E.164 without plus for Indian mobile numbers)
+  var cleanDigits = rawPhone ? rawPhone.toString().replace(/[^0-9]/g, '') : '';
+  var normalizedPhone = cleanDigits;
+  if (cleanDigits.length === 10) {
+    normalizedPhone = '91' + cleanDigits;
+  }
   
   // Parse boolean values
   var consentBool = false;
   if (consent) {
-    var cStr = consent.toString().toLowerCase();
-    consentBool = cStr.indexOf('yes') !== -1 || cStr.indexOf('true') !== -1 || cStr.indexOf('consent') !== -1;
+    var cStr = consent.toString().toLowerCase().trim();
+    consentBool = cStr.indexOf('yes') !== -1 || cStr === 'true' || cStr.indexOf('willing') !== -1;
   }
   
   var donatedRecentBool = false;
   if (donatedRecent) {
-    var dStr = donatedRecent.toString().toLowerCase();
-    donatedRecentBool = dStr.indexOf('yes') !== -1 || dStr.indexOf('true') !== -1;
+    var dStr = donatedRecent.toString().toLowerCase().trim();
+    donatedRecentBool = dStr.indexOf('yes') !== -1 || dStr === 'true';
   }
   
-  // Parse last donation date if provided
-  var formattedLastDate = null;
-  if (lastDonation) {
-    try {
-      var d = new Date(lastDonation);
-      if (!isNaN(d.getTime())) {
-        formattedLastDate = d.toISOString().split('T')[0];
-      }
-    } catch (dateErr) {
-      // Keep null
-    }
-  }
-  
-  // Construct stable, validated payload
+  // Construct stable, validated payload matching backend schema
   var payload = {
-    name: name.toString().trim(),
-    blood_group: bloodGroup.toString().trim(),
-    city: city ? city.toString().trim() : 'Lucknow',
-    area: area ? area.toString().trim() : '',
-    phone: phone ? phone.toString().trim() : '',
-    email: email ? email.toString().trim() : '',
+    name: name ? name.toString().trim() : 'Anonymous Volunteer',
+    blood_group: bloodGroup ? bloodGroup.toString().trim().toUpperCase() : 'O+',
+    city: city.toString().trim(),
+    area: area ? area.toString().trim() : null,
+    phone: normalizedPhone,
+    email: email ? email.toString().trim().toLowerCase() : null,
     consent_to_contact: consentBool,
     donated_last_3_months: donatedRecentBool,
-    last_donation_date: formattedLastDate,
+    last_donation_date: null,
     submission_id: 'gform_row_' + row + '_' + new Date(timestamp).getTime()
   };
+  
+  Logger.log('Submitting donor to BloodBridge: ' + JSON.stringify(payload));
   
   // Dispatch with exponential retry
   var maxRetries = 3;
@@ -153,26 +178,26 @@ function onFormSubmit(e) {
     }
   }
   
-  // Record status back into Google Sheet
+  // Record status back into the Google Sheet
   if (success) {
     recordSyncStatus(sheet, row, 'SYNCED (' + new Date().toLocaleTimeString() + ')');
   } else {
-    recordSyncStatus(sheet, row, 'FAILED: ' + responseText.slice(0, 120));
+    recordSyncStatus(sheet, row, 'FAILED: ' + responseText.slice(0, 100));
   }
 }
 
 /**
- * Helper to extract field value by checking multiple key candidates and partial matches
+ * Intelligent helper to extract field value using exact matches and partial substring searches
  */
 function getFieldValue(formObject, candidateKeys) {
-  // 1. Exact match on clean header key
+  // 1. Exact match
   for (var i = 0; i < candidateKeys.length; i++) {
     var k = candidateKeys[i].toLowerCase();
     if (formObject[k] !== undefined && formObject[k] !== null && formObject[k] !== '') {
       return formObject[k];
     }
   }
-  // 2. Partial substring search across all headers
+  // 2. Partial substring match across headers
   for (var header in formObject) {
     for (var j = 0; j < candidateKeys.length; j++) {
       if (header.indexOf(candidateKeys[j].toLowerCase()) !== -1) {
@@ -208,7 +233,7 @@ function recordSyncStatus(sheet, row, statusText) {
 }
 
 /**
- * Diagnostic test function: Run this from the Apps Script toolbar dropdown to test connection!
+ * Diagnostic test function: Run this directly from the Apps Script editor to test connectivity!
  */
 function testBloodBridgeWebhook() {
   var scriptProperties = PropertiesService.getScriptProperties();
@@ -223,11 +248,12 @@ function testBloodBridgeWebhook() {
     return;
   }
   
+  // Real test donor matching your exact form fields
   var testPayload = {
     name: 'Test Volunteer (Apps Script Diagnostic)',
-    blood_group: 'O+',
+    blood_group: 'B+',
     city: 'Lucknow',
-    phone: '9876543210',
+    phone: '919876543210',
     consent_to_contact: true,
     donated_last_3_months: false,
     submission_id: 'diagnostic_test_' + new Date().getTime()
@@ -245,11 +271,11 @@ function testBloodBridgeWebhook() {
     };
     
     var response = UrlFetchApp.fetch(webhookUrl, options);
-    Logger.log('Response Code: ' + response.getResponseCode());
+    Logger.log('HTTP Status: ' + response.getResponseCode());
     Logger.log('Response Body: ' + response.getContentText());
     
     if (response.getResponseCode() === 200 || response.getResponseCode() === 201) {
-      Logger.log('SUCCESS! Google Apps Script can communicate securely with BloodBridge Vision-X.');
+      Logger.log('SUCCESS! Google Apps Script is securely synced with BloodBridge Vision-X.');
     } else {
       Logger.log('ERROR: Webhook returned HTTP ' + response.getResponseCode());
     }
