@@ -94,6 +94,7 @@ function validateGoogleFormPayload(payload) {
 async function syncDonorToDatabase(donorData, isUpdate) {
   const pool = getPool();
   const supabase = getSupabase();
+  const donorId = donorData.id || uuidv4();
 
   if (pool && isPostgresConnected()) {
     try {
@@ -169,29 +170,29 @@ async function syncDonorToDatabase(donorData, isUpdate) {
              NOW(), NOW()
            );`,
           [
-            donorData.id,
-            donorData.name,
-            donorData.blood_group,
-            donorData.city,
-            donorData.area,
-            donorData.phone,
-            donorData.email,
-            donorData.latitude,
-            donorData.longitude,
-            donorData.availability_status,
-            donorData.consent_to_contact,
-            donorData.consent_status,
-            donorData.donated_last_3_months,
-            donorData.donation_history_status,
-            donorData.cooldown_until,
-            donorData.google_form_submission_id
+            donorId,
+            donorData.name || 'Anonymous Volunteer',
+            donorData.blood_group || 'O+',
+            donorData.city || 'Lucknow',
+            donorData.area || null,
+            donorData.phone || null,
+            donorData.email || null,
+            donorData.latitude != null ? donorData.latitude : null,
+            donorData.longitude != null ? donorData.longitude : null,
+            donorData.availability_status || 'available',
+            donorData.consent_to_contact !== false,
+            donorData.consent_status || (donorData.consent_to_contact !== false ? 'consented' : 'withdrawn'),
+            donorData.donated_last_3_months || false,
+            donorData.donation_history_status || (donorData.donated_last_3_months ? 'reported_recent' : 'unconfirmed'),
+            donorData.cooldown_until || null,
+            donorData.google_form_submission_id || null
           ]
         );
 
         await pool.query(
           `INSERT INTO integration_logs (id, source, event_type, status, payload_summary, created_at)
            VALUES ($1, 'google_forms', 'donor_registered', 'success', $2, NOW());`,
-          [uuidv4(), JSON.stringify({ donor_id: donorData.id, blood_group: donorData.blood_group, city: donorData.city })]
+          [uuidv4(), JSON.stringify({ donor_id: donorId, blood_group: donorData.blood_group, city: donorData.city })]
         );
       }
     } catch (pgErr) {

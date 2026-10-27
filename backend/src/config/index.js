@@ -1,3 +1,7 @@
+const path = require('path');
+// Automatically resolve .env from backend directory or project root
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 require('dotenv').config();
 
 const config = {
