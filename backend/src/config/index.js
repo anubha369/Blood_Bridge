@@ -31,6 +31,8 @@ const config = {
   whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
   whatsappBusinessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
   whatsappWebhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
+  whatsappAppSecret: process.env.WHATSAPP_APP_SECRET || '',
+  whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME || 'blood_donation_urgent_request',
   whatsappUseTemplate: process.env.WHATSAPP_USE_TEMPLATE === 'true',
 
   // Spatial search defaults

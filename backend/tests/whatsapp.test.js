@@ -289,6 +289,12 @@ test('WhatsApp: handleDonorActionToken handles expiry, idempotency, and prevents
   assert.strictEqual(repeatRes.success, true);
   assert.ok(repeatRes.message.includes('already recorded'));
 
+  // Single-use behavior: attempting to modify action to 'unavailable' throws
+  assert.throws(
+    () => handleDonorActionToken(activeToken, 'unavailable'),
+    /already been used/i
+  );
+
   // Security check: completed_donation reports donor cooldown but DOES NOT fulfill request alone
   const completeToken = `token_complete_${Date.now()}`;
   localStore.whatsapp_notifications.push({
@@ -450,4 +456,35 @@ test('WhatsApp API: Meta Webhook Challenge Verification & Status Updates', async
   assert.strictEqual(statusRes.status, 200);
   assert.strictEqual(testJob.delivery_status, 'delivered');
   assert.strictEqual(testJob.status, 'delivered');
+
+  // Monotonic check: Delayed 'sent' status cannot downgrade 'delivered'
+  const delayedSentPayload = {
+    object: 'whatsapp_business_account',
+    entry: [{ changes: [{ value: { statuses: [{ id: testMsgId, status: 'sent', timestamp: '1793199999' }] } }] }]
+  };
+  await testRequest('POST', '/api/whatsapp/webhook', delayedSentPayload);
+  assert.strictEqual(testJob.delivery_status, 'delivered', 'Status must not downgrade from delivered to sent');
+
+  // Signature check: When app secret is set, unsigned or bad signature is rejected
+  const crypto = require('crypto');
+  const testSecret = 'test_webhook_app_secret_2026';
+  config.whatsappAppSecret = testSecret;
+
+  const unsignedRes = await testRequest('POST', '/api/whatsapp/webhook', statusPayload);
+  assert.strictEqual(unsignedRes.status, 401, 'Unsigned webhook payload must be rejected');
+
+  const badSigRes = await testRequest('POST', '/api/whatsapp/webhook', statusPayload, {
+    'x-hub-signature-256': 'sha256=bad_signature_hash'
+  });
+  assert.strictEqual(badSigRes.status, 401, 'Invalid signature must be rejected');
+
+  const rawBody = JSON.stringify(statusPayload);
+  const validSig = 'sha256=' + crypto.createHmac('sha256', testSecret).update(rawBody).digest('hex');
+  const validSignedRes = await testRequest('POST', '/api/whatsapp/webhook', statusPayload, {
+    'x-hub-signature-256': validSig
+  });
+  assert.strictEqual(validSignedRes.status, 200, 'Valid HMAC signature must be accepted');
+
+  // Clean up config
+  config.whatsappAppSecret = '';
 });

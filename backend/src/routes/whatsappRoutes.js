@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const {
   localStore,
   searchNearbyWhatsAppDonors,
@@ -275,10 +276,43 @@ router.get('/webhook', (req, res) => {
   }
 });
 
+// In-memory set for webhook event deduplication / replay prevention
+const processedWebhookEventIds = new Set();
+
+// Delivery status monotonic ranking to prevent out-of-order status regressions
+const DELIVERY_STATUS_RANK = {
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 4
+};
+
 // POST /api/whatsapp/webhook
 // Meta WhatsApp Cloud API Webhook Delivery Status Updates
 router.post('/webhook', async (req, res) => {
   try {
+    // 1. Signature Verification using WHATSAPP_APP_SECRET
+    const appSecret = config.whatsappAppSecret || process.env.WHATSAPP_APP_SECRET;
+    if (appSecret) {
+      const signatureHeader = req.headers['x-hub-signature-256'];
+      if (!signatureHeader) {
+        return res.status(401).json({ error: 'Missing x-hub-signature-256 signature header.' });
+      }
+
+      const raw = req.rawBody || Buffer.from(JSON.stringify(req.body));
+      const expectedSignature = 'sha256=' + crypto.createHmac('sha256', appSecret).update(raw).digest('hex');
+
+      const expectedBuf = Buffer.from(expectedSignature);
+      const signatureBuf = Buffer.from(signatureHeader);
+
+      if (
+        expectedBuf.length !== signatureBuf.length ||
+        !crypto.timingSafeEqual(expectedBuf, signatureBuf)
+      ) {
+        return res.status(401).json({ error: 'Invalid webhook signature.' });
+      }
+    }
+
     const body = req.body;
     if (body.object === 'whatsapp_business_account') {
       const entry = body.entry?.[0];
@@ -290,18 +324,37 @@ router.post('/webhook', async (req, res) => {
         for (const statusObj of statuses) {
           const messageId = statusObj.id;
           const deliveryStatus = statusObj.status; // sent, delivered, read, failed
+          const eventTimestamp = statusObj.timestamp || Date.now();
+          const eventKey = `${messageId}_${deliveryStatus}_${eventTimestamp}`;
+
+          // Webhook replay check
+          if (processedWebhookEventIds.has(eventKey)) {
+            continue;
+          }
+          processedWebhookEventIds.add(eventKey);
+          if (processedWebhookEventIds.size > 5000) {
+            // Prevent unbounded set growth
+            const first = processedWebhookEventIds.values().next().value;
+            processedWebhookEventIds.delete(first);
+          }
 
           // Update localStore
           const job = (localStore.whatsapp_notifications || []).find((j) => j.provider_message_id === messageId);
           if (job) {
-            job.delivery_status = deliveryStatus;
-            if (deliveryStatus === 'failed') {
-              job.status = 'failed';
-              job.error_message = statusObj.errors?.[0]?.message || 'Delivery failed';
-            } else if (deliveryStatus === 'delivered' || deliveryStatus === 'read') {
-              job.status = deliveryStatus;
+            const currentRank = DELIVERY_STATUS_RANK[job.delivery_status] || 0;
+            const newRank = DELIVERY_STATUS_RANK[deliveryStatus] || 0;
+
+            // Only advance delivery status monotonically (never downgrade read -> sent)
+            if (newRank >= currentRank) {
+              job.delivery_status = deliveryStatus;
+              if (deliveryStatus === 'failed') {
+                job.status = 'failed';
+                job.error_message = statusObj.errors?.[0]?.message || 'Delivery failed';
+              } else if (deliveryStatus === 'delivered' || deliveryStatus === 'read') {
+                job.status = deliveryStatus;
+              }
+              job.updated_at = new Date().toISOString();
             }
-            job.updated_at = new Date().toISOString();
           }
 
           // Update PostgreSQL if connected

@@ -139,6 +139,7 @@ async function dispatchRequestNotifications({ request, eligibleDonors, maxRecipi
       continue;
     }
 
+    const templateName = config.whatsappTemplateName || 'blood_donation_urgent_request';
     const actionToken = `bb_${uuidv4().replace(/-/g, '').slice(0, 24)}`;
     const messageBody = formatDonorNotificationMessage(request, donor, actionToken);
     const jobId = uuidv4();
@@ -149,7 +150,7 @@ async function dispatchRequestNotifications({ request, eligibleDonors, maxRecipi
       donor_id: donorId,
       donor_name: donor.name,
       recipient_phone: recipientPhone,
-      template_name: 'emergency_blood_request_v1',
+      template_name: templateName,
       message_body: messageBody,
       action_token: actionToken,
       status: hasCloudApi ? 'queued' : 'simulated_sent',
@@ -167,7 +168,10 @@ async function dispatchRequestNotifications({ request, eligibleDonors, maxRecipi
         const cloudRes = await sendViaWhatsAppCloudApi({
           to: recipientPhone,
           message: messageBody,
-          template: job.template_name
+          template: job.template_name,
+          request,
+          donor,
+          actionToken
         });
         job.status = 'sent';
         job.delivery_status = 'sent';
@@ -269,6 +273,11 @@ function handleDonorActionToken(token, action) {
       message: 'Your response was already recorded. Thank you!',
       job
     };
+  }
+
+  // 3. Single-Use Check: once an action is recorded, token cannot be reused for a different action
+  if (job.donor_response && job.donor_response !== action) {
+    throw new Error('This notification action link has already been used and cannot be modified.');
   }
 
   const donor = (localStore.donors || []).find((d) => d.id === job.donor_id);
@@ -384,7 +393,7 @@ function handleDonorActionToken(token, action) {
 /**
  * Real WhatsApp Cloud API dispatcher (invoked when credentials are provided)
  */
-async function sendViaWhatsAppCloudApi({ to, message, template }) {
+async function sendViaWhatsAppCloudApi({ to, message, template, request, donor, actionToken }) {
   const token = config.whatsappToken || process.env.WHATSAPP_TOKEN;
   const phoneNumberId = config.whatsappPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -401,7 +410,19 @@ async function sendViaWhatsAppCloudApi({ to, message, template }) {
 
   let payload;
   if (config.whatsappUseTemplate && template) {
-    // Official template message
+    // Official template message with positional parameters:
+    // {{1}} = Blood group, {{2}} = Hospital, {{3}} = City, {{4}} = Units, {{5}} = Action URL
+    const actionUrl = actionToken ? `https://bloodbridge.org/action/${actionToken}` : '';
+    const bodyParams = request ? [
+      { type: 'text', text: request.blood_group || '' },
+      { type: 'text', text: request.hospital_name || '' },
+      { type: 'text', text: request.city || '' },
+      { type: 'text', text: String(request.units_needed || 1) },
+      { type: 'text', text: actionUrl }
+    ] : [
+      { type: 'text', text: message }
+    ];
+
     payload = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -413,7 +434,7 @@ async function sendViaWhatsAppCloudApi({ to, message, template }) {
         components: [
           {
             type: 'body',
-            parameters: [{ type: 'text', text: message }]
+            parameters: bodyParams
           }
         ]
       }
