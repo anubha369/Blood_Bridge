@@ -151,3 +151,42 @@ test('API: Password Recovery Flow (Forgot Password & Reset Password)', async () 
     new_password: 'BloodBridge2026!'
   });
 });
+// Google Forms webhook integration tests
+const config = require('../src/config');
+
+const webhookPath = '/api/integrations/google-forms/webhook';
+
+test('Google Forms webhook rejects missing secret', async () => {
+  const response = await testRequest(
+    'POST',
+    webhookPath,
+    { name: 'Test Donor', blood_group: 'O+' }
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.success, false);
+});
+
+test('Google Forms webhook rejects invalid secret', async () => {
+  const response = await testRequest(
+    'POST',
+    webhookPath,
+    { name: 'Test Donor', blood_group: 'O+' },
+    { 'x-webhook-secret': 'definitely-wrong-secret' }
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.success, false);
+});
+test('Google Forms webhook rejects invalid blood group', async () => {
+  const response = await testRequest(
+    'POST',
+    webhookPath,
+    { name: 'Test Donor', blood_group: 'INVALID' },
+    { 'x-webhook-secret': config.googleFormWebhookSecret }
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.success, false);
+  assert.match(response.body.error, /Validation failed/i);
+});

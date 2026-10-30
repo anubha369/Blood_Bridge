@@ -20,13 +20,13 @@
  * 1. In your Google Sheet, open: Extensions -> Apps Script
  * 2. Replace everything in Code.gs with this entire file and click Save (💾).
  * 3. Open Project Settings (Gear Icon) -> Script Properties and add:
- *    - BLOODBRIDGE_WEBHOOK_URL: https://<your-server-or-tunnel-url>/api/integrations/google-forms/webhook
- *    - BLOODBRIDGE_SECRET_KEY: bloodbridge_gform_webhook_secret_2026
+ *    - BLOODBRIDGE_WEBHOOK_URL: https://statistical-aspects-miracle-piano.trycloudflare.com/api/integrations/google-forms/webhook
+ *    - BLOODBRIDGE_SECRET_KEY: (Your backend secret from backend/.env GOOGLE_FORM_WEBHOOK_SECRET)
  * 4. Open Triggers (Clock Icon) -> Add Trigger:
  *    - Function: onFormSubmit
  *    - Event source: From spreadsheet
  *    - Event type: On form submit
- * 5. Select testBloodBridgeWebhook() from the toolbar dropdown and click Run to test!
+ * 5. Select testBloodBridgeWebhook() from the toolbar dropdown and click Run to verify!
  */
 
 /**
@@ -38,11 +38,12 @@ function onFormSubmit(e) {
   
   // Read Script Properties
   var scriptProperties = PropertiesService.getScriptProperties();
-  var webhookUrl = scriptProperties.getProperty('BLOODBRIDGE_WEBHOOK_URL');
+  var webhookUrl = scriptProperties.getProperty('BLOODBRIDGE_WEBHOOK_URL') || 
+                   'https://statistical-aspects-miracle-piano.trycloudflare.com/api/integrations/google-forms/webhook';
   var secretKey = scriptProperties.getProperty('BLOODBRIDGE_SECRET_KEY');
   
-  if (!webhookUrl || !secretKey) {
-    var errorMsg = 'CONFIG_ERROR: Please set BLOODBRIDGE_WEBHOOK_URL and BLOODBRIDGE_SECRET_KEY in Apps Script Project Settings -> Script Properties.';
+  if (!secretKey) {
+    var errorMsg = 'CONFIG_ERROR: Please set BLOODBRIDGE_SECRET_KEY in Apps Script Project Settings -> Script Properties.';
     Logger.log(errorMsg);
     recordSyncStatus(sheet, row, errorMsg);
     return;
@@ -233,53 +234,85 @@ function recordSyncStatus(sheet, row, statusText) {
 }
 
 /**
- * Diagnostic test function: Run this directly from the Apps Script editor to test connectivity!
+ * Diagnostic test function: Safely tests connectivity and authentication WITHOUT
+ * creating or updating any donor record in the live database.
+ * 
+ * Note on Backend Capabilities:
+ * The BloodBridge backend does not feature a dedicated non-mutating /dry-run webhook
+ * query parameter. Therefore, this diagnostic executes two safe checks:
+ * 1. Health Probe: Calls GET /api/health to confirm network egress, DNS, and server health.
+ * 2. Auth Probe: Sends an empty JSON payload with the 'x-webhook-secret' header.
+ *    - If secret is invalid: Backend rejects at step 1 with HTTP 401 (Unauthorized).
+ *    - If secret is valid: Backend verifies secret, then fails schema validation at step 2
+ *      with HTTP 400 ('Donor name is required'). Zero records are inserted or altered.
  */
 function testBloodBridgeWebhook() {
   var scriptProperties = PropertiesService.getScriptProperties();
-  var webhookUrl = scriptProperties.getProperty('BLOODBRIDGE_WEBHOOK_URL');
+  var webhookUrl = scriptProperties.getProperty('BLOODBRIDGE_WEBHOOK_URL') || 
+                   'https://statistical-aspects-miracle-piano.trycloudflare.com/api/integrations/google-forms/webhook';
   var secretKey = scriptProperties.getProperty('BLOODBRIDGE_SECRET_KEY');
   
-  Logger.log('Target URL: ' + webhookUrl);
-  Logger.log('Secret Configured: ' + (secretKey ? 'YES (Length: ' + secretKey.length + ')' : 'NO'));
+  Logger.log('=== BloodBridge Webhook Connectivity Diagnostic ===');
+  Logger.log('Target Webhook URL: ' + webhookUrl);
+  Logger.log('Secret Configured: ' + (secretKey ? 'YES (Length: ' + secretKey.length + ' chars)' : 'NO'));
   
-  if (!webhookUrl || !secretKey) {
-    Logger.log('FAILED: Please configure BLOODBRIDGE_WEBHOOK_URL and BLOODBRIDGE_SECRET_KEY in Script Properties first.');
+  if (!secretKey) {
+    Logger.log('❌ FAILED: BLOODBRIDGE_SECRET_KEY is missing from Script Properties.');
+    Logger.log('Please open Project Settings (gear icon) -> Script Properties and add BLOODBRIDGE_SECRET_KEY.');
     return;
   }
   
-  // Real test donor matching your exact form fields
-  var testPayload = {
-    name: 'Test Volunteer (Apps Script Diagnostic)',
-    blood_group: 'B+',
-    city: 'Lucknow',
-    phone: '919876543210',
-    consent_to_contact: true,
-    donated_last_3_months: false,
-    submission_id: 'diagnostic_test_' + new Date().getTime()
-  };
+  // Step 1: Server Reachability Probe via /api/health
+  var healthUrl = webhookUrl.replace(/\/api\/integrations\/.*$/, '/api/health');
+  Logger.log('\nStep 1: Testing server reachability via ' + healthUrl + '...');
   
   try {
-    var options = {
+    var healthResponse = UrlFetchApp.fetch(healthUrl, {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+    var healthCode = healthResponse.getResponseCode();
+    Logger.log('Health Endpoint HTTP Status: ' + healthCode);
+    if (healthCode === 200) {
+      Logger.log('✔ Server is online, responding with HTTP 200, and PostgreSQL with PostGIS is active.');
+    } else {
+      Logger.log('⚠ Server responded with HTTP ' + healthCode + ': ' + healthResponse.getContentText().slice(0, 120));
+    }
+  } catch (healthErr) {
+    Logger.log('❌ Network error reaching server: ' + healthErr.message);
+    Logger.log('Verify that your Cloudflare tunnel and backend server are actively running.');
+    return;
+  }
+  
+  // Step 2: Non-Mutating Webhook Authentication Probe
+  Logger.log('\nStep 2: Testing webhook secret authentication (non-mutating probe)...');
+  try {
+    var probeResponse = UrlFetchApp.fetch(webhookUrl, {
       method: 'post',
       contentType: 'application/json',
       headers: {
         'x-webhook-secret': secretKey
       },
-      payload: JSON.stringify(testPayload),
+      payload: JSON.stringify({}),
       muteHttpExceptions: true
-    };
+    });
     
-    var response = UrlFetchApp.fetch(webhookUrl, options);
-    Logger.log('HTTP Status: ' + response.getResponseCode());
-    Logger.log('Response Body: ' + response.getContentText());
+    var probeCode = probeResponse.getResponseCode();
+    var probeText = probeResponse.getContentText();
+    Logger.log('Webhook Probe HTTP Status: ' + probeCode);
+    Logger.log('Webhook Probe Response: ' + probeText);
     
-    if (response.getResponseCode() === 200 || response.getResponseCode() === 201) {
-      Logger.log('SUCCESS! Google Apps Script is securely synced with BloodBridge Vision-X.');
+    if (probeCode === 400 && probeText.indexOf('Validation failed') !== -1) {
+      Logger.log('✔ SUCCESS! The webhook secret was verified and authenticated by the backend.');
+      Logger.log('✔ Confirmed: Zero donor records were created or modified.');
+      Logger.log('The Google Apps Script integration is ready for real form submissions.');
+    } else if (probeCode === 401) {
+      Logger.log('❌ AUTHENTICATION ERROR: HTTP 401 Unauthorized.');
+      Logger.log('The BLOODBRIDGE_SECRET_KEY in Script Properties does not match the GOOGLE_FORM_WEBHOOK_SECRET in backend/.env.');
     } else {
-      Logger.log('ERROR: Webhook returned HTTP ' + response.getResponseCode());
+      Logger.log('Unexpected response [HTTP ' + probeCode + ']: ' + probeText);
     }
-  } catch (err) {
-    Logger.log('EXCEPTION: ' + err.message);
+  } catch (probeErr) {
+    Logger.log('❌ Webhook probe network error: ' + probeErr.message);
   }
 }
