@@ -732,6 +732,130 @@ async function searchNearbyDonors({
     .slice(offset, offset + limit);
 }
 
+
+
+
+
+// Private donor search specifically for WhatsApp notifications.
+// This function returns phone numbers only to the trusted backend.
+async function searchNearbyWhatsAppDonors({
+  latitude,
+  longitude,
+  radiusKm = 25,
+  bloodGroup = null,
+  limit = 20
+}) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  const radius = Number(radiusKm);
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    throw new Error('Invalid latitude for WhatsApp donor search.');
+  }
+
+  if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+    throw new Error('Invalid longitude for WhatsApp donor search.');
+  }
+
+  if (!Number.isFinite(radius) || radius <= 0) {
+    throw new Error('Invalid radius for WhatsApp donor search.');
+  }
+
+  if (bloodGroup && !['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].includes(bloodGroup)) {
+    throw new Error('Invalid blood group for WhatsApp donor search.');
+  }
+
+  if (isPostgres && pool) {
+    const query = `
+      SELECT *
+      FROM public.search_nearby_whatsapp_donors($1, $2, $3, $4, $5);
+    `;
+
+    const result = await pool.query(query, [
+      lat,
+      lon,
+      radius,
+      bloodGroup || null,
+      safeLimit
+    ]);
+
+    return result.rows.map((r) => ({
+      ...r,
+      id: r.donor_id,
+      donor_id: r.donor_id,
+      whatsapp_opt_in: true,
+      consent_to_contact: true,
+      consent_status: 'consented',
+      availability_status: 'available'
+    }));
+  }
+
+  // Local fallback: apply the same consent and availability checks.
+  const now = new Date();
+
+  return (localStore.donors || [])
+    .filter((d) => {
+      if (d.whatsapp_opt_in !== true) return false;
+      if (!d.whatsapp_opt_in_at) return false;
+
+      if (
+        d.whatsapp_opt_out_at &&
+        new Date(d.whatsapp_opt_in_at) <= new Date(d.whatsapp_opt_out_at)
+      ) return false;
+
+      if (d.consent_to_contact !== true) return false;
+      if (d.consent_status !== 'consented') return false;
+      if (d.availability_status !== 'available') return false;
+
+      if (
+        d.verification_status !== 'verified' &&
+        d.verification_status !== 'pending_verification'
+      ) return false;
+
+      if (!d.phone || !d.location && (d.latitude == null || d.longitude == null)) {
+        return false;
+      }
+
+      if (d.cooldown_until && new Date(d.cooldown_until) > now) return false;
+
+      if (d.donated_last_3_months === true && !d.cooldown_until) {
+        return false;
+      }
+
+      if (bloodGroup && d.blood_group !== bloodGroup) return false;
+      if (d.latitude == null || d.longitude == null) return false;
+
+      return calculateHaversineDistanceKm(
+        lat, lon, d.latitude, d.longitude
+      ) <= radius;
+    })
+    .map((d) => {
+      const distance = calculateHaversineDistanceKm(
+        lat, lon, d.latitude, d.longitude
+      );
+
+      return {
+        id: d.id,
+        donor_id: d.id,
+        name: d.name,
+        phone: d.phone,
+        blood_group: d.blood_group,
+        city: d.city,
+        area: d.area,
+        verification_status: d.verification_status,
+        distance_km: distance,
+        distance_band: getPrivacySafeDistanceBand(distance),
+        whatsapp_opt_in: true,
+        consent_to_contact: true,
+        consent_status: 'consented',
+        availability_status: 'available'
+      };
+    })
+    .sort((a, b) => a.distance_km - b.distance_km)
+    .slice(0, safeLimit);
+}
+
 // Spatial search for Blood Banks
 async function searchNearbyBloodBanks({ latitude, longitude, radiusKm = 50, limit = 20 }) {
   const lat = latitude ? parseFloat(latitude) : null;
@@ -768,6 +892,97 @@ async function searchNearbyBloodBanks({ latitude, longitude, radiusKm = 50, limi
     .slice(0, limit);
 }
 
+
+// WhatsApp notification persistence
+async function saveWhatsAppNotification(job) {
+  if (!isPostgres || !pool) {
+    throw new Error('PostgreSQL is not connected. Cannot persist WhatsApp notification.');
+  }
+
+  const query = `
+    INSERT INTO whatsapp_notifications (
+      request_id,
+      donor_id,
+      recipient_phone,
+      template_name,
+      message_body,
+      status,
+      provider_message_id,
+      action_token,
+      error_message
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *
+  `;
+
+  const values = [
+    job.request_id,
+    job.donor_id,
+    job.recipient_phone,
+    job.template_name || 'emergency_blood_request_v1',
+    job.message_body,
+    job.status || 'queued',
+    job.provider_message_id || null,
+    job.action_token,
+    job.error_message || null
+  ];
+
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
+async function getWhatsAppNotificationByToken(token) {
+  if (!isPostgres || !pool) {
+    throw new Error('PostgreSQL is not connected.');
+  }
+
+  const result = await pool.query(
+    'SELECT * FROM whatsapp_notifications WHERE action_token = $1 LIMIT 1',
+    [token]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function updateWhatsAppNotification(id, updates) {
+  if (!isPostgres || !pool) {
+    throw new Error('PostgreSQL is not connected.');
+  }
+
+  const allowedFields = [
+    'status',
+    'provider_message_id',
+    'delivery_status',
+    'donor_response',
+    'responded_at',
+    'error_message'
+  ];
+
+  const entries = Object.entries(updates).filter(([key]) =>
+    allowedFields.includes(key)
+  );
+
+  if (!entries.length) {
+    throw new Error('No valid notification fields supplied.');
+  }
+
+  const setClause = entries
+    .map(([key], index) => `${key} = $${index + 2}`)
+    .join(', ');
+
+  const values = entries.map(([, value]) => value);
+
+  const result = await pool.query(
+    `UPDATE whatsapp_notifications
+     SET ${setClause}, updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, ...values]
+  );
+
+  return result.rows[0] || null;
+}
+
 module.exports = {
   initDb,
   searchNearbyDonors,
@@ -777,5 +992,9 @@ module.exports = {
   getPrivacySafeDistanceBand,
   isPostgresConnected: () => isPostgres,
   getPool: () => pool,
-  getSupabase: () => supabase
+  getSupabase: () => supabase,
+  saveWhatsAppNotification,
+  getWhatsAppNotificationByToken,
+  updateWhatsAppNotification,
+  searchNearbyWhatsAppDonors,
 };

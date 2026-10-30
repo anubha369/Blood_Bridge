@@ -1,9 +1,10 @@
+
 const rateLimit = require('express-rate-limit');
 
 // General API Rate Limiter
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300, // Limit each IP to 300 requests per 15 minutes
+  windowMs: 15 * 60 * 1000,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -12,10 +13,10 @@ const apiLimiter = rateLimit({
   }
 });
 
-// Stricter Auth Limiter (Brute-force protection)
+// Authentication Limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30, // 30 attempts per 15 minutes
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -24,10 +25,10 @@ const authLimiter = rateLimit({
   }
 });
 
-// AI & Natural Language Limiter
+// AI Rate Limiter
 const aiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 60, // 60 queries per 5 minutes
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -36,10 +37,12 @@ const aiLimiter = rateLimit({
   }
 });
 
-// Webhook Limiter
+// Google Forms Webhook Limiter
 const webhookLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     success: false,
     error: 'Webhook rate limit exceeded.'

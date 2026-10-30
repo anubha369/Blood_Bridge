@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -20,31 +21,40 @@ const whatsappRoutes = require('./routes/whatsappRoutes');
 
 const app = express();
 
+// Reverse proxy configuration
+// Assumes exactly one trusted proxy hop.
+// Verify this setting against your deployment topology.
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
 // CORS setup
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser requests or allowed frontend origins
-    if (!origin || config.allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+    if (
+      !origin ||
+      config.allowedOrigins.includes(origin) ||
+      process.env.NODE_ENV !== 'production'
+    ) {
       return callback(null, true);
     }
+
     return callback(new Error('Blocked by CORS policy'));
   },
   credentials: true
 }));
 
-// Body parsing with safe size limit
+// Body parsing
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// Global rate limiter
+// Global API rate limiter
 app.use('/api/', apiLimiter);
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -57,11 +67,12 @@ app.get('/api/health', (req, res) => {
       : 'Local In-Memory PostGIS-compatible Geo-Engine',
     groq_configured: !!config.groqApiKey,
     timestamp: new Date().toISOString(),
-    clinical_disclaimer: 'BloodBridge coordinates potential blood availability; clinical cross-matching and transfusion compatibility belong exclusively to authorized medical professionals.'
+    clinical_disclaimer:
+      'BloodBridge coordinates potential blood availability; clinical cross-matching and transfusion compatibility belong exclusively to authorized medical professionals.'
   });
 });
 
-// API Routes
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/donors', donorRoutes);
 app.use('/api/requests', requestRoutes);
@@ -77,7 +88,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    error: `API route not found: ${req.method} ${req.baseUrl}`
+    error: `API route not found: ${req.method} ${req.originalUrl}`
   });
 });
 

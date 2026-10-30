@@ -172,8 +172,28 @@ router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
     }
 
     const radiusKm = parseFloat(req.query.radius_km || 30);
-    const searchLat = request.latitude || 26.8467;
-    const searchLon = request.longitude || 80.9462;
+    let searchLat = request.latitude;
+    let searchLon = request.longitude;
+
+    if (searchLat == null || searchLon == null) {
+      const coords = resolveCityCoordinates(request.city);
+      if (coords) {
+        searchLat = coords.lat;
+        searchLon = coords.lon;
+      }
+    }
+
+    if (
+      searchLat == null ||
+      searchLon == null ||
+      !Number.isFinite(Number(searchLat)) ||
+      !Number.isFinite(Number(searchLon))
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid request coordinates or a supported city location are required for candidate matching.'
+      });
+    }
 
     const nearbyDonors = await findNearbyDonors({
       latitude: searchLat,

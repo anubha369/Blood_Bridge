@@ -224,6 +224,7 @@ test('Rule 8: Notification dispatch does not queue duplicate alerts to same dono
     city: 'Lucknow',
     availability_status: 'available',
     consent_to_contact: true,
+    whatsapp_opt_in: true,
     verification_status: 'verified'
   };
 
@@ -345,7 +346,7 @@ test('Rule 13: Manual WhatsApp deep link generator formats prefilled URL safely'
 });
 
 // 14. Confirmed Donation Outcome Triggers Immediate Cooldown & Points
-test('Rule 14: Confirmed donation outcome triggers 3-month cooldown and fulfills request', () => {
+test('Rule 14: Confirmed donation outcome triggers 3-month cooldown without unverified request fulfillment', () => {
   const donorId = uuidv4();
   const reqId = uuidv4();
 
@@ -381,7 +382,8 @@ test('Rule 14: Confirmed donation outcome triggers 3-month cooldown and fulfills
   assert.strictEqual(testDonor.availability_status, 'recently_donated');
   assert.strictEqual(testDonor.donated_last_3_months, true);
   assert.ok(testDonor.cooldown_until);
-  assert.strictEqual(testRequestRecord.status, 'fulfilled');
+  // Security rule: donor action alone must not mark blood request fulfilled without requester authorization
+  assert.notStrictEqual(testRequestRecord.status, 'fulfilled');
 });
 
 // 15. LLM Fallback Heuristic Parser
