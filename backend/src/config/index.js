@@ -11,7 +11,7 @@ const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   
   // Supabase & PostgreSQL
-  supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+  supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '',
   databaseUrl: process.env.DATABASE_URL || '',
 
