@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { localStore, calculateHaversineDistanceKm, getPrivacySafeDistanceBand } = require('../db/db');
+const { localStore, calculateHaversineDistanceKm, getPrivacySafeDistanceBand, searchNearbyTelegramDonors } = require('../db/db');
 const { authenticateUser, optionalAuth } = require('../middleware/auth');
 const { rankCandidateDonors } = require('../services/matchingService');
 const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatialService');
 const { recordCompletedDonation } = require('../services/cooldownService');
+const { dispatchEmergencyRequestNotifications } = require('../services/telegramService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const VALID_STATUSES = [
@@ -96,6 +97,30 @@ router.post('/', authenticateUser, async (req, res, next) => {
     };
 
     localStore.blood_requests.push(newRequest);
+
+    // Automatic Telegram emergency alerts if urgency is emergency
+    if (newRequest.urgency === 'emergency' && (newRequest.latitude != null && newRequest.longitude != null)) {
+      (async () => {
+        try {
+          const eligibleDonors = await searchNearbyTelegramDonors({
+            latitude: newRequest.latitude,
+            longitude: newRequest.longitude,
+            radiusKm: 30,
+            bloodGroup: newRequest.blood_group,
+            limit: 20
+          });
+          if (eligibleDonors && eligibleDonors.length > 0) {
+            await dispatchEmergencyRequestNotifications({
+              request: newRequest,
+              eligibleDonors,
+              maxRecipients: 10
+            });
+          }
+        } catch (alertErr) {
+          console.warn('Auto Telegram emergency alert notice:', alertErr.message);
+        }
+      })();
+    }
 
     return res.status(201).json({
       success: true,
@@ -235,9 +260,18 @@ router.get('/:id/accepted-donors', authenticateUser, (req, res) => {
   }
 
   // Find notification jobs for this request that have donor_response === 'accepted'
-  const acceptedJobs = (localStore.whatsapp_notifications || []).filter(
+  const whatsappAccepted = (localStore.whatsapp_notifications || []).filter(
     (j) => j.request_id === request.id && j.donor_response === 'accepted'
   );
+  const telegramAccepted = (localStore.telegram_notifications || []).filter(
+    (j) => j.request_id === request.id && j.donor_response === 'accepted'
+  );
+  const acceptedJobs = [...whatsappAccepted];
+  for (const tgJob of telegramAccepted) {
+    if (!acceptedJobs.some((j) => j.donor_id === tgJob.donor_id)) {
+      acceptedJobs.push(tgJob);
+    }
+  }
 
   const acceptedDonors = acceptedJobs.map((job) => {
     const donor = (localStore.donors || []).find((d) => d.id === job.donor_id);
@@ -294,6 +328,8 @@ router.post('/:id/select-donor', authenticateUser, (req, res) => {
 
   // Validate that this donor actually accepted this specific request!
   const acceptedJob = (localStore.whatsapp_notifications || []).find(
+    (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
+  ) || (localStore.telegram_notifications || []).find(
     (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
   );
 

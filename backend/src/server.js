@@ -1,6 +1,7 @@
 const app = require('./app');
 const config = require('./config');
 const { initDb } = require('./db/db');
+const { startPolling, stopPolling } = require('./services/telegramService');
 
 async function startServer() {
   try {
@@ -16,9 +17,17 @@ async function startServer() {
       console.log(`=======================================================`);
     });
 
+    // Initialize Telegram Bot long polling if token is configured
+    if (config.telegramBotToken && config.nodeEnv !== 'test') {
+      startPolling().catch((err) => {
+        console.warn('Telegram bot polling init warning:', err.message);
+      });
+    }
+
     // Graceful shutdown
     const handleShutdown = (signal) => {
       console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+      stopPolling();
       server.close(() => {
         console.log('Server closed. Process terminating.');
         process.exit(0);

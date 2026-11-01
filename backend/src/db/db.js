@@ -595,7 +595,9 @@ const localStore = {
       metadata: {}
     }
   ],
-  whatsapp_notifications: []
+  whatsapp_notifications: [],
+  telegram_link_codes: [],
+  telegram_notifications: []
 };
 
 // Precise Haversine distance in kilometers (exact spherical match to PostGIS ST_Distance)
@@ -983,6 +985,457 @@ async function updateWhatsAppNotification(id, updates) {
   return result.rows[0] || null;
 }
 
+// Private donor search specifically for Telegram notifications
+async function searchNearbyTelegramDonors({
+  latitude,
+  longitude,
+  radiusKm = 25,
+  bloodGroup = null,
+  limit = 20
+}) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  const radius = Number(radiusKm);
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    throw new Error('Invalid latitude for Telegram donor search.');
+  }
+
+  if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+    throw new Error('Invalid longitude for Telegram donor search.');
+  }
+
+  if (!Number.isFinite(radius) || radius <= 0) {
+    throw new Error('Invalid radius for Telegram donor search.');
+  }
+
+  if (bloodGroup && !['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].includes(bloodGroup)) {
+    throw new Error('Invalid blood group for Telegram donor search.');
+  }
+
+  if (isPostgres && pool) {
+    try {
+      const query = `
+        SELECT
+          d.id AS donor_id,
+          d.name,
+          d.phone,
+          d.blood_group,
+          d.city,
+          d.area,
+          d.telegram_chat_id,
+          d.telegram_username,
+          d.verification_status,
+          ST_Distance(
+            d.location,
+            ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
+          ) / 1000.0 AS distance_km,
+          CASE
+            WHEN ST_Distance(d.location, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000.0 <= 5 THEN '0-5 km'
+            WHEN ST_Distance(d.location, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000.0 <= 10 THEN '5-10 km'
+            WHEN ST_Distance(d.location, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000.0 <= 25 THEN '10-25 km'
+            ELSE '25+ km'
+          END AS distance_band
+        FROM public.donors d
+        WHERE
+          $1 BETWEEN -90 AND 90
+          AND $2 BETWEEN -180 AND 180
+          AND $3 > 0
+          AND d.location IS NOT NULL
+          AND d.telegram_chat_id IS NOT NULL
+          AND d.telegram_opt_in = TRUE
+          AND d.telegram_opt_in_at IS NOT NULL
+          AND (d.telegram_opt_out_at IS NULL OR d.telegram_opt_in_at > d.telegram_opt_out_at)
+          AND d.consent_to_contact = TRUE
+          AND (d.consent_status IS NULL OR d.consent_status = 'consented')
+          AND d.availability_status = 'available'
+          AND d.verification_status IN ('verified', 'pending_verification')
+          AND (d.cooldown_until IS NULL OR d.cooldown_until <= NOW())
+          AND (d.donated_last_3_months IS DISTINCT FROM TRUE OR d.cooldown_until IS NOT NULL)
+          AND ($4::varchar IS NULL OR d.blood_group = $4)
+          AND ST_DWithin(d.location, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3 * 1000)
+        ORDER BY distance_km ASC
+        LIMIT $5;
+      `;
+      const result = await pool.query(query, [lat, lon, radius, bloodGroup || null, safeLimit]);
+      return result.rows.map((r) => ({
+        ...r,
+        id: r.donor_id,
+        telegram_opt_in: true,
+        consent_to_contact: true,
+        consent_status: 'consented',
+        availability_status: 'available'
+      }));
+    } catch (dbErr) {
+      console.warn('DB searchNearbyTelegramDonors warning, falling back to localStore:', dbErr.message);
+    }
+  }
+
+  // Local fallback: apply exact matching and eligibility checks
+  const now = new Date();
+  return (localStore.donors || [])
+    .filter((d) => {
+      if (!d.telegram_chat_id) return false;
+      if (d.telegram_opt_in !== true) return false;
+      if (!d.telegram_opt_in_at) return false;
+      if (
+        d.telegram_opt_out_at &&
+        new Date(d.telegram_opt_in_at) <= new Date(d.telegram_opt_out_at)
+      ) return false;
+
+      if (d.consent_to_contact !== true) return false;
+      if (d.consent_status && d.consent_status !== 'consented') return false;
+      if (d.availability_status !== 'available') return false;
+      if (
+        d.verification_status !== 'verified' &&
+        d.verification_status !== 'pending_verification'
+      ) return false;
+
+      if (d.cooldown_until && new Date(d.cooldown_until) > now) return false;
+      if (d.donated_last_3_months === true && !d.cooldown_until) return false;
+
+      if (bloodGroup && d.blood_group !== bloodGroup) return false;
+      if (d.latitude == null || d.longitude == null) return false;
+
+      return calculateHaversineDistanceKm(lat, lon, d.latitude, d.longitude) <= radius;
+    })
+    .map((d) => {
+      const distance = calculateHaversineDistanceKm(lat, lon, d.latitude, d.longitude);
+      return {
+        id: d.id,
+        donor_id: d.id,
+        name: d.name,
+        phone: d.phone,
+        blood_group: d.blood_group,
+        city: d.city,
+        area: d.area,
+        telegram_chat_id: d.telegram_chat_id,
+        telegram_username: d.telegram_username,
+        verification_status: d.verification_status,
+        distance_km: distance,
+        distance_band: getPrivacySafeDistanceBand(distance),
+        telegram_opt_in: true,
+        consent_to_contact: true,
+        consent_status: 'consented',
+        availability_status: 'available'
+      };
+    })
+    .sort((a, b) => a.distance_km - b.distance_km)
+    .slice(0, safeLimit);
+}
+
+// Telegram link codes & persistence helpers
+async function saveTelegramLinkCode({ donor_id, code_hash, expires_at }) {
+  if (!localStore.telegram_link_codes) localStore.telegram_link_codes = [];
+  const entry = {
+    id: require('uuid').v4(),
+    donor_id,
+    code_hash,
+    expires_at: new Date(expires_at).toISOString(),
+    used_at: null,
+    created_at: new Date().toISOString()
+  };
+  localStore.telegram_link_codes.push(entry);
+
+  if (isPostgres && pool) {
+    try {
+      const q = `
+        INSERT INTO public.telegram_link_codes (donor_id, code_hash, expires_at)
+        VALUES ($1, $2, $3)
+        RETURNING *
+      `;
+      const res = await pool.query(q, [donor_id, code_hash, new Date(expires_at)]);
+      return res.rows[0];
+    } catch (err) {
+      console.warn('DB saveTelegramLinkCode warning:', err.message);
+    }
+  }
+  return entry;
+}
+
+async function getTelegramLinkCodeByHash(code_hash) {
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query('SELECT * FROM public.telegram_link_codes WHERE code_hash = $1 LIMIT 1', [code_hash]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB getTelegramLinkCodeByHash warning:', err.message);
+    }
+  }
+  if (!localStore.telegram_link_codes) localStore.telegram_link_codes = [];
+  return localStore.telegram_link_codes.find((c) => c.code_hash === code_hash) || null;
+}
+
+async function markTelegramLinkCodeUsed(code_hash) {
+  const now = new Date().toISOString();
+  if (!localStore.telegram_link_codes) localStore.telegram_link_codes = [];
+  const local = localStore.telegram_link_codes.find((c) => c.code_hash === code_hash);
+  if (local) local.used_at = now;
+
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query(
+        'UPDATE public.telegram_link_codes SET used_at = NOW() WHERE code_hash = $1 RETURNING *',
+        [code_hash]
+      );
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB markTelegramLinkCodeUsed warning:', err.message);
+    }
+  }
+  return local;
+}
+
+async function getDonorByTelegramChatId(chatId) {
+  const numId = Number(chatId);
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query('SELECT * FROM public.donors WHERE telegram_chat_id = $1 LIMIT 1', [numId]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB getDonorByTelegramChatId warning:', err.message);
+    }
+  }
+  return (localStore.donors || []).find((d) => Number(d.telegram_chat_id) === numId) || null;
+}
+
+async function getDonorByUserId(userId) {
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query('SELECT * FROM public.donors WHERE user_id = $1 LIMIT 1', [userId]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB getDonorByUserId warning:', err.message);
+    }
+  }
+  return (localStore.donors || []).find((d) => d.user_id === userId) || null;
+}
+
+async function getDonorById(donorId) {
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query('SELECT * FROM public.donors WHERE id = $1 LIMIT 1', [donorId]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB getDonorById warning:', err.message);
+    }
+  }
+  return (localStore.donors || []).find((d) => d.id === donorId) || null;
+}
+
+async function linkDonorTelegramAccount({ donor_id, telegram_chat_id, telegram_username }) {
+  const now = new Date().toISOString();
+  const numChatId = Number(telegram_chat_id);
+
+  // Update in localStore
+  const localDonor = (localStore.donors || []).find((d) => d.id === donor_id);
+  if (localDonor) {
+    localDonor.telegram_chat_id = numChatId;
+    localDonor.telegram_username = telegram_username || null;
+    localDonor.telegram_opt_in = true;
+    localDonor.telegram_opt_in_at = now;
+    localDonor.telegram_opt_out_at = null;
+    localDonor.telegram_linked_at = now;
+    localDonor.updated_at = now;
+  }
+
+  // Update in PostgreSQL
+  if (isPostgres && pool) {
+    try {
+      const q = `
+        UPDATE public.donors
+        SET
+          telegram_chat_id = $1,
+          telegram_username = $2,
+          telegram_opt_in = TRUE,
+          telegram_opt_in_at = NOW(),
+          telegram_opt_out_at = NULL,
+          telegram_linked_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $3
+        RETURNING *
+      `;
+      const res = await pool.query(q, [numChatId, telegram_username || null, donor_id]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB linkDonorTelegramAccount warning:', err.message);
+    }
+  }
+  return localDonor;
+}
+
+async function unlinkDonorTelegramAccount(donor_id) {
+  const now = new Date().toISOString();
+
+  // Update in localStore
+  const localDonor = (localStore.donors || []).find((d) => d.id === donor_id);
+  if (localDonor) {
+    localDonor.telegram_chat_id = null;
+    localDonor.telegram_username = null;
+    localDonor.telegram_opt_in = false;
+    localDonor.telegram_opt_out_at = now;
+    localDonor.telegram_linked_at = null;
+    localDonor.updated_at = now;
+  }
+
+  // Update in PostgreSQL
+  if (isPostgres && pool) {
+    try {
+      const q = `
+        UPDATE public.donors
+        SET
+          telegram_chat_id = NULL,
+          telegram_username = NULL,
+          telegram_opt_in = FALSE,
+          telegram_opt_out_at = NOW(),
+          telegram_linked_at = NULL,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `;
+      const res = await pool.query(q, [donor_id]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB unlinkDonorTelegramAccount warning:', err.message);
+    }
+  }
+  return localDonor;
+}
+
+async function setDonorTelegramConsent(donor_id, enabled) {
+  const now = new Date().toISOString();
+  const optIn = Boolean(enabled);
+
+  // Update in localStore
+  const localDonor = (localStore.donors || []).find((d) => d.id === donor_id);
+  if (localDonor) {
+    localDonor.telegram_opt_in = optIn;
+    if (optIn) {
+      localDonor.telegram_opt_in_at = now;
+      localDonor.telegram_opt_out_at = null;
+    } else {
+      localDonor.telegram_opt_out_at = now;
+    }
+    localDonor.updated_at = now;
+  }
+
+  // Update in PostgreSQL
+  if (isPostgres && pool) {
+    try {
+      const q = `
+        UPDATE public.donors
+        SET
+          telegram_opt_in = $1,
+          telegram_opt_in_at = CASE WHEN $1 = TRUE THEN NOW() ELSE telegram_opt_in_at END,
+          telegram_opt_out_at = CASE WHEN $1 = FALSE THEN NOW() ELSE telegram_opt_out_at END,
+          updated_at = NOW()
+        WHERE id = $2
+        RETURNING *
+      `;
+      const res = await pool.query(q, [optIn, donor_id]);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB setDonorTelegramConsent warning:', err.message);
+    }
+  }
+  return localDonor;
+}
+
+async function saveTelegramNotification(job) {
+  if (!localStore.telegram_notifications) localStore.telegram_notifications = [];
+  const entry = {
+    id: require('uuid').v4(),
+    request_id: job.request_id,
+    donor_id: job.donor_id,
+    telegram_chat_id: Number(job.telegram_chat_id),
+    message_text: job.message_text,
+    telegram_message_id: job.telegram_message_id || null,
+    status: job.status || 'sent',
+    donor_response: job.donor_response || null,
+    responded_at: job.responded_at || null,
+    error_message: job.error_message || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  localStore.telegram_notifications.push(entry);
+
+  if (isPostgres && pool) {
+    try {
+      const q = `
+        INSERT INTO public.telegram_notifications (
+          request_id, donor_id, telegram_chat_id, message_text,
+          telegram_message_id, status, donor_response, responded_at, error_message
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+      `;
+      const res = await pool.query(q, [
+        job.request_id,
+        job.donor_id,
+        Number(job.telegram_chat_id),
+        job.message_text,
+        job.telegram_message_id || null,
+        job.status || 'sent',
+        job.donor_response || null,
+        job.responded_at ? new Date(job.responded_at) : null,
+        job.error_message || null
+      ]);
+      return res.rows[0];
+    } catch (err) {
+      console.warn('DB saveTelegramNotification warning:', err.message);
+    }
+  }
+  return entry;
+}
+
+async function getTelegramNotificationByRequestAndDonor(requestId, donorId) {
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query(
+        'SELECT * FROM public.telegram_notifications WHERE request_id = $1 AND donor_id = $2 LIMIT 1',
+        [requestId, donorId]
+      );
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB getTelegramNotificationByRequestAndDonor warning:', err.message);
+    }
+  }
+  if (!localStore.telegram_notifications) localStore.telegram_notifications = [];
+  return localStore.telegram_notifications.find(
+    (n) => n.request_id === requestId && n.donor_id === donorId
+  ) || null;
+}
+
+async function updateTelegramNotificationResponse(requestId, donorId, donorResponse) {
+  const now = new Date().toISOString();
+  if (!localStore.telegram_notifications) localStore.telegram_notifications = [];
+  const local = localStore.telegram_notifications.find(
+    (n) => n.request_id === requestId && n.donor_id === donorId
+  );
+  if (local) {
+    local.donor_response = donorResponse;
+    local.responded_at = now;
+    local.updated_at = now;
+  }
+
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query(
+        `UPDATE public.telegram_notifications
+         SET donor_response = $3, responded_at = NOW(), updated_at = NOW()
+         WHERE request_id = $1 AND donor_id = $2
+         RETURNING *`,
+        [requestId, donorId, donorResponse]
+      );
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB updateTelegramNotificationResponse warning:', err.message);
+    }
+  }
+  return local;
+}
+
 module.exports = {
   initDb,
   searchNearbyDonors,
@@ -997,4 +1450,17 @@ module.exports = {
   getWhatsAppNotificationByToken,
   updateWhatsAppNotification,
   searchNearbyWhatsAppDonors,
+  searchNearbyTelegramDonors,
+  saveTelegramLinkCode,
+  getTelegramLinkCodeByHash,
+  markTelegramLinkCodeUsed,
+  getDonorByTelegramChatId,
+  getDonorByUserId,
+  getDonorById,
+  linkDonorTelegramAccount,
+  unlinkDonorTelegramAccount,
+  setDonorTelegramConsent,
+  saveTelegramNotification,
+  getTelegramNotificationByRequestAndDonor,
+  updateTelegramNotificationResponse
 };

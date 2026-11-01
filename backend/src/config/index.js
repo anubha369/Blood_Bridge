@@ -21,6 +21,7 @@ const config = {
   // - 'llama-3.3-70b-versatile' (Recommended: high accuracy, structured JSON extraction)
   // - 'llama-3.1-8b-instant' (Alternative: low-latency, fast throughput)
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
 
   // Google Forms / Apps Script Webhook Secret & Google Sheets Sync
   googleFormWebhookSecret: process.env.GOOGLE_FORM_WEBHOOK_SECRET || process.env.GOOGLE_SCRIPT_SECRET || 'bb-vision-x-gform-secret-2026',

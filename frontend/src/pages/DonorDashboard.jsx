@@ -16,7 +16,12 @@ import {
   Sparkles,
   Check,
   AlertTriangle,
-  History
+  History,
+  Send,
+  ExternalLink,
+  Copy,
+  RefreshCw,
+  Unlink
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -35,14 +40,24 @@ export default function DonorDashboard() {
   const [donationDate, setDonationDate] = useState(new Date().toISOString().split('T')[0]);
   const [confirmingDonation, setConfirmingDonation] = useState(false);
 
+  // Telegram integration state
+  const [telegramStatus, setTelegramStatus] = useState(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramLinkData, setTelegramLinkData] = useState(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [togglingTelegramConsent, setTogglingTelegramConsent] = useState(false);
+  const [unlinkingTelegram, setUnlinkingTelegram] = useState(false);
+
   const fetchDonorData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [profileRes, cooldownRes, creditRes] = await Promise.all([
+      const [profileRes, cooldownRes, creditRes, telegramRes] = await Promise.all([
         api.donors.getProfile().catch((e) => (e.status === 404 ? { donor: null } : Promise.reject(e))),
         api.donors.getCooldownStatus().catch(() => null),
-        api.credits.getHistory().catch(() => ({ balance: 0, history: [] }))
+        api.credits.getHistory().catch(() => ({ balance: 0, history: [] })),
+        api.telegram.getStatus().catch(() => null)
       ]);
 
       if (profileRes && profileRes.donor) {
@@ -58,10 +73,86 @@ export default function DonorDashboard() {
       if (creditRes && creditRes.success) {
         setCredits({ balance: creditRes.balance, history: creditRes.history || [] });
       }
+
+      if (telegramRes && telegramRes.success) {
+        setTelegramStatus(telegramRes);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load donor dashboard data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTelegramStatus = async () => {
+    setTelegramLoading(true);
+    try {
+      const res = await api.telegram.getStatus();
+      if (res && res.success) {
+        setTelegramStatus(res);
+      }
+    } catch (e) {
+      console.warn('Failed to refresh Telegram status:', e.message);
+    } finally {
+      setTelegramLoading(false);
+    }
+  };
+
+  const handleGenerateTelegramCode = async () => {
+    setGeneratingCode(true);
+    setCopiedCode(false);
+    try {
+      const res = await api.telegram.getLinkCode();
+      if (res && res.success) {
+        setTelegramLinkData(res);
+      }
+    } catch (err) {
+      alert(`Could not generate Telegram linking code: ${err.message}`);
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const handleCopyCode = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 3000);
+  };
+
+  const handleToggleTelegramConsent = async () => {
+    if (!telegramStatus) return;
+    setTogglingTelegramConsent(true);
+    const newConsent = !telegramStatus.telegram_opt_in;
+    try {
+      const res = await api.telegram.updateConsent(newConsent);
+      if (res && res.success) {
+        setTelegramStatus((prev) => ({
+          ...prev,
+          telegram_opt_in: newConsent
+        }));
+      }
+    } catch (err) {
+      alert(`Could not update Telegram notification setting: ${err.message}`);
+    } finally {
+      setTogglingTelegramConsent(false);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    if (!window.confirm('Are you sure you want to disconnect your Telegram account? You will stop receiving instant emergency alerts on Telegram.')) {
+      return;
+    }
+    setUnlinkingTelegram(true);
+    try {
+      const res = await api.telegram.unlink();
+      if (res && res.success) {
+        setTelegramLinkData(null);
+        await fetchTelegramStatus();
+      }
+    } catch (err) {
+      alert(`Could not disconnect Telegram: ${err.message}`);
+    } finally {
+      setUnlinkingTelegram(false);
     }
   };
 
@@ -323,6 +414,198 @@ export default function DonorDashboard() {
           </div>
         </div>
 
+      </div>
+
+      {/* Telegram Emergency Alerts Integration Card */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
+              <Send className="w-5 h-5 -rotate-12 translate-x-0.5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  Telegram Emergency Alert Network
+                </h2>
+                {telegramStatus?.linked ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 bg-emerald-100 rounded-full border border-emerald-300">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold text-slate-600 bg-slate-100 rounded-full border border-slate-300">
+                    Not Connected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Instant emergency alerts with interactive Accept and Decline buttons directly on Telegram
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={fetchTelegramStatus}
+            disabled={telegramLoading}
+            className="self-start sm:self-center p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+            title="Refresh status"
+          >
+            <RefreshCw className={`w-4 h-4 ${telegramLoading ? 'animate-spin text-sky-600' : ''}`} />
+          </button>
+        </div>
+
+        {telegramStatus?.linked ? (
+          /* Connected View */
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+              <div>
+                <span className="text-[11px] text-slate-400 block font-medium">Telegram User</span>
+                <span className="font-bold text-slate-900">
+                  {telegramStatus.telegram_username ? `@${telegramStatus.telegram_username}` : 'Linked via Bot'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 block font-medium">Masked Chat ID</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {telegramStatus.telegram_chat_id_masked || '••••'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 block font-medium">Connected Since</span>
+                <span className="font-semibold text-slate-700">
+                  {telegramStatus.telegram_linked_at ? new Date(telegramStatus.telegram_linked_at).toLocaleDateString() : 'Active'}
+                </span>
+              </div>
+            </div>
+
+            {/* Notification Consent Toggle */}
+            <div className="flex items-center justify-between p-4 bg-sky-50/50 rounded-2xl border border-sky-100">
+              <div>
+                <span className="font-bold text-slate-900 text-xs block">
+                  Telegram Emergency Alerts
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {telegramStatus.telegram_opt_in
+                    ? 'Active: You will receive direct messages with Accept/Decline buttons for compatible urgent requests.'
+                    : 'Paused: Alerts to this Telegram account are temporarily suspended.'}
+                </p>
+              </div>
+              <button
+                onClick={handleToggleTelegramConsent}
+                disabled={togglingTelegramConsent}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                  telegramStatus.telegram_opt_in
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                    : 'bg-slate-300 hover:bg-slate-400 text-slate-800'
+                }`}
+              >
+                {telegramStatus.telegram_opt_in ? 'Alerts ON' : 'Alerts Paused'}
+              </button>
+            </div>
+
+            {/* Disconnect Action */}
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[11px] text-slate-400">
+                You can also use <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">/stop</code> or <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">/unlink</code> inside the bot at any time.
+              </span>
+              <button
+                onClick={handleUnlinkTelegram}
+                disabled={unlinkingTelegram}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:text-rose-800 hover:bg-rose-50 rounded-xl transition-colors"
+              >
+                <Unlink className="w-3.5 h-3.5" />
+                {unlinkingTelegram ? 'Disconnecting...' : 'Disconnect Telegram'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Not Connected View */
+          <div className="space-y-4">
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Connect your Telegram account to receive instant notifications during critical blood shortages. You can accept or decline requests in one tap without needing to open the website.
+            </p>
+
+            {!telegramLinkData ? (
+              <div>
+                <button
+                  onClick={handleGenerateTelegramCode}
+                  disabled={generatingCode}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-sm transition-all shadow-sky-200"
+                >
+                  <Send className="w-3.5 h-3.5 -rotate-12" />
+                  {generatingCode ? 'Generating Secure Code...' : 'Connect Telegram'}
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 bg-sky-50/70 border border-sky-200 rounded-2xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-sky-900 block">
+                      Your One-Time Linking Code (Expires in 15 mins)
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-base font-mono font-black text-slate-900 bg-white px-3 py-1.5 rounded-xl border border-sky-200 tracking-wider">
+                        {telegramLinkData.code}
+                      </code>
+                      <button
+                        onClick={() => handleCopyCode(telegramLinkData.code)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors"
+                      >
+                        {copiedCode ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-emerald-700">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Copy Code</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <a
+                    href={telegramLinkData.deep_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow transition-all shadow-sky-200 self-start sm:self-center"
+                  >
+                    <span>Open in Telegram</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+
+                <div className="border-t border-sky-100 pt-3 space-y-1.5 text-xs text-sky-950">
+                  <span className="font-bold block">Quick Instructions:</span>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
+                    <li>Click <strong>Open in Telegram</strong> above, or search for <strong>@{telegramLinkData.bot_username || 'Blood_Bridgebot'}</strong> in Telegram.</li>
+                    <li>Tap <strong>Start</strong> in the bot, or send: <code className="bg-white px-1 py-0.5 rounded text-slate-800">/start {telegramLinkData.code}</code></li>
+                    <li>Once sent, tap <strong>I've Sent the Code (Check Status)</strong> below to confirm your connection.</li>
+                  </ol>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    onClick={fetchTelegramStatus}
+                    className="text-xs font-bold text-sky-700 hover:text-sky-800 inline-flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    I've Sent the Code (Check Status)
+                  </button>
+                  <button
+                    onClick={() => setTelegramLinkData(null)}
+                    className="text-xs text-slate-400 hover:text-slate-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Credit Points & Participation Recognition Ledger */}

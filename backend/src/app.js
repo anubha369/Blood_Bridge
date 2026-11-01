@@ -18,6 +18,7 @@ const integrationRoutes = require('./routes/integrationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const creditRoutes = require('./routes/creditRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
+const telegramRoutes = require('./routes/telegramRoutes');
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use('/api/integrations', integrationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/telegram', telegramRoutes);
 
 // 404 handler
 app.use('/api/*', (req, res) => {

@@ -72,6 +72,15 @@ export const api = {
     getManualLink: (payload) => request('/whatsapp/manual-link', { method: 'POST', body: JSON.stringify(payload) })
   },
 
+  // Telegram Emergency Alerts & Account Linking
+  telegram: {
+    getStatus: () => request('/telegram/status'),
+    getLinkCode: () => request('/telegram/link-code', { method: 'POST' }),
+    updateConsent: (enabled) => request('/telegram/consent', { method: 'POST', body: JSON.stringify({ enabled }) }),
+    unlink: () => request('/telegram/unlink', { method: 'POST' }),
+    sendRequestNotifications: (payload) => request('/telegram/send-request-notifications', { method: 'POST', body: JSON.stringify(payload) })
+  },
+
   // Requests
   requests: {
     create: (payload) => request('/requests', { method: 'POST', body: JSON.stringify(payload) }),
