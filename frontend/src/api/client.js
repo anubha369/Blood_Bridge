@@ -1,29 +1,77 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 /**
- * Core HTTP Request Wrapper
+ * Core HTTP Request Wrapper with safe JSON / HTML content inspection
  */
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('bloodbridge_token');
   const headers = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers
+    });
+  } catch (networkErr) {
+    const error = new Error(`Unable to reach the server at ${API_BASE}. Please ensure your backend is running.`);
+    error.status = 0;
+    error.originalError = networkErr;
+    throw error;
+  }
 
-  const data = await response.json();
+  // Safe response parsing: inspect Content-Type before parsing JSON to prevent syntax crashes on HTML error pages
+  const contentType = response.headers.get('content-type') || '';
+  let data = null;
+  let rawText = '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await response.json();
+    } catch (_) {
+      data = null;
+    }
+  } else {
+    try {
+      rawText = await response.text();
+    } catch (_) {}
+  }
 
   if (!response.ok) {
-    const errorMsg = data.error || `Request failed with status ${response.status}`;
+    let errorMsg = '';
+    if (data && data.error) {
+      errorMsg = data.error;
+    } else if (data && data.message) {
+      errorMsg = data.message;
+    } else if (response.status === 404) {
+      errorMsg = `API route not found (404): ${endpoint}. Please ensure the backend server is running and VITE_API_URL is configured.`;
+    } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+      errorMsg = `Backend server temporarily unavailable (${response.status}). Please verify that the API server is reachable.`;
+    } else if (rawText) {
+      const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
+      const cleanTitle = titleMatch ? titleMatch[1].trim() : '';
+      errorMsg = cleanTitle || `Request failed with status ${response.status}`;
+    } else {
+      errorMsg = `Request failed with status ${response.status}`;
+    }
+
     const error = new Error(errorMsg);
     error.status = response.status;
     error.data = data;
+    error.raw = rawText;
     throw error;
+  }
+
+  if (!data) {
+    if (rawText) {
+      return { success: true, text: rawText };
+    }
+    return { success: true };
   }
 
   return data;

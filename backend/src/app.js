@@ -91,8 +91,8 @@ app.use('/api/credits', creditRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/telegram', telegramRoutes);
 
-// 404 handler
-app.use('/api/*', (req, res) => {
+// Catch-all 404 handler for all unmatched routes (guarantees JSON format)
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     error: `API route not found: ${req.method} ${req.originalUrl}`
