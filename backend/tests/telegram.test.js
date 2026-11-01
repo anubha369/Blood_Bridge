@@ -305,6 +305,31 @@ test('Telegram: Bot Commands (/start, /status, /stop, /unlink)', async () => {
   assert.ok(mockSentMessages[0].payload.text.includes('Account Disconnected'));
   assert.strictEqual(donor.telegram_chat_id, null);
   assert.strictEqual(donor.telegram_opt_in, false);
+
+  // 7. Command variations: /start@BloodBridgeVisionXBot, plain "start", and greeting "hello"
+  mockSentMessages.length = 0;
+  await handleTelegramMessage({
+    chat: { id: testChatId },
+    text: '/start@BloodBridgeVisionXBot'
+  });
+  assert.strictEqual(mockSentMessages.length, 1);
+  assert.ok(mockSentMessages[0].payload.text.includes('Welcome to BloodBridge'));
+
+  mockSentMessages.length = 0;
+  await handleTelegramMessage({
+    chat: { id: testChatId },
+    text: 'start'
+  });
+  assert.strictEqual(mockSentMessages.length, 1);
+  assert.ok(mockSentMessages[0].payload.text.includes('Welcome to BloodBridge'));
+
+  mockSentMessages.length = 0;
+  await handleTelegramMessage({
+    chat: { id: testChatId },
+    text: 'hello'
+  });
+  assert.strictEqual(mockSentMessages.length, 1);
+  assert.ok(mockSentMessages[0].payload.text.includes('Welcome to BloodBridge'));
 });
 
 test('Telegram: Emergency Message Formatting and Duplicate Alert Prevention', async () => {

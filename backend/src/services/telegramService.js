@@ -66,11 +66,20 @@ async function callTelegramApi(method, payload) {
   }
 
   const url = `https://api.telegram.org/bot${token}/${method}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (netErr) {
+    let sanitized = netErr.message || 'Network error';
+    if (token && sanitized.includes(token)) {
+      sanitized = sanitized.replaceAll(token, '[REDACTED_BOT_TOKEN]');
+    }
+    throw new Error(`Telegram API network failure on ${method}: ${sanitized}`);
+  }
 
   const data = await response.json();
   if (!data.ok) {
@@ -199,7 +208,7 @@ async function sendTelegramMessage(chatId, text, inlineKeyboard = null) {
   } catch (err) {
     // If Markdown parsing fails, retry without parse_mode so message is guaranteed to deliver
     if (err.message && err.message.toLowerCase().includes("can't parse entities")) {
-      console.warn('[Telegram Bot] Markdown parsing failed, retrying in plain text for chat:', chatId);
+      console.warn('[Telegram Bot] Markdown parsing failed, retrying in plain text for chat:', maskChatId(chatId));
       const plainPayload = {
         chat_id: chatId,
         text
@@ -410,19 +419,34 @@ async function handleTelegramMessage(message) {
   const parts = trimmed.split(/\s+/);
   const firstPart = parts[0] || '';
 
-  // Match command and optional bot username e.g. /start or /start@Blood_Bridgebot
-  const cmdMatch = firstPart.match(/^\/([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9_]+))?$/i);
-  if (!cmdMatch) return;
+  let command = null;
+  let rawArg = '';
 
-  const command = cmdMatch[1].toLowerCase();
-  const botTarget = cmdMatch[2];
-  if (botTarget && botTarget.toLowerCase() !== BOT_USERNAME.toLowerCase()) {
-    // Message targeted at another bot in a group chat
-    return;
+  // Match command and optional bot username e.g. /start, /start@Blood_Bridgebot, /start@BloodBridgeVisionXBot
+  const cmdMatch = firstPart.match(/^\/([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9_]+))?$/i);
+  if (cmdMatch) {
+    command = cmdMatch[1].toLowerCase();
+    const botTarget = cmdMatch[2];
+    const isPrivateChat = !message.chat.type || message.chat.type === 'private';
+    if (botTarget && !isPrivateChat && botTarget.toLowerCase() !== BOT_USERNAME.toLowerCase() && !botTarget.toLowerCase().includes('blood')) {
+      // Message targeted at another bot in a group chat
+      return;
+    }
+    rawArg = parts.slice(1).join(' ').trim();
+  } else {
+    // Plain text fallback without slash e.g. "start", "start <code>", "status", "stop", "unlink", "help"
+    const lowerFirst = firstPart.toLowerCase();
+    if (['start', 'status', 'stop', 'unlink', 'help'].includes(lowerFirst)) {
+      command = lowerFirst === 'help' ? 'start' : lowerFirst;
+      rawArg = parts.slice(1).join(' ').trim();
+    } else {
+      // Any other text greeting (e.g. "hi", "hello") routes safely to welcome guidance
+      command = 'start';
+      rawArg = '';
+    }
   }
 
-  const rawArg = parts.slice(1).join(' ').trim();
-  console.log(`[Telegram Bot] Processing command: /${command} (arg: "${rawArg}") from chat: ${chatId}`);
+  console.log(`[Telegram Command Handler] Handling /${command} (has_code_arg: ${Boolean(rawArg)}) [chat: ${maskChatId(chatId)}]`);
 
   // Command 1: /start
   if (command === 'start') {
@@ -697,10 +721,26 @@ async function handleTelegramCallbackQuery(callbackQuery) {
  */
 async function handleTelegramUpdate(update) {
   if (!update) return;
+  const updateType = update.message
+    ? 'message'
+    : update.callback_query
+    ? 'callback_query'
+    : update.edited_message
+    ? 'edited_message'
+    : update.my_chat_member
+    ? 'my_chat_member'
+    : 'other';
+
+  console.log(`[Telegram Update] Dispatching update_id #${update.update_id} (type: ${updateType})`);
+
   if (update.message) {
     await handleTelegramMessage(update.message);
+  } else if (update.edited_message) {
+    await handleTelegramMessage(update.edited_message);
   } else if (update.callback_query) {
     await handleTelegramCallbackQuery(update.callback_query);
+  } else if (update.my_chat_member) {
+    console.log(`[Telegram Update] Chat membership updated for chat: ${maskChatId(update.my_chat_member.chat ? update.my_chat_member.chat.id : null)}`);
   }
 }
 
@@ -733,48 +773,93 @@ async function startPolling() {
   }
 
   let offset = 0;
+  let pollCycle = 0;
 
   // Polling loop
   (async () => {
     console.log(`[Telegram Bot] Polling loop active for @${BOT_USERNAME}`);
     while (pollingActive) {
+      pollCycle++;
+      const cycleStart = Date.now();
       try {
+        // Use client-side timeout of 16s so fetch never hangs indefinitely on dead sockets
+        const clientTimeoutSignal = AbortSignal.timeout(16000);
+        const requestSignal = pollingAbortController
+          ? AbortSignal.any([clientTimeoutSignal, pollingAbortController.signal])
+          : clientTimeoutSignal;
+
         const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             offset,
             timeout: 10,
-            allowed_updates: ['message', 'callback_query']
+            allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member']
           }),
-          signal: pollingAbortController ? pollingAbortController.signal : undefined
+          signal: requestSignal
         });
+
+        const elapsedMs = Date.now() - cycleStart;
 
         if (!res.ok) {
           const errText = await res.text();
-          console.warn(`[Telegram Bot] Polling HTTP error: ${res.status}`, errText);
+          let parsedErr = {};
+          try {
+            parsedErr = JSON.parse(errText);
+          } catch (_) {}
+
+          if (res.status === 409 || parsedErr.error_code === 409) {
+            console.warn(`[Telegram Polling WARNING] HTTP 409 Conflict detected (cycle #${pollCycle}, took ${elapsedMs}ms). Another process or bot instance is actively calling getUpdates or a webhook is configured.`);
+          } else if (res.status === 401 || parsedErr.error_code === 401) {
+            console.error(`[Telegram Polling ERROR] HTTP 401 Unauthorized (cycle #${pollCycle}). Bot token is invalid.`);
+          } else {
+            console.warn(`[Telegram Polling Warning] HTTP ${res.status} (cycle #${pollCycle}, took ${elapsedMs}ms): ${parsedErr.description || errText}`);
+          }
           await new Promise((r) => setTimeout(r, 4000));
           continue;
         }
 
         const data = await res.json();
-        if (data.ok && Array.isArray(data.result)) {
+        const updateCount = Array.isArray(data.result) ? data.result.length : 0;
+
+        // Log the HTTP response status, Telegram ok field, update count, and offset (privacy-safe, no chat IDs or tokens)
+        console.log(`[Telegram Polling] Cycle #${pollCycle} | HTTP ${res.status} | ok: ${Boolean(data.ok)} | updates_received: ${updateCount} | current_offset: ${offset} | duration: ${elapsedMs}ms`);
+
+        if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
+          const prevOffset = offset;
           for (const update of data.result) {
             if (update.update_id >= offset) {
               offset = update.update_id + 1;
             }
+          }
+          console.log(`[Telegram Polling] Received ${data.result.length} update(s). Polling offset advanced from ${prevOffset} to ${offset}`);
+
+          for (const update of data.result) {
             try {
-              console.log(`[Telegram Bot] Processing update #${update.update_id} (${update.message ? 'message' : update.callback_query ? 'callback_query' : 'other'})`);
               await handleTelegramUpdate(update);
             } catch (itemErr) {
-              console.error(`[Telegram Bot] Error processing update #${update.update_id}:`, itemErr.message);
+              console.error(`[Telegram Update Error] Error processing update #${update.update_id}:`, itemErr.message);
             }
           }
         }
       } catch (pollErr) {
         if (!pollingActive) break;
-        if (pollErr.name === 'AbortError') break;
-        console.error('[Telegram Bot] Polling network exception:', pollErr.message);
+        if (pollingAbortController && pollingAbortController.signal.aborted) break;
+
+        const isTimeout =
+          pollErr.name === 'TimeoutError' ||
+          (pollErr.name === 'AbortError' && (!pollingAbortController || !pollingAbortController.signal.aborted));
+
+        if (isTimeout) {
+          console.log(`[Telegram Polling] Cycle #${pollCycle} client socket timeout after ${Date.now() - cycleStart}ms. Re-polling...`);
+          continue;
+        }
+
+        let safeErrMsg = pollErr.message || 'Unknown network error';
+        if (token && safeErrMsg.includes(token)) {
+          safeErrMsg = safeErrMsg.replaceAll(token, '[REDACTED_BOT_TOKEN]');
+        }
+        console.error(`[Telegram Polling Network Error] Cycle #${pollCycle}: ${safeErrMsg}`);
         await new Promise((r) => setTimeout(r, 3000));
       }
     }
