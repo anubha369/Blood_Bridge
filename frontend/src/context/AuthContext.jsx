@@ -38,8 +38,14 @@ export function AuthProvider({ children }) {
     return fallback;
   };
 
-  const login = async (email, password) => {
-    const res = await api.auth.login({ email, password });
+  const login = async (identifierOrEmail, password, role = null) => {
+    const payload = {
+      identifier: identifierOrEmail,
+      email: identifierOrEmail,
+      password,
+      ...(role ? { role } : {})
+    };
+    const res = await api.auth.login(payload);
     if (res.success && res.token) {
       localStorage.setItem('bloodbridge_token', res.token);
       setUser(res.user);
@@ -56,6 +62,18 @@ export function AuthProvider({ children }) {
       return res.user;
     }
     throw new Error(extractErrorMessage(res, 'Registration failed. Please check your details.'));
+  };
+
+  const sendOtp = async (phone) => {
+    return await api.auth.sendOtp({ phone });
+  };
+
+  const verifyOtp = async (phone, otp, challengeId) => {
+    return await api.auth.verifyOtp({ phone, otp, challenge_id: challengeId });
+  };
+
+  const resendOtp = async (phone, challengeId) => {
+    return await api.auth.resendOtp({ phone, challenge_id: challengeId });
   };
 
   const logout = () => {
@@ -75,12 +93,13 @@ export function AuthProvider({ children }) {
   };
 
   const loginAsDemo = async (role) => {
-    let email = '';
-    if (role === 'admin') email = 'admin@bloodbridge.org';
-    else if (role === 'donor') email = 'donor@bloodbridge.org';
-    else email = 'requester@bloodbridge.org';
-
-    return login(email, 'BloodBridge2026!');
+    if (role === 'admin') {
+      return login('admin@bloodbridge.org', 'AdminPass2026!');
+    } else if (role === 'donor') {
+      return login('donor.sarah@bloodbridge.org', 'DonorPass2026!');
+    } else {
+      return login('dr.mehta@cityhospital.org', 'HospitalPass2026!');
+    }
   };
 
   return (
@@ -90,13 +109,17 @@ export function AuthProvider({ children }) {
         loading,
         login,
         signup,
+        sendOtp,
+        verifyOtp,
+        resendOtp,
         logout,
         refreshUser,
         loginAsDemo,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'admin',
         isDonor: user?.role === 'donor',
-        isRequester: user?.role === 'requester'
+        isRequester: user?.role === 'requester',
+        isPatient: user?.role === 'requester'
       }}
     >
       {children}

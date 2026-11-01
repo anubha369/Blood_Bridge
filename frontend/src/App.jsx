@@ -23,6 +23,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import RequestDetails from './pages/RequestDetails';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyOtp from './pages/VerifyOtp';
 import RequesterDashboard from './pages/RequesterDashboard';
 import CreateRequest from './pages/CreateRequest';
 import DonorDashboard from './pages/DonorDashboard';
@@ -84,10 +85,27 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/register" element={<Signup />} />
+              <Route path="/verify-otp" element={<VerifyOtp />} />
 
-              {/* Requester Protected Routes & Aliases */}
+              {/* Requester & Patient Protected Routes & Aliases */}
               <Route
                 path="/requester/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['requester', 'admin']}>
+                    <RequesterDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/patient/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['requester', 'admin']}>
+                    <RequesterDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/patient"
                 element={
                   <ProtectedRoute allowedRoles={['requester', 'admin']}>
                     <RequesterDashboard />

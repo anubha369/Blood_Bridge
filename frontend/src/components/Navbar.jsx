@@ -34,6 +34,11 @@ export default function Navbar({ onOpenAI }) {
 
   const isActive = (path) => location.pathname === path;
 
+  // On landing page and dedicated authentication pages, let their own specialized visual headers render
+  if (['/', '/login', '/signup', '/verify-otp'].includes(location.pathname)) {
+    return null;
+  }
+
   return (
     <header className="sticky top-0 z-40 bg-navy-950/95 backdrop-blur border-b border-navy-800 text-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

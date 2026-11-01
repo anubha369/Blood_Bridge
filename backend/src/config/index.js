@@ -42,6 +42,12 @@ const config = {
   whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME || 'blood_donation_urgent_request',
   whatsappUseTemplate: process.env.WHATSAPP_USE_TEMPLATE === 'true',
 
+  // MSG91 SMS OTP Configuration
+  msg91AuthKey: process.env.MSG91_AUTH_KEY || '',
+  msg91TemplateId: process.env.MSG91_TEMPLATE_ID || '',
+  msg91OtpExpiry: parseInt(process.env.MSG91_OTP_EXPIRY || '5', 10),
+  msg91OtpLength: parseInt(process.env.MSG91_OTP_LENGTH || '6', 10),
+
   // Spatial search defaults
   defaultSearchRadiusKm: 25,
   maxSearchRadiusKm: 150,
