@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
-const { localStore } = require('../db/db');
+const { localStore, isPostgresConnected, getPool } = require('../db/db');
 const { authenticateUser } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
 
@@ -22,7 +22,17 @@ router.post('/signup', authLimiter, async (req, res, next) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const existing = localStore.users.find((u) => u.email === normalizedEmail);
+    let existing = localStore.users.find((u) => u.email === normalizedEmail);
+    if (!existing && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const check = await pool.query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [normalizedEmail]);
+        if (check.rows.length > 0) existing = check.rows[0];
+      } catch (err) {
+        // Fallback to memory
+      }
+    }
+
     if (existing) {
       return res.status(409).json({ success: false, error: 'An account with this email address already exists.' });
     }
@@ -41,6 +51,20 @@ router.post('/signup', authLimiter, async (req, res, next) => {
     };
 
     localStore.users.push(newUser);
+
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `INSERT INTO public.users (id, email, password_hash, name, role, phone, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+           ON CONFLICT (email) DO NOTHING`,
+          [newUser.id, newUser.email, newUser.password_hash, newUser.name, newUser.role, newUser.phone]
+        );
+      } catch (err) {
+        console.warn('PostgreSQL user insert notice:', err.message);
+      }
+    }
 
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email, role: newUser.role },
@@ -74,7 +98,23 @@ router.post('/login', authLimiter, async (req, res, next) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const user = localStore.users.find((u) => u.email === normalizedEmail);
+    let user = localStore.users.find((u) => u.email === normalizedEmail);
+
+    if (!user && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const userRes = await pool.query('SELECT * FROM public.users WHERE email = $1 LIMIT 1', [normalizedEmail]);
+        if (userRes.rows.length > 0) {
+          user = userRes.rows[0];
+          if (!localStore.users.find((u) => u.id === user.id)) {
+            localStore.users.push(user);
+          }
+        }
+      } catch (err) {
+        console.warn('PostgreSQL login lookup notice:', err.message);
+      }
+    }
+
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid email or password.' });
     }
@@ -91,7 +131,14 @@ router.post('/login', authLimiter, async (req, res, next) => {
     );
 
     // Also look up donor profile if role is donor
-    const donorProfile = localStore.donors.find((d) => d.user_id === user.id);
+    let donorProfile = localStore.donors.find((d) => d.user_id === user.id);
+    if (!donorProfile && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const dRes = await pool.query('SELECT * FROM public.donors WHERE user_id = $1 LIMIT 1', [user.id]);
+        if (dRes.rows.length > 0) donorProfile = dRes.rows[0];
+      } catch (e) {}
+    }
 
     return res.json({
       success: true,
@@ -111,13 +158,28 @@ router.post('/login', authLimiter, async (req, res, next) => {
 });
 
 // GET /api/auth/me
-router.get('/me', authenticateUser, (req, res) => {
-  const user = localStore.users.find((u) => u.id === req.user.id);
+router.get('/me', authenticateUser, async (req, res) => {
+  let user = localStore.users.find((u) => u.id === req.user.id);
+  if (!user && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const userRes = await pool.query('SELECT * FROM public.users WHERE id = $1 LIMIT 1', [req.user.id]);
+      if (userRes.rows.length > 0) user = userRes.rows[0];
+    } catch (e) {}
+  }
+
   if (!user) {
     return res.status(404).json({ success: false, error: 'User profile not found.' });
   }
 
-  const donorProfile = localStore.donors.find((d) => d.user_id === user.id);
+  let donorProfile = localStore.donors.find((d) => d.user_id === user.id);
+  if (!donorProfile && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dRes = await pool.query('SELECT * FROM public.donors WHERE user_id = $1 LIMIT 1', [user.id]);
+      if (dRes.rows.length > 0) donorProfile = dRes.rows[0];
+    } catch (e) {}
+  }
 
   return res.json({
     success: true,

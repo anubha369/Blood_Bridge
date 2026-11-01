@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { localStore, calculateHaversineDistanceKm, getPrivacySafeDistanceBand, searchNearbyTelegramDonors } = require('../db/db');
+const {
+  localStore,
+  calculateHaversineDistanceKm,
+  getPrivacySafeDistanceBand,
+  searchNearbyTelegramDonors,
+  isPostgresConnected,
+  getPool
+} = require('../db/db');
 const { authenticateUser, optionalAuth } = require('../middleware/auth');
 const { rankCandidateDonors } = require('../services/matchingService');
 const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatialService');
@@ -98,6 +105,46 @@ router.post('/', authenticateUser, async (req, res, next) => {
 
     localStore.blood_requests.push(newRequest);
 
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `INSERT INTO public.blood_requests (
+            id, requester_id, patient_name, blood_group, units_needed,
+            hospital_name, hospital_address, city, latitude, longitude,
+            urgency, needed_by, description, contact_phone, contact_preference,
+            status, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15,
+            $16, NOW(), NOW()
+          )
+          ON CONFLICT (id) DO NOTHING`,
+          [
+            newRequest.id,
+            newRequest.requester_id,
+            newRequest.patient_name,
+            newRequest.blood_group,
+            newRequest.units_needed,
+            newRequest.hospital_name,
+            newRequest.hospital_address,
+            newRequest.city,
+            newRequest.latitude,
+            newRequest.longitude,
+            newRequest.urgency,
+            newRequest.needed_by,
+            newRequest.description,
+            newRequest.contact_phone,
+            newRequest.contact_preference,
+            newRequest.status
+          ]
+        );
+      } catch (dbErr) {
+        console.warn('PostgreSQL blood request insert warning:', dbErr.message);
+      }
+    }
+
     // Automatic Telegram emergency alerts if urgency is emergency
     if (newRequest.urgency === 'emergency' && (newRequest.latitude != null && newRequest.longitude != null)) {
       (async () => {
@@ -134,10 +181,26 @@ router.post('/', authenticateUser, async (req, res, next) => {
 
 // GET /api/requests
 // List requests (admin sees all, regular users see own or active public list)
-router.get('/', optionalAuth, (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   const { status, city, blood_group, own_only } = req.query;
 
   let requests = [...localStore.blood_requests];
+
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const resDb = await pool.query('SELECT * FROM public.blood_requests ORDER BY created_at DESC');
+      if (resDb.rows.length > 0) {
+        const seen = new Set(requests.map((r) => r.id));
+        for (const row of resDb.rows) {
+          if (!seen.has(row.id)) {
+            requests.push(row);
+            seen.add(row.id);
+          }
+        }
+      }
+    } catch (e) {}
+  }
 
   if (own_only === 'true' && req.user) {
     requests = requests.filter((r) => r.requester_id === req.user.id);
@@ -153,7 +216,7 @@ router.get('/', optionalAuth, (req, res) => {
     requests = requests.filter((r) => r.status === status);
   }
   if (city) {
-    requests = requests.filter((r) => r.city.toLowerCase() === city.toLowerCase());
+    requests = requests.filter((r) => r.city && r.city.toLowerCase() === city.toLowerCase());
   }
   if (blood_group) {
     requests = requests.filter((r) => r.blood_group === blood_group.toUpperCase());
@@ -170,8 +233,21 @@ router.get('/', optionalAuth, (req, res) => {
 });
 
 // GET /api/requests/:id
-router.get('/:id', optionalAuth, (req, res) => {
-  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+router.get('/:id', optionalAuth, async (req, res) => {
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const resDb = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (resDb.rows.length > 0) {
+        request = resDb.rows[0];
+        if (!localStore.blood_requests.find((r) => r.id === request.id)) {
+          localStore.blood_requests.push(request);
+        }
+      }
+    } catch (e) {}
+  }
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
   }
@@ -311,7 +387,7 @@ router.get('/:id/accepted-donors', authenticateUser, (req, res) => {
 
 // POST /api/requests/:id/select-donor
 // Select one accepting donor for coordination and reveal contact info
-router.post('/:id/select-donor', authenticateUser, (req, res) => {
+router.post('/:id/select-donor', authenticateUser, async (req, res) => {
   const request = localStore.blood_requests.find((r) => r.id === req.params.id);
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
@@ -350,6 +426,16 @@ router.post('/:id/select-donor', authenticateUser, (req, res) => {
   request.status = 'donor_selected';
   request.updated_at = new Date().toISOString();
 
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        'UPDATE public.blood_requests SET selected_donor_id = $1, selected_at = NOW(), status = $2, updated_at = NOW() WHERE id = $3',
+        [donor_id, request.status, request.id]
+      );
+    } catch (e) {}
+  }
+
   // Audit event
   localStore.audit_events.push({
     id: String(Date.now()),
@@ -379,7 +465,7 @@ router.post('/:id/select-donor', authenticateUser, (req, res) => {
 
 // POST /api/requests/:id/reselect-donor
 // Clear selection and allow picking another accepting donor
-router.post('/:id/reselect-donor', authenticateUser, (req, res) => {
+router.post('/:id/reselect-donor', authenticateUser, async (req, res) => {
   const request = localStore.blood_requests.find((r) => r.id === req.params.id);
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
@@ -394,6 +480,16 @@ router.post('/:id/reselect-donor', authenticateUser, (req, res) => {
   request.status = 'responses_received';
   request.updated_at = new Date().toISOString();
 
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        'UPDATE public.blood_requests SET selected_donor_id = NULL, selected_at = NULL, status = $1, updated_at = NOW() WHERE id = $2',
+        [request.status, request.id]
+      );
+    } catch (e) {}
+  }
+
   return res.json({
     success: true,
     message: 'Donor selection cleared. You may select another accepting donor.',
@@ -402,7 +498,7 @@ router.post('/:id/reselect-donor', authenticateUser, (req, res) => {
 });
 
 // PATCH /api/requests/:id/status
-router.patch('/:id/status', authenticateUser, (req, res) => {
+router.patch('/:id/status', authenticateUser, async (req, res) => {
   const request = localStore.blood_requests.find((r) => r.id === req.params.id);
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
@@ -420,6 +516,16 @@ router.patch('/:id/status', authenticateUser, (req, res) => {
 
   request.status = status;
   request.updated_at = new Date().toISOString();
+
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        'UPDATE public.blood_requests SET status = $1, updated_at = NOW() WHERE id = $2',
+        [status, request.id]
+      );
+    } catch (e) {}
+  }
 
   // If request is marked fulfilled and a donor was selected, record completed donation & trigger cooldown
   if (status === 'fulfilled' && request.selected_donor_id) {

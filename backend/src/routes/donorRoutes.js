@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { localStore } = require('../db/db');
+const { localStore, isPostgresConnected, getPool, getDonorByUserId } = require('../db/db');
 const { authenticateUser, optionalAuth, requireRole } = require('../middleware/auth');
 const { findNearbyDonors, resolveCityCoordinates, getAllSupportedCities } = require('../services/spatialService');
 const { calculateCooldownDate, recordCompletedDonation, isDonorEligibleForNotification, checkAndUpdateCooldownExpiry } = require('../services/cooldownService');
@@ -98,7 +98,15 @@ router.post('/register', authenticateUser, async (req, res, next) => {
     }
 
     // Check if user already registered as donor
-    const existing = localStore.donors.find((d) => d.user_id === req.user.id);
+    let existing = localStore.donors.find((d) => d.user_id === req.user.id);
+    if (!existing && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const check = await pool.query('SELECT id FROM public.donors WHERE user_id = $1 LIMIT 1', [req.user.id]);
+        if (check.rows.length > 0) existing = check.rows[0];
+      } catch (e) {}
+    }
+
     if (existing) {
       return res.status(409).json({ success: false, error: 'A donor profile already exists for this account. Please update your existing profile.' });
     }
@@ -145,6 +153,57 @@ router.post('/register', authenticateUser, async (req, res, next) => {
 
     localStore.donors.push(newDonor);
 
+    // Persist into PostgreSQL donors table
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `INSERT INTO public.donors (
+            id, user_id, name, blood_group, city, area, postal_code,
+            latitude, longitude, availability_status, consent_to_contact,
+            consent_status, consent_updated_at, verification_status,
+            last_donation_date, source, phone, email,
+            created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10, $11,
+            $12, NOW(), $13,
+            $14, $15, $16, $17,
+            NOW(), NOW()
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            blood_group = EXCLUDED.blood_group,
+            city = EXCLUDED.city,
+            area = EXCLUDED.area,
+            postal_code = EXCLUDED.postal_code,
+            latitude = EXCLUDED.latitude,
+            longitude = EXCLUDED.longitude,
+            updated_at = NOW()`,
+          [
+            newDonor.id,
+            newDonor.user_id,
+            newDonor.name,
+            newDonor.blood_group,
+            newDonor.city,
+            newDonor.area,
+            newDonor.postal_code,
+            newDonor.latitude,
+            newDonor.longitude,
+            newDonor.availability_status,
+            newDonor.consent_to_contact,
+            newDonor.consent_status,
+            'verified',
+            newDonor.last_donation_date,
+            'platform',
+            req.user.phone || null,
+            req.user.email || null
+          ]
+        );
+      } catch (dbErr) {
+        console.warn('PostgreSQL donor insert warning:', dbErr.message);
+      }
+    }
+
     // Award initial profile completion points (50 points)
     try {
       awardCreditPoints({
@@ -163,6 +222,16 @@ router.post('/register', authenticateUser, async (req, res, next) => {
       userRecord.role = 'donor';
     }
 
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE public.users SET role = 'donor', updated_at = NOW() WHERE id = $1 AND role <> 'admin'`,
+          [req.user.id]
+        );
+      } catch (e) {}
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Donor registration completed successfully.',
@@ -174,8 +243,11 @@ router.post('/register', authenticateUser, async (req, res, next) => {
 });
 
 // GET /api/donors/profile
-router.get('/profile', authenticateUser, (req, res) => {
-  const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+router.get('/profile', authenticateUser, async (req, res) => {
+  let donor = await getDonorByUserId(req.user.id);
+  if (!donor) {
+    donor = localStore.donors.find((d) => d.user_id === req.user.id);
+  }
   if (!donor) {
     return res.status(404).json({ success: false, error: 'No donor profile found for current user.' });
   }
@@ -183,9 +255,12 @@ router.get('/profile', authenticateUser, (req, res) => {
 });
 
 // PUT /api/donors/profile
-router.put('/profile', authenticateUser, (req, res, next) => {
+router.put('/profile', authenticateUser, async (req, res, next) => {
   try {
-    const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+    let donor = localStore.donors.find((d) => d.user_id === req.user.id);
+    if (!donor && isPostgresConnected()) {
+      donor = await getDonorByUserId(req.user.id);
+    }
     if (!donor) {
       return res.status(404).json({ success: false, error: 'No donor profile found.' });
     }
@@ -198,6 +273,7 @@ router.put('/profile', authenticateUser, (req, res, next) => {
 
     if (typeof consent_to_contact === 'boolean') {
       donor.consent_to_contact = consent_to_contact;
+      donor.consent_status = consent_to_contact ? 'consented' : 'withdrawn';
     }
 
     if (city) donor.city = city.trim();
@@ -206,6 +282,34 @@ router.put('/profile', authenticateUser, (req, res, next) => {
     if (notification_preferences) donor.notification_preferences = notification_preferences;
 
     donor.updated_at = new Date().toISOString();
+
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE public.donors SET
+            availability_status = $1,
+            consent_to_contact = $2,
+            consent_status = $3,
+            city = COALESCE($4, city),
+            area = $5,
+            last_donation_date = $6,
+            updated_at = NOW()
+          WHERE user_id = $7`,
+          [
+            donor.availability_status,
+            donor.consent_to_contact,
+            donor.consent_status,
+            city || null,
+            donor.area,
+            donor.last_donation_date,
+            req.user.id
+          ]
+        );
+      } catch (dbErr) {
+        console.warn('PostgreSQL donor update warning:', dbErr.message);
+      }
+    }
 
     return res.json({
       success: true,
@@ -219,8 +323,11 @@ router.put('/profile', authenticateUser, (req, res, next) => {
 
 // POST /api/donors/availability
 // Toggle current availability
-router.post('/availability', authenticateUser, (req, res) => {
-  const donor = localStore.donors.find((d) => d.user_id === req.user.id);
+router.post('/availability', authenticateUser, async (req, res) => {
+  let donor = localStore.donors.find((d) => d.user_id === req.user.id);
+  if (!donor && isPostgresConnected()) {
+    donor = await getDonorByUserId(req.user.id);
+  }
   if (!donor) {
     return res.status(404).json({ success: false, error: 'Donor profile not found.' });
   }
@@ -233,6 +340,20 @@ router.post('/availability', authenticateUser, (req, res) => {
   donor.availability_status = status;
   donor.last_availability_confirmed_at = new Date().toISOString();
   donor.updated_at = new Date().toISOString();
+
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `UPDATE public.donors SET
+          availability_status = $1,
+          last_availability_confirmed_at = NOW(),
+          updated_at = NOW()
+        WHERE user_id = $2`,
+        [status, req.user.id]
+      );
+    } catch (e) {}
+  }
 
   // Award monthly availability confirmation points (10 pts) idempotently
   const currentMonthKey = new Date().toISOString().slice(0, 7); // e.g. "2026-10"

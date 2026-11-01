@@ -56,18 +56,46 @@ export default function App() {
               <Route path="/contact" element={<Contact />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfUse />} />
+
+              {/* Finding Donors - Primary & Aliases */}
               <Route path="/donors/nearby" element={<NearbyDonors />} />
+              <Route path="/find-donors" element={<NearbyDonors />} />
+              <Route path="/finding-donors" element={<NearbyDonors />} />
+              <Route path="/donors" element={<NearbyDonors />} />
+              <Route path="/donors/search" element={<NearbyDonors />} />
+              <Route path="/nearby-donors" element={<NearbyDonors />} />
+
+              {/* Blood Banks - Primary & Aliases */}
               <Route path="/blood-banks" element={<BloodBanks />} />
+              <Route path="/bloodbanks" element={<BloodBanks />} />
+              <Route path="/blood-bank" element={<BloodBanks />} />
+
+              {/* Request Tracking - Primary & Aliases */}
               <Route path="/requests/:id" element={<RequestDetails />} />
+              <Route path="/request/:id" element={<RequestDetails />} />
+              <Route path="/track/:id" element={<RequestDetails />} />
+
+              {/* Action & Responses */}
               <Route path="/action/:token" element={<DonorResponse />} />
               <Route path="/donor/response/:token" element={<DonorResponse />} />
+
+              {/* Authentication */}
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/register" element={<Signup />} />
 
-              {/* Requester Protected Routes */}
+              {/* Requester Protected Routes & Aliases */}
               <Route
                 path="/requester/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['requester', 'admin']}>
+                    <RequesterDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/requester"
                 element={
                   <ProtectedRoute allowedRoles={['requester', 'admin']}>
                     <RequesterDashboard />
@@ -82,10 +110,34 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/request/create"
+                element={
+                  <ProtectedRoute allowedRoles={['requester', 'donor', 'admin']}>
+                    <CreateRequest />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/create-request"
+                element={
+                  <ProtectedRoute allowedRoles={['requester', 'donor', 'admin']}>
+                    <CreateRequest />
+                  </ProtectedRoute>
+                }
+              />
 
-              {/* Donor Protected Routes */}
+              {/* Donor Protected Routes & Aliases */}
               <Route
                 path="/donor/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['donor', 'admin']}>
+                    <DonorDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/donor"
                 element={
                   <ProtectedRoute allowedRoles={['donor', 'admin']}>
                     <DonorDashboard />
@@ -100,10 +152,42 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/donor-registration"
+                element={
+                  <ProtectedRoute>
+                    <DonorRegistration />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/donors/register"
+                element={
+                  <ProtectedRoute>
+                    <DonorRegistration />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/register-donor"
+                element={
+                  <ProtectedRoute>
+                    <DonorRegistration />
+                  </ProtectedRoute>
+                }
+              />
 
-              {/* Admin Protected Routes */}
+              {/* Admin Protected Routes & Aliases */}
               <Route
                 path="/admin/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <AdminDashboard />

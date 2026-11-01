@@ -36,9 +36,15 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
-      if (user.role === 'admin') navigate('/admin/dashboard');
-      else if (user.role === 'donor') navigate('/donor/dashboard');
-      else navigate('/requester/dashboard');
+      if (from && from !== '/') {
+        navigate(from, { replace: true });
+      } else if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (user.role === 'donor') {
+        navigate('/donor/dashboard');
+      } else {
+        navigate('/requester/dashboard');
+      }
     } catch (err) {
       setError(sanitizeError(err, 'Login failed. Please check credentials.'));
     } finally {
