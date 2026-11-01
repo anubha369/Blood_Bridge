@@ -44,20 +44,57 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     let errorMsg = '';
+
+    // 1. Inspect data.error (handle strings, nested objects, or Supabase/Vercel error shapes)
     if (data && data.error) {
-      errorMsg = data.error;
-    } else if (data && data.message) {
-      errorMsg = data.message;
-    } else if (response.status === 404) {
-      errorMsg = `API route not found (404): ${endpoint}. Please ensure the backend server is running and VITE_API_URL is configured.`;
-    } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-      errorMsg = `Backend server temporarily unavailable (${response.status}). Please verify that the API server is reachable.`;
-    } else if (rawText) {
-      const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
-      const cleanTitle = titleMatch ? titleMatch[1].trim() : '';
-      errorMsg = cleanTitle || `Request failed with status ${response.status}`;
-    } else {
-      errorMsg = `Request failed with status ${response.status}`;
+      if (typeof data.error === 'string') {
+        errorMsg = data.error;
+      } else if (typeof data.error.message === 'string') {
+        errorMsg = data.error.message;
+      } else {
+        try {
+          errorMsg = JSON.stringify(data.error);
+        } catch (_) {
+          errorMsg = '';
+        }
+      }
+    }
+
+    // 2. Inspect data.message if no errorMsg yet
+    if (!errorMsg && data && data.message) {
+      if (typeof data.message === 'string') {
+        errorMsg = data.message;
+      } else if (typeof data.message.error === 'string') {
+        errorMsg = data.message.error;
+      } else {
+        try {
+          errorMsg = JSON.stringify(data.message);
+        } catch (_) {
+          errorMsg = '';
+        }
+      }
+    }
+
+    // 3. Fallback to status-specific human-readable messages
+    if (!errorMsg) {
+      if (response.status === 404) {
+        errorMsg = `API service route not found (404): ${endpoint}. Please ensure the backend server is reachable and VITE_API_URL is configured.`;
+      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+        errorMsg = `Backend server temporarily unavailable (${response.status}). Please verify that the API server is reachable.`;
+      } else if (rawText) {
+        const titleMatch = rawText.match(/<title>(.*?)<\/title>/i);
+        const cleanTitle = titleMatch ? titleMatch[1].trim() : '';
+        errorMsg = cleanTitle || rawText.slice(0, 150).trim() || `Request failed with status ${response.status}`;
+      } else {
+        errorMsg = `Request failed with status ${response.status}`;
+      }
+    }
+
+    // 4. Hard safety check: ensure errorMsg is never literally "[object Object]"
+    if (typeof errorMsg !== 'string' || errorMsg.trim() === '[object Object]' || !errorMsg.trim()) {
+      errorMsg = response.status === 404
+        ? `API route not found (404): ${endpoint}. Please verify backend connection.`
+        : `Request failed with status ${response.status}`;
     }
 
     const error = new Error(errorMsg);

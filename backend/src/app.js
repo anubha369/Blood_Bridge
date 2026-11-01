@@ -38,6 +38,7 @@ app.use(cors({
     if (
       !origin ||
       config.allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin) ||
       process.env.NODE_ENV !== 'production'
     ) {
       return callback(null, true);

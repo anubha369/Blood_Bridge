@@ -15,6 +15,18 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const sanitizeError = (err, fallback = 'Registration failed. Please check your details.') => {
+    if (!err) return fallback;
+    if (typeof err === 'string' && err !== '[object Object]') return err;
+    if (err.message && typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
+    if (typeof err.error === 'string' && err.error !== '[object Object]') return err.error;
+    if (err.data?.error) {
+      if (typeof err.data.error === 'string' && err.data.error !== '[object Object]') return err.data.error;
+      if (typeof err.data.error.message === 'string') return err.data.error.message;
+    }
+    return fallback;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !email || !password) return;
@@ -37,7 +49,7 @@ export default function Signup() {
         navigate('/requester/dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Registration failed. Please check your details.');
+      setError(sanitizeError(err, 'Registration failed. Please check your details.'));
     } finally {
       setLoading(false);
     }

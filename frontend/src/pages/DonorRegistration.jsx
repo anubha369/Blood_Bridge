@@ -47,7 +47,12 @@ export default function DonorRegistration() {
         navigate('/donor/dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Failed to complete donor registration.');
+      const msg = typeof err === 'string' && err !== '[object Object]'
+        ? err
+        : err?.message && err.message !== '[object Object]'
+        ? err.message
+        : err?.data?.error || 'Failed to complete donor registration.';
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }

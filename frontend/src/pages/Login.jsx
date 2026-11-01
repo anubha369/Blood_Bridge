@@ -15,6 +15,18 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/';
 
+  const sanitizeError = (err, fallback = 'Login failed. Please check credentials.') => {
+    if (!err) return fallback;
+    if (typeof err === 'string' && err !== '[object Object]') return err;
+    if (err.message && typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
+    if (typeof err.error === 'string' && err.error !== '[object Object]') return err.error;
+    if (err.data?.error) {
+      if (typeof err.data.error === 'string' && err.data.error !== '[object Object]') return err.data.error;
+      if (typeof err.data.error.message === 'string') return err.data.error.message;
+    }
+    return fallback;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -28,7 +40,7 @@ export default function Login() {
       else if (user.role === 'donor') navigate('/donor/dashboard');
       else navigate('/requester/dashboard');
     } catch (err) {
-      setError(err.message || 'Login failed. Please check credentials.');
+      setError(sanitizeError(err, 'Login failed. Please check credentials.'));
     } finally {
       setLoading(false);
     }
@@ -43,7 +55,7 @@ export default function Login() {
       else if (role === 'donor') navigate('/donor/dashboard');
       else navigate('/requester/dashboard');
     } catch (err) {
-      setError(err.message || 'Demo login failed.');
+      setError(sanitizeError(err, 'Demo login failed.'));
     } finally {
       setLoading(false);
     }

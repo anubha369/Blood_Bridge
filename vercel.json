@@ -3,10 +3,9 @@
   "framework": "vite",
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|assets/|favicon.ico|.*\\..*).*)",
       "destination": "/index.html"
     }
   ]

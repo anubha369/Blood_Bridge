@@ -29,6 +29,15 @@ export function AuthProvider({ children }) {
     loadSession();
   }, []);
 
+  const extractErrorMessage = (res, fallback) => {
+    if (!res) return fallback;
+    if (typeof res === 'string' && res !== '[object Object]') return res;
+    if (typeof res.error === 'string' && res.error !== '[object Object]') return res.error;
+    if (res.error?.message && typeof res.error.message === 'string') return res.error.message;
+    if (typeof res.message === 'string' && res.message !== '[object Object]') return res.message;
+    return fallback;
+  };
+
   const login = async (email, password) => {
     const res = await api.auth.login({ email, password });
     if (res.success && res.token) {
@@ -36,7 +45,7 @@ export function AuthProvider({ children }) {
       setUser(res.user);
       return res.user;
     }
-    throw new Error(res.error || 'Login failed');
+    throw new Error(extractErrorMessage(res, 'Login failed. Please check credentials.'));
   };
 
   const signup = async (payload) => {
@@ -46,7 +55,7 @@ export function AuthProvider({ children }) {
       setUser(res.user);
       return res.user;
     }
-    throw new Error(res.error || 'Signup failed');
+    throw new Error(extractErrorMessage(res, 'Registration failed. Please check your details.'));
   };
 
   const logout = () => {
