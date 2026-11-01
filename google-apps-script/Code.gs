@@ -316,3 +316,87 @@ function testBloodBridgeWebhook() {
     Logger.log('❌ Webhook probe network error: ' + probeErr.message);
   }
 }
+
+/**
+ * ============================================================================
+ * Web App GET Endpoint: Enables BloodBridge Backend to Fetch Missed Records
+ * ============================================================================
+ * When deployed as a Web App (Deploy -> New deployment -> Web app):
+ * The BloodBridge backend calls this endpoint with the secret to fetch missed
+ * form responses directly from Google Sheets without needing Google Cloud Console.
+ */
+function doGet(e) {
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var secretKey = scriptProperties.getProperty('BLOODBRIDGE_SECRET_KEY');
+  var reqSecret = e && e.parameter ? (e.parameter.secret || e.parameter['x-webhook-secret']) : '';
+
+  if (!secretKey || reqSecret !== secretKey) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: 'Unauthorized: Secret key is invalid or not configured.'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var action = e && e.parameter ? e.parameter.action : 'fetch_missed';
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      total_rows: 0,
+      headers: [],
+      rows: []
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var headers = data[0];
+  var offset = parseInt(e.parameter.offset || '0', 10);
+  var limit = parseInt(e.parameter.limit || '100', 10);
+
+  var allRows = data.slice(1);
+  var pagedRows = allRows.slice(offset, offset + limit);
+
+  return ContentService.createTextOutput(JSON.stringify({
+    success: true,
+    action: action,
+    total_rows: allRows.length,
+    offset: offset,
+    limit: limit,
+    has_more: (offset + limit) < allRows.length,
+    next_offset: (offset + limit) < allRows.length ? (offset + limit) : null,
+    headers: headers,
+    rows: pagedRows
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Manual Trigger: Sync all un-synced rows directly from Apps Script Editor
+ * Select 'syncAllMissedRows' from the function dropdown and click Run (▶).
+ */
+function syncAllMissedRows() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var lastRow = sheet.getLastRow();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  var statusColIndex = -1;
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i].toString().trim().toLowerCase() === 'bloodbridge sync status') {
+      statusColIndex = i + 1;
+      break;
+    }
+  }
+
+  Logger.log('Scanning rows 2 to ' + lastRow + ' for missed submissions...');
+  var syncedCount = 0;
+  for (var r = 2; r <= lastRow; r++) {
+    var status = statusColIndex !== -1 ? sheet.getRange(r, statusColIndex).getValue() : '';
+    if (!status || status.toString().indexOf('SYNCED') === -1) {
+      Logger.log('Syncing missed row ' + r + '...');
+      onFormSubmit({ range: sheet.getRange(r, 1, 1, sheet.getLastColumn()) });
+      syncedCount++;
+      Utilities.sleep(500); // polite rate limit
+    }
+  }
+  Logger.log('Finished manual sync: ' + syncedCount + ' rows processed.');
+}

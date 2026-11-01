@@ -129,6 +129,26 @@ export const api = {
     getIntegrationLogs: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return request(`/integrations/logs?${qs}`);
+    },
+    syncRecentRecords: (options = {}) => {
+      return request('/integrations/google-forms/sync-recent-records', {
+        method: 'POST',
+        body: JSON.stringify(options)
+      });
+    }
+  },
+
+  // Integrations
+  integrations: {
+    syncRecentRecords: (options = {}) => {
+      return request('/integrations/google-forms/sync-recent-records', {
+        method: 'POST',
+        body: JSON.stringify(options)
+      });
+    },
+    getLogs: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/integrations/logs?${qs}`);
     }
   }
 };

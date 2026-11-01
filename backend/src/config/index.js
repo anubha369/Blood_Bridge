@@ -22,8 +22,14 @@ const config = {
   // - 'llama-3.1-8b-instant' (Alternative: low-latency, fast throughput)
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
 
-  // Google Forms / Apps Script Webhook Secret
+  // Google Forms / Apps Script Webhook Secret & Google Sheets Sync
   googleFormWebhookSecret: process.env.GOOGLE_FORM_WEBHOOK_SECRET || process.env.GOOGLE_SCRIPT_SECRET || 'bb-vision-x-gform-secret-2026',
+  googleSpreadsheetId: process.env.GOOGLE_SPREADSHEET_ID || '1oxe4NxeOTETUoMoO-YyQU_gKJacQZAhj_e7GU-2tVp8',
+  googleSheetsSheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Form Responses 1',
+  googleSheetsApiKey: process.env.GOOGLE_SHEETS_API_KEY || '',
+  googleServiceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '',
+  googleServiceAccountPrivateKey: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '',
+  googleAppsScriptWebAppUrl: process.env.GOOGLE_APPS_SCRIPT_WEBAPP_URL || '',
 
   // WhatsApp Cloud API Configuration
   whatsappApiEnabled: process.env.WHATSAPP_API_ENABLED === 'true',

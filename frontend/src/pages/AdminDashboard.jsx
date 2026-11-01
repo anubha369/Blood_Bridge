@@ -38,6 +38,31 @@ export default function AdminDashboard() {
   const [donorSearch, setDonorSearch] = useState('');
   const [updatingDonorId, setUpdatingDonorId] = useState(null);
 
+  // Sync Missed Google Form Records State
+  const [syncingRecords, setSyncingRecords] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState(null);
+  const [showConfigHelp, setShowConfigHelp] = useState(false);
+
+  const handleSyncRecentRecords = async () => {
+    setSyncingRecords(true);
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await api.admin.syncRecentRecords();
+      setSyncResult(res);
+      await fetchAdminData();
+    } catch (err) {
+      if (err.data && err.data.configured === false) {
+        setSyncResult(err.data);
+      } else {
+        setSyncError(err.message || 'Failed to synchronize missed records.');
+      }
+    } finally {
+      setSyncingRecords(false);
+    }
+  };
+
   // Cooldown Override Modal State
   const [cooldownModalDonor, setCooldownModalDonor] = useState(null);
   const [overrideCooldownDate, setOverrideCooldownDate] = useState('');
@@ -758,6 +783,108 @@ export default function AdminDashboard() {
       {/* TAB 5: AUDIT LOGS & WEBHOOK INTEGRATION */}
       {activeTab === 'audit' && (
         <div className="space-y-6">
+          {/* Missed Responses Sync Control */}
+          <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-white/10">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-400" />
+                  <h3 className="text-lg font-extrabold tracking-tight">Google Form & Sheet Response Sync</h3>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                    Offline Recovery
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 max-w-2xl">
+                  Recover Google Form responses submitted while the server or tunnel was offline. Fetches missing records from Google Sheets and inserts them into Supabase with automatic deduplication.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSyncRecentRecords}
+                  disabled={syncingRecords}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-indigo-500 hover:bg-indigo-400 text-white shadow-lg shadow-indigo-500/25 transition disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncingRecords ? 'animate-spin' : ''}`} />
+                  {syncingRecords ? 'Syncing Missing Records...' : 'Sync Recent Records'}
+                </button>
+              </div>
+            </div>
+
+            {/* Sync Results Banner */}
+            {syncResult && (
+              <div className={`p-4 rounded-2xl text-xs space-y-3 ${
+                syncResult.configured === false
+                  ? 'bg-amber-950/60 border border-amber-500/30 text-amber-200'
+                  : 'bg-white/10 border border-white/15 text-white'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold flex items-center gap-1.5">
+                    {syncResult.configured === false ? (
+                      <AlertCircle className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    )}
+                    {syncResult.message || (syncResult.configured === false ? 'Google Sheets Credentials Required' : 'Sync Completed')}
+                  </span>
+                  {syncResult.configured === false && (
+                    <button
+                      onClick={() => setShowConfigHelp(!showConfigHelp)}
+                      className="text-[11px] underline font-bold text-amber-300 hover:text-white"
+                    >
+                      {showConfigHelp ? 'Hide Setup Guide' : 'View Setup Guide'}
+                    </button>
+                  )}
+                </div>
+
+                {syncResult.configured !== false && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                    <div className="bg-black/20 p-2.5 rounded-xl text-center">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Fetched</p>
+                      <p className="text-lg font-extrabold text-white">{syncResult.fetched ?? 0}</p>
+                    </div>
+                    <div className="bg-emerald-950/40 border border-emerald-500/20 p-2.5 rounded-xl text-center">
+                      <p className="text-[10px] text-emerald-400 font-bold uppercase">Inserted to Supabase</p>
+                      <p className="text-lg font-extrabold text-emerald-300">{syncResult.inserted ?? 0}</p>
+                    </div>
+                    <div className="bg-amber-950/40 border border-amber-500/20 p-2.5 rounded-xl text-center">
+                      <p className="text-[10px] text-amber-400 font-bold uppercase">Skipped (Duplicates)</p>
+                      <p className="text-lg font-extrabold text-amber-300">{syncResult.skipped_duplicates ?? 0}</p>
+                    </div>
+                    <div className="bg-red-950/40 border border-red-500/20 p-2.5 rounded-xl text-center">
+                      <p className="text-[10px] text-red-400 font-bold uppercase">Failed</p>
+                      <p className="text-lg font-extrabold text-red-300">{syncResult.failed ?? 0}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Configuration Guidance Accordion */}
+                {(showConfigHelp || syncResult.configured === false) && syncResult.instructions && (
+                  <div className="mt-3 p-3 bg-black/40 rounded-xl space-y-2 text-[11px] font-mono text-slate-300 border border-white/10">
+                    <p className="font-bold text-amber-300 text-xs">How to configure Google Sheets API access on your backend:</p>
+                    {syncResult.instructions.setup_options?.map((opt, i) => (
+                      <div key={i} className="space-y-1 pt-1 border-t border-white/5 first:border-0">
+                        <p className="font-bold text-white">{opt.method}:</p>
+                        <ul className="list-disc pl-4 space-y-0.5 text-slate-400 font-sans">
+                          {opt.steps.map((st, j) => (
+                            <li key={j}>{st}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {syncError && (
+              <div className="p-3 bg-red-950/60 border border-red-500/40 rounded-2xl text-xs text-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{syncError}</span>
+              </div>
+            )}
+          </div>
+
           {/* External Integrations */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-3">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
