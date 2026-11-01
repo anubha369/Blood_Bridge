@@ -8,7 +8,8 @@ const {
   handleTelegramUpdate,
   maskChatId,
   BOT_USERNAME,
-  dispatchEmergencyRequestNotifications
+  dispatchEmergencyRequestNotifications,
+  runOneTimeDiagnostic
 } = require('../services/telegramService');
 const {
   getDonorByUserId,
@@ -241,6 +242,18 @@ router.post('/webhook', async (req, res) => {
   } catch (err) {
     console.error('Telegram webhook handler error:', err.message);
     return res.status(200).json({ ok: true }); // Always 200 OK to Telegram
+  }
+});
+
+// POST /api/telegram/live-diagnostic
+// Controlled one-time getUpdates diagnostic endpoint for development testing
+router.post('/live-diagnostic', async (req, res, next) => {
+  try {
+    const timeout = parseInt(req.query.timeout || (req.body && req.body.timeout), 10) || 25;
+    const result = await runOneTimeDiagnostic(timeout);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
   }
 });
 
