@@ -183,7 +183,7 @@ async function unlinkTelegramAccount(donorId) {
 }
 
 /**
- * Send an arbitrary Telegram text message
+ * Send an arbitrary Telegram text message with automatic Markdown fallback
  */
 async function sendTelegramMessage(chatId, text, inlineKeyboard = null) {
   const payload = {
@@ -194,7 +194,23 @@ async function sendTelegramMessage(chatId, text, inlineKeyboard = null) {
   if (inlineKeyboard) {
     payload.reply_markup = inlineKeyboard;
   }
-  return await callTelegramApi('sendMessage', payload);
+  try {
+    return await callTelegramApi('sendMessage', payload);
+  } catch (err) {
+    // If Markdown parsing fails, retry without parse_mode so message is guaranteed to deliver
+    if (err.message && err.message.toLowerCase().includes("can't parse entities")) {
+      console.warn('[Telegram Bot] Markdown parsing failed, retrying in plain text for chat:', chatId);
+      const plainPayload = {
+        chat_id: chatId,
+        text
+      };
+      if (inlineKeyboard) {
+        plainPayload.reply_markup = inlineKeyboard;
+      }
+      return await callTelegramApi('sendMessage', plainPayload);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -383,19 +399,33 @@ async function dispatchEmergencyRequestNotifications({ request, eligibleDonors, 
 }
 
 /**
- * Handle incoming Telegram command or message
+ * Handle incoming Telegram command or message with robust syntax parsing
  */
 async function handleTelegramMessage(message) {
   if (!message || !message.chat || !message.text) return;
 
   const chatId = message.chat.id;
-  const text = message.text.trim();
   const username = message.from ? message.from.username : null;
+  const trimmed = message.text.trim();
+  const parts = trimmed.split(/\s+/);
+  const firstPart = parts[0] || '';
+
+  // Match command and optional bot username e.g. /start or /start@Blood_Bridgebot
+  const cmdMatch = firstPart.match(/^\/([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9_]+))?$/i);
+  if (!cmdMatch) return;
+
+  const command = cmdMatch[1].toLowerCase();
+  const botTarget = cmdMatch[2];
+  if (botTarget && botTarget.toLowerCase() !== BOT_USERNAME.toLowerCase()) {
+    // Message targeted at another bot in a group chat
+    return;
+  }
+
+  const rawArg = parts.slice(1).join(' ').trim();
+  console.log(`[Telegram Bot] Processing command: /${command} (arg: "${rawArg}") from chat: ${chatId}`);
 
   // Command 1: /start
-  if (text.startsWith('/start')) {
-    const rawArg = text.replace(/^\/start\s*/, '').trim();
-
+  if (command === 'start') {
     if (rawArg) {
       // Account linking attempt
       try {
@@ -445,7 +475,7 @@ async function handleTelegramMessage(message) {
   }
 
   // Command 2: /status
-  if (text === '/status') {
+  if (command === 'status') {
     const donor = await getDonorByTelegramChatId(chatId);
     if (!donor) {
       const notLinkedMsg =
@@ -475,7 +505,7 @@ async function handleTelegramMessage(message) {
   }
 
   // Command 3: /stop
-  if (text === '/stop') {
+  if (command === 'stop') {
     const donor = await getDonorByTelegramChatId(chatId);
     if (!donor) {
       await sendTelegramMessage(chatId, `ℹ️ This Telegram account is not connected to a BloodBridge donor profile.`);
@@ -494,7 +524,7 @@ async function handleTelegramMessage(message) {
   }
 
   // Command 4: /unlink
-  if (text === '/unlink') {
+  if (command === 'unlink') {
     const donor = await getDonorByTelegramChatId(chatId);
     if (!donor) {
       await sendTelegramMessage(chatId, `ℹ️ This Telegram account is not connected to a BloodBridge donor profile.`);
@@ -687,28 +717,42 @@ async function startPolling() {
   pollingActive = true;
   pollingAbortController = new AbortController();
 
-  console.log(`Telegram Bot long polling initializing for @${BOT_USERNAME}...`);
+  console.log(`[Telegram Bot] Initializing long polling for @${BOT_USERNAME}...`);
 
-  // First clear any existing webhook to avoid conflict
+  // First clear any existing webhook to avoid 409 conflict
   try {
-    await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`);
+    const delRes = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drop_pending_updates: false })
+    });
+    const delData = await delRes.json();
+    console.log(`[Telegram Bot] Webhook clear status:`, delData.ok ? 'Webhook cleared, polling enabled' : delData.description);
   } catch (err) {
-    console.warn('deleteWebhook notice:', err.message);
+    console.warn('[Telegram Bot] deleteWebhook notice:', err.message);
   }
 
   let offset = 0;
 
   // Polling loop
   (async () => {
+    console.log(`[Telegram Bot] Polling loop active for @${BOT_USERNAME}`);
     while (pollingActive) {
       try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=20&allowed_updates=["message","callback_query"]`, {
+        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            offset,
+            timeout: 10,
+            allowed_updates: ['message', 'callback_query']
+          }),
           signal: pollingAbortController ? pollingAbortController.signal : undefined
         });
 
         if (!res.ok) {
           const errText = await res.text();
-          console.warn(`Telegram polling HTTP error: ${res.status}`, errText);
+          console.warn(`[Telegram Bot] Polling HTTP error: ${res.status}`, errText);
           await new Promise((r) => setTimeout(r, 4000));
           continue;
         }
@@ -720,19 +764,21 @@ async function startPolling() {
               offset = update.update_id + 1;
             }
             try {
+              console.log(`[Telegram Bot] Processing update #${update.update_id} (${update.message ? 'message' : update.callback_query ? 'callback_query' : 'other'})`);
               await handleTelegramUpdate(update);
             } catch (itemErr) {
-              console.error('Error processing Telegram update:', itemErr.message);
+              console.error(`[Telegram Bot] Error processing update #${update.update_id}:`, itemErr.message);
             }
           }
         }
       } catch (pollErr) {
         if (!pollingActive) break;
-        // Exponential/constant backoff on network drop
+        if (pollErr.name === 'AbortError') break;
+        console.error('[Telegram Bot] Polling network exception:', pollErr.message);
         await new Promise((r) => setTimeout(r, 3000));
       }
     }
-    console.log('Telegram Bot long polling stopped.');
+    console.log('[Telegram Bot] Long polling loop stopped.');
   })();
 }
 
