@@ -470,12 +470,14 @@ async function handleTelegramMessage(message) {
           `• /unlink — Disconnect your Telegram account`;
 
         await sendTelegramMessage(chatId, welcomeLinked);
+        console.log(`[Telegram Command Handler] Account linking reply sent [chat: ${maskChatId(chatId)}]`);
       } catch (err) {
         const failMessage =
           `❌ *Account Linking Failed*\n\n` +
           `${err.message}\n\n` +
           `To generate a new code, please open your BloodBridge *Donor Dashboard* and click *Connect Telegram*.`;
         await sendTelegramMessage(chatId, failMessage);
+        console.log(`[Telegram Command Handler] Account linking failure reply sent [chat: ${maskChatId(chatId)}]`);
       }
       return;
     }
@@ -495,6 +497,7 @@ async function handleTelegramMessage(message) {
       `• /unlink — Disconnect your Telegram account completely`;
 
     await sendTelegramMessage(chatId, welcomeGeneral);
+    console.log(`[Telegram Command Handler] Welcome guidance reply sent [chat: ${maskChatId(chatId)}]`);
     return;
   }
 
@@ -788,14 +791,17 @@ async function startPolling() {
           ? AbortSignal.any([clientTimeoutSignal, pollingAbortController.signal])
           : clientTimeoutSignal;
 
+        const reqPayload = {
+          timeout: 10
+        };
+        if (offset > 0) {
+          reqPayload.offset = offset;
+        }
+
         const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            offset,
-            timeout: 10,
-            allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member']
-          }),
+          body: JSON.stringify(reqPayload),
           signal: requestSignal
         });
 
