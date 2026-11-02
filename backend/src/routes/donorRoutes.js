@@ -13,6 +13,7 @@ const { authenticateUser, optionalAuth, requireRole } = require('../middleware/a
 const { findNearbyDonors, resolveCityCoordinates, getAllSupportedCities } = require('../services/spatialService');
 const { calculateCooldownDate, recordCompletedDonation, isDonorEligibleForNotification, checkAndUpdateCooldownExpiry } = require('../services/cooldownService');
 const { awardCreditPoints } = require('../services/creditService');
+const { isGroupCompatible, MEDICAL_SAFETY_DISCLAIMER } = require('../services/matchingService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -55,18 +56,47 @@ router.get('/nearby', optionalAuth, async (req, res, next) => {
       searchCity = searchCity || 'Lucknow';
     }
 
-    const donors = await findNearbyDonors({
+    // Query donors in radius
+    const allNearby = await findNearbyDonors({
       latitude: searchLat,
       longitude: searchLon,
       radiusKm: radius_km,
-      bloodGroup: blood_group ? blood_group.trim().toUpperCase() : null,
-      limit: parseInt(limit, 10),
-      offset: parseInt(offset, 10)
+      bloodGroup: null, // Fetch all in radius to allow compatible ranking
+      limit: 100,
+      offset: 0
     });
+
+    let results = allNearby;
+    if (blood_group) {
+      const targetGroup = blood_group.trim().toUpperCase();
+      // 1. Incompatible groups must never appear
+      results = results.filter((d) => isGroupCompatible(targetGroup, d.blood_group));
+
+      // 2. Deterministic ranking: Exact matches first, then compatible, closer first, verified first
+      results.sort((a, b) => {
+        const isExactA = (a.blood_group || '').trim().toUpperCase() === targetGroup;
+        const isExactB = (b.blood_group || '').trim().toUpperCase() === targetGroup;
+        if (isExactA !== isExactB) return isExactA ? -1 : 1;
+
+        const distA = a.distance_km != null ? Number(a.distance_km) : 9999;
+        const distB = b.distance_km != null ? Number(b.distance_km) : 9999;
+        if (Math.abs(distA - distB) > 0.05) return distA - distB;
+
+        const isVerifiedA = ['verified', 'verified_by_authorized_personnel'].includes(a.verification_status);
+        const isVerifiedB = ['verified', 'verified_by_authorized_personnel'].includes(b.verification_status);
+        if (isVerifiedA !== isVerifiedB) return isVerifiedA ? -1 : 1;
+
+        return String(a.donor_id || a.id).localeCompare(String(b.donor_id || b.id));
+      });
+    }
+
+    // Apply pagination
+    const paginated = results.slice(parseInt(offset, 10), parseInt(offset, 10) + parseInt(limit, 10));
 
     return res.json({
       success: true,
-      count: donors.length,
+      count: paginated.length,
+      total_count: results.length,
       search_center: {
         latitude: parseFloat(searchLat),
         longitude: parseFloat(searchLon),
@@ -74,8 +104,8 @@ router.get('/nearby', optionalAuth, async (req, res, next) => {
       },
       radius_km: parseFloat(radius_km || 25),
       blood_group_filter: blood_group || 'All Compatible',
-      results: donors,
-      disclaimer: 'Potential donor candidates found. Coordinates are approximate to safeguard donor privacy. Always verify clinical compatibility at an authorized blood bank.'
+      results: paginated,
+      disclaimer: MEDICAL_SAFETY_DISCLAIMER
     });
   } catch (err) {
     next(err);

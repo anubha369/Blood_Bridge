@@ -36,7 +36,7 @@ test('Matching Service: Deterministic Scoring & Reasons', () => {
   assert.ok(evalClose.reasons.some((r) => r.includes('Exact blood group match')));
   assert.ok(evalClose.reasons.some((r) => r.includes('Very close proximity')));
   assert.ok(evalClose.reasons.some((r) => r.includes('Verified donor profile')));
-  assert.ok(evalClose.disclaimer.includes('Confirm eligibility and compatibility with the authorized blood bank'));
+  assert.ok(evalClose.disclaimer.includes('authorized blood bank personnel'));
 
   // Incompatible blood group
   const incompatibleDonor = { ...donor, blood_group: 'A+' };

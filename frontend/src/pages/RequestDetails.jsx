@@ -39,6 +39,12 @@ export default function RequestDetails() {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [selectingDonorId, setSelectingDonorId] = useState(null);
   const [sendingToDonorId, setSendingToDonorId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
 
   const fetchRequest = async () => {
     try {
@@ -159,13 +165,31 @@ export default function RequestDetails() {
     try {
       const res = await api.requests.sendDonorRequest(id, donorId);
       if (res.success) {
-        alert(res.message || 'Telegram notification dispatched to donor.');
+        showToast(res.message || 'Telegram request sent successfully. Waiting for donor response.', 'success');
         await fetchContactRequests();
       } else {
-        alert(res.error || 'Failed to dispatch Telegram request.');
+        showToast(res.error || 'Failed to dispatch Telegram request.', 'error');
       }
     } catch (err) {
-      alert(`Dispatch error: ${err.message}`);
+      let friendlyMsg = err.message || 'Could not send Telegram request.';
+      if (err.status === 401 || friendlyMsg.includes('session is invalid') || friendlyMsg.includes('User account no longer exists')) {
+        friendlyMsg = 'Session expired; please log in again.';
+      } else if (err.status === 404 && friendlyMsg.includes('not found')) {
+        friendlyMsg = 'Donor profile or blood request was not found.';
+      } else if (err.status === 400 && friendlyMsg.includes('already')) {
+        friendlyMsg = 'Duplicate request already exists. A coordination request has already been sent to this donor.';
+      } else if (err.status === 400 && friendlyMsg.includes('unavailable')) {
+        friendlyMsg = 'Donor is currently marked unavailable.';
+      } else if (err.status === 400 && friendlyMsg.includes('linked')) {
+        friendlyMsg = 'Donor has not linked their Telegram account yet.';
+      } else if (err.status === 400 && friendlyMsg.includes('enabled')) {
+        friendlyMsg = 'Donor has not enabled Telegram notifications.';
+      } else if (err.status === 400 && friendlyMsg.includes('expired')) {
+        friendlyMsg = 'This blood request has expired or is no longer active.';
+      } else if (err.status === 502) {
+        friendlyMsg = 'Telegram service temporarily unavailable.';
+      }
+      showToast(friendlyMsg, 'error');
     } finally {
       setSendingToDonorId(null);
     }
@@ -539,6 +563,33 @@ export default function RequestDetails() {
           })}
         </div>
       </div>
+
+      {/* Floating Toast Notification Banner */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 text-xs font-bold py-3.5 px-4 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-bottom-3 max-w-md ${
+          toast.type === 'success'
+            ? 'bg-emerald-950 text-emerald-100 border border-emerald-800'
+            : toast.type === 'error'
+            ? 'bg-rose-950 text-rose-100 border border-rose-800'
+            : 'bg-slate-900 text-slate-100 border border-slate-700'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          ) : toast.type === 'error' ? (
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+          ) : (
+            <Clock className="w-4 h-4 text-sky-400 flex-shrink-0" />
+          )}
+          <span className="flex-1 leading-snug">{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-white ml-2 text-sm font-bold"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

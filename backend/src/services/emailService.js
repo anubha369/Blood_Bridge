@@ -183,6 +183,30 @@ function maskEmail(email) {
 
 let _lastDispatchedOtpForTest = null;
 
+let _cachedSmtpTransporter = null;
+
+function getSmtpTransporter() {
+  if (_cachedSmtpTransporter) return _cachedSmtpTransporter;
+  const smtpUser = config.brevoSmtpLogin || config.brevoSenderEmail || 'vedikadubey16@gmail.com';
+  _cachedSmtpTransporter = nodemailer.createTransport({
+    host: config.brevoSmtpHost || 'smtp-relay.brevo.com',
+    port: config.brevoSmtpPort || 587,
+    secure: (config.brevoSmtpPort === 465),
+    auth: {
+      user: smtpUser,
+      pass: config.brevoApiKey
+    },
+    family: 4,
+    connectionTimeout: 30000,
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100
+  });
+  return _cachedSmtpTransporter;
+}
+
 /**
  * Sends a transactional OTP email using Brevo (REST API or SMTP).
  * Falls back to simulation logging in development if Brevo credentials are not yet live.
@@ -232,21 +256,7 @@ async function sendOtpEmail({ toEmail, toName, otp, expiresInMinutes = 5 }) {
   // Method 2: Brevo SMTP Relay (used for xsmtpsib- keys)
   if (config.brevoApiKey) {
     try {
-      const smtpUser = config.brevoSmtpLogin || config.brevoSenderEmail || 'vedikadubey16@gmail.com';
-      const transporter = nodemailer.createTransport({
-        host: config.brevoSmtpHost || 'smtp-relay.brevo.com',
-        port: config.brevoSmtpPort || 587,
-        secure: (config.brevoSmtpPort === 465),
-        auth: {
-          user: smtpUser,
-          pass: config.brevoApiKey
-        },
-        family: 4,
-        connectionTimeout: 15000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000
-      });
-
+      const transporter = getSmtpTransporter();
       const info = await transporter.sendMail({
         from: `"${config.brevoSenderName || 'Blood Bridge'}" <${config.brevoSenderEmail || 'vedikadubey16@gmail.com'}>`,
         to: cleanEmail,

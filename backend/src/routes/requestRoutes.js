@@ -7,13 +7,23 @@ const {
   getPrivacySafeDistanceBand,
   searchNearbyTelegramDonors,
   isPostgresConnected,
-  getPool
+  getPool,
+  getTelegramNotificationByRequestAndDonor,
+  saveTelegramNotification
 } = require('../db/db');
 const { authenticateUser, optionalAuth } = require('../middleware/auth');
-const { rankCandidateDonors } = require('../services/matchingService');
+const {
+  rankCandidateDonors,
+  isGroupCompatible,
+  getCompatibleDonorGroups,
+  MEDICAL_SAFETY_DISCLAIMER
+} = require('../services/matchingService');
 const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatialService');
 const { recordCompletedDonation } = require('../services/cooldownService');
-const { dispatchEmergencyRequestNotifications } = require('../services/telegramService');
+const {
+  dispatchEmergencyRequestNotifications,
+  sendEmergencyBloodRequestNotification
+} = require('../services/telegramService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const VALID_STATUSES = [
@@ -328,7 +338,7 @@ router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
       search_radius_km: radiusKm,
       candidate_count: candidates.length,
       candidates,
-      disclaimer: 'BloodBridge coordinates potential donor matches based on location and reported blood group. Clinical compatibility, cross-matching, and blood testing must be performed by authorized healthcare professionals.'
+      disclaimer: MEDICAL_SAFETY_DISCLAIMER
     });
   } catch (err) {
     next(err);
@@ -359,6 +369,7 @@ router.post('/:id/send-donor-request', authenticateUser, async (req, res, next) 
       return res.status(400).json({ success: false, error: 'donor_id is required.' });
     }
 
+    // 1. Retrieve blood request
     let request = localStore.blood_requests.find((r) => r.id === req.params.id);
     if (!request && isPostgresConnected() && getPool()) {
       try {
@@ -371,63 +382,103 @@ router.post('/:id/send-donor-request', authenticateUser, async (req, res, next) 
       return res.status(404).json({ success: false, error: 'Blood request not found.' });
     }
 
+    // 2. Validate request ownership (requester owns request, or admin)
     if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
       return res.status(403).json({ success: false, error: 'Unauthorized to manage this blood request.' });
     }
 
+    // Check request active status
+    if (['fulfilled', 'cancelled', 'closed', 'expired'].includes(request.status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'This blood request has expired or is no longer active.'
+      });
+    }
+
+    // 3. Verify selected donor exists and is a legitimate potential match
     const donor = await getDonorWithContact(donor_id);
     if (!donor) {
       return res.status(404).json({ success: false, error: 'Donor profile not found.' });
     }
 
-    if (donor.consent_to_contact === false || donor.consent_status === 'withdrawn') {
-      return res.status(400).json({ success: false, error: 'Donor has withdrawn contact consent.' });
+    if (!isGroupCompatible(request.blood_group, donor.blood_group)) {
+      return res.status(400).json({
+        success: false,
+        error: `Selected donor blood group (${donor.blood_group}) is not compatible with request (${request.blood_group}).`
+      });
     }
+
+    // 4. Check donor availability
     if (donor.availability_status && donor.availability_status !== 'available') {
       return res.status(400).json({ success: false, error: 'Donor is currently marked unavailable.' });
     }
 
-    // Check existing contact request
-    const existing = await getTelegramNotificationByRequestAndDonor(request.id, donor.id);
-    if (existing && existing.donor_response && ['accepted', 'declined'].includes(existing.donor_response)) {
+    // 5. Check donor contact consent
+    if (donor.consent_to_contact === false || donor.consent_status === 'withdrawn') {
+      return res.status(400).json({ success: false, error: 'Donor has withdrawn contact consent.' });
+    }
+
+    // 6. Check that donor has linked Telegram
+    if (!donor.telegram_chat_id) {
       return res.status(400).json({
         success: false,
-        error: `Donor has already responded (${existing.donor_response}) to this request.`
+        error: 'Donor has not linked their Telegram account yet.'
       });
     }
 
-    // Calculate distance band
+    // 7. Check Telegram notification opt-in
+    if (donor.telegram_opt_in !== true) {
+      return res.status(400).json({
+        success: false,
+        error: 'Donor has not enabled Telegram notifications.'
+      });
+    }
+
+    // 8. Check for duplicate contact requests
+    const existing = await getTelegramNotificationByRequestAndDonor(request.id, donor.id);
+    if (existing) {
+      if (existing.donor_response && ['accepted', 'declined'].includes(existing.donor_response)) {
+        return res.status(400).json({
+          success: false,
+          error: `Donor has already responded (${existing.donor_response}) to this request.`
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'A coordination request has already been sent to this donor.'
+      });
+    }
+
+    // Calculate privacy-safe distance band
     let distanceBand = 'Proximity verified';
     if (request.latitude && request.longitude && donor.latitude && donor.longitude) {
       const dist = calculateHaversineDistanceKm(request.latitude, request.longitude, donor.latitude, donor.longitude);
       distanceBand = getPrivacySafeDistanceBand(dist);
     }
 
-    // Send Telegram Notification
-    let notificationResult = null;
-    if (donor.telegram_chat_id && donor.telegram_opt_in === true) {
-      notificationResult = await sendEmergencyBloodRequestNotification(donor, request);
-    } else {
-      // Record pending notification entry in DB/memory even if Telegram bot isn't connected yet
-      const messageText = `Blood request for ${request.patient_name} (${request.blood_group}) at ${request.hospital_name}, ${request.city}`;
-      notificationResult = await saveTelegramNotification({
-        request_id: request.id,
+    // 9, 10, 11. Send Telegram Notification and store actual dispatch status
+    const notificationResult = await sendEmergencyBloodRequestNotification(donor, request);
+
+    if (notificationResult && notificationResult.success) {
+      return res.json({
+        success: true,
+        message: 'Telegram request sent successfully. Waiting for donor response.',
+        status: 'sent',
         donor_id: donor.id,
-        telegram_chat_id: donor.telegram_chat_id || 0,
-        message_text: messageText,
-        status: 'pending',
-        donor_response: 'pending'
+        distance_band: distanceBand
       });
     }
 
-    return res.json({
-      success: true,
-      message: donor.telegram_chat_id && donor.telegram_opt_in
-        ? `Emergency Telegram request sent to ${donor.name}. Waiting for donor response.`
-        : `Contact request initiated for ${donor.name}. Waiting for donor response.`,
-      status: 'pending',
-      donor_id: donor.id,
-      distance_band: distanceBand
+    if (notificationResult && notificationResult.skipped) {
+      return res.status(400).json({
+        success: false,
+        error: 'A coordination request has already been sent to this donor.'
+      });
+    }
+
+    return res.status(502).json({
+      success: false,
+      error: notificationResult?.error || 'Telegram service temporarily unavailable.'
     });
   } catch (err) {
     next(err);

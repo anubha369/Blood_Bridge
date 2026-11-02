@@ -9,12 +9,69 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { localStore } = require('../db/db');
+const { localStore, isPostgresConnected, getPool, getSupabase } = require('../db/db');
 
 /**
- * Verify JWT token from Authorization header
+ * Robust User Lookup Helper:
+ * 1. Checks in-memory localStore cache
+ * 2. Checks PostgreSQL public.users
+ * 3. Checks Supabase client
  */
-function authenticateUser(req, res, next) {
+async function findUserById(userId) {
+  if (!userId) return null;
+
+  // 1. In-memory localStore
+  let user = (localStore.users || []).find((u) => u.id === userId);
+  if (user) return user;
+
+  // 2. PostgreSQL public.users lookup
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const res = await pool.query(
+        'SELECT id, email, name, role, is_verified, phone FROM public.users WHERE id = $1 LIMIT 1',
+        [userId]
+      );
+      if (res.rows.length > 0) {
+        user = res.rows[0];
+        if (!localStore.users) localStore.users = [];
+        if (!localStore.users.some((u) => u.id === user.id)) {
+          localStore.users.push(user);
+        }
+        return user;
+      }
+    } catch (err) {
+      console.warn('Auth user PostgreSQL lookup notice:', err.message);
+    }
+  }
+
+  // 3. Supabase fallback
+  try {
+    const sb = getSupabase ? getSupabase() : null;
+    if (sb) {
+      const { data, error } = await sb
+        .from('users')
+        .select('id, email, name, role, is_verified, phone')
+        .eq('id', userId)
+        .maybeSingle();
+      if (data && !error) {
+        user = data;
+        if (!localStore.users) localStore.users = [];
+        if (!localStore.users.some((u) => u.id === user.id)) {
+          localStore.users.push(user);
+        }
+        return user;
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+/**
+ * Verify JWT token from Authorization header and attach authenticated identity
+ */
+async function authenticateUser(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
@@ -27,9 +84,14 @@ function authenticateUser(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret);
-    
-    // Fetch current user from store to verify existence
-    const user = localStore.users.find((u) => u.id === decoded.id);
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session expired or invalid token. Please log in again.'
+      });
+    }
+
+    const user = await findUserById(decoded.id);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -41,7 +103,8 @@ function authenticateUser(req, res, next) {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role // Always extracted from backend database, never trusted from client
+      role: user.role, // Always extracted from backend database, never trusted from client
+      phone: user.phone || null
     };
 
     next();
@@ -56,17 +119,25 @@ function authenticateUser(req, res, next) {
 /**
  * Optional authentication middleware for public endpoints that can be personalized
  */
-function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     try {
       const decoded = jwt.verify(token, config.jwtSecret);
-      const user = localStore.users.find((u) => u.id === decoded.id);
-      if (user) {
-        req.user = { id: user.id, email: user.email, name: user.name, role: user.role };
+      if (decoded && decoded.id) {
+        const user = await findUserById(decoded.id);
+        if (user) {
+          req.user = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            phone: user.phone || null
+          };
+        }
       }
-    } catch (err) {
+    } catch (_) {
       // Ignore token verification errors for optional auth
     }
   }
@@ -100,5 +171,6 @@ function requireRole(allowedRoles) {
 module.exports = {
   authenticateUser,
   optionalAuth,
-  requireRole
+  requireRole,
+  findUserById
 };

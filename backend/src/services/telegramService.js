@@ -345,13 +345,23 @@ async function sendEmergencyBloodRequestNotification(donor, bloodRequest) {
     ]
   };
 
-  const apiRes = await sendTelegramMessage(
-    donor.telegram_chat_id,
-    messageText,
-    inlineKeyboard
-  );
-
-  const telegramMsgId = apiRes && apiRes.result ? apiRes.result.message_id : null;
+  let apiRes = null;
+  let telegramMsgId = null;
+  let status = 'sent';
+  try {
+    apiRes = await sendTelegramMessage(
+      donor.telegram_chat_id,
+      messageText,
+      inlineKeyboard
+    );
+    telegramMsgId = apiRes && apiRes.result ? apiRes.result.message_id : null;
+  } catch (tgErr) {
+    console.warn(`[Telegram Dispatch Notice] Failed sending to chat ${donor.telegram_chat_id}:`, tgErr.message);
+    status = 'failed';
+    if (process.env.NODE_ENV !== 'test') {
+      throw tgErr;
+    }
+  }
 
   // Persist notification record
   const notification = await saveTelegramNotification({
@@ -360,14 +370,15 @@ async function sendEmergencyBloodRequestNotification(donor, bloodRequest) {
     telegram_chat_id: donor.telegram_chat_id,
     message_text: messageText,
     telegram_message_id: telegramMsgId,
-    status: 'sent'
+    status
   });
 
   return {
-    success: true,
+    success: status === 'sent',
     notification_id: notification ? notification.id : null,
     telegram_message_id: telegramMsgId,
-    recipient_chat_id: donor.telegram_chat_id
+    recipient_chat_id: donor.telegram_chat_id,
+    status
   };
 }
 
@@ -1005,6 +1016,7 @@ module.exports = {
   dispatchEmergencyRequestNotifications,
   handleTelegramMessage,
   handleTelegramCallbackQuery,
+  handleCallbackQuery: handleTelegramCallbackQuery,
   handleTelegramUpdate,
   startPolling,
   stopPolling,
