@@ -22,11 +22,12 @@ BloodBridge Vision-X is an emergency blood coordination and navigation platform 
 
 ## Tech Stack
 
-- **Frontend**: React 18, Vite, Tailwind CSS, React Router v6, Lucide Icons
-- **Backend**: Node.js, Express.js, JWT Authentication, Helmet, Rate Limiting
+- **Web Frontend**: React 18, Vite, Tailwind CSS, React Router v6, Lucide Icons
+- **Mobile Application**: React Native, Expo SDK 58, TypeScript, React Navigation, Expo SecureStore
+- **Shared Backend**: Node.js, Express.js, JWT Authentication, Helmet, Rate Limiting
 - **Database**: PostgreSQL with PostGIS extension (Supabase compatible)
 - **AI & LLM**: Groq SDK (`llama-3.3-70b-versatile`), TF-IDF/pgvector embedding pipeline
-- **Integrations**: Google Forms, Google Sheets, Google Apps Script
+- **Integrations**: Google Forms, Google Sheets, Google Apps Script, Telegram Bot, WhatsApp Cloud API
 
 ---
 
@@ -46,6 +47,9 @@ cd backend && npm install
 
 # Install frontend dependencies
 cd ../frontend && npm install
+
+# Install mobile application dependencies
+cd ../mobile && npm install
 ```
 
 ### 3. Environment Setup
@@ -55,6 +59,9 @@ Copy the example environment configurations:
 cp .env.example .env
 
 # In frontend/
+cp .env.example .env
+
+# In mobile/
 cp .env.example .env
 ```
 
@@ -77,9 +84,13 @@ npm run dev:backend
 
 # In another terminal, start frontend (Port 5173)
 npm run dev:frontend
+
+# In another terminal, start mobile app (Expo dev server)
+npm run mobile
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+- Web App: [http://localhost:5173](http://localhost:5173)
+- Mobile App: Press `a` for Android Emulator, `i` for iOS Simulator, or scan QR with Expo Go.
 
 ---
 

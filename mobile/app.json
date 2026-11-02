@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "BloodBridge Vision-X",
+    "slug": "bloodbridge-vision-x",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "bloodbridge",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B132B"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.bloodbridge.visionx",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BloodBridge utilizes approximate location to coordinate nearby emergency blood requests and find compatible donors within your radius."
+      }
+    },
+    "android": {
+      "package": "org.bloodbridge.visionx",
+      "adaptiveIcon": {
+        "backgroundColor": "#8B0000",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
