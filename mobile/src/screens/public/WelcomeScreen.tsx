@@ -66,14 +66,25 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             </Text>
           </View>
 
-          <TouchableOpacity
-            onPress={() => navigation.navigate('BloodBankDirectory')}
-            style={styles.bloodBankPill}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="business-outline" size={14} color={THEME.colors.slate700} />
-            <Text style={styles.bloodBankPillText}>Blood Banks</Text>
-          </TouchableOpacity>
+          <View style={styles.navHeaderRight}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('HowItWorks')}
+              style={styles.navHeaderPill}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="layers-outline" size={13} color={THEME.colors.slate700} />
+              <Text style={styles.bloodBankPillText}>How It Works</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('BloodBankDirectory')}
+              style={styles.bloodBankPill}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="business-outline" size={13} color={THEME.colors.slate700} />
+              <Text style={styles.bloodBankPillText}>Blood Banks</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Hero Section */}
@@ -264,6 +275,22 @@ const styles = StyleSheet.create({
   },
   brandCrimson: {
     color: THEME.colors.primary
+  },
+  navHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  navHeaderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark
   },
   bloodBankPill: {
     flexDirection: 'row',

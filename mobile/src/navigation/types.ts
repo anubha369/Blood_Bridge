@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Register: { defaultRole?: 'requester' | 'donor' } | undefined;
   ForgotPassword: undefined;
   PrivacyPolicy: undefined;
+  HowItWorks: undefined;
 
   // Main Role Hubs
   RequesterMain: NavigatorScreenParams<RequesterTabParamList>;

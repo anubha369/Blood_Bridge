@@ -80,6 +80,7 @@ export interface ContactRequest {
   patient_name?: string;
   hospital_name?: string;
   units_needed?: number;
+  units_requested?: number;
   urgency_level?: UrgencyLevel;
   status: 'sent' | 'accepted' | 'declined' | 'snoozed' | 'expired';
   channel: 'telegram' | 'whatsapp' | 'sms' | 'push' | 'app';

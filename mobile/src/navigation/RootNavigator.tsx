@@ -9,6 +9,7 @@ import { LoginScreen } from '../screens/public/LoginScreen';
 import { RegisterScreen } from '../screens/public/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/public/ForgotPasswordScreen';
 import { PrivacyPolicyScreen } from '../screens/public/PrivacyPolicyScreen';
+import { HowItWorksScreen } from '../screens/public/HowItWorksScreen';
 
 // Tab Navigators
 import { RequesterTabNavigator } from './RequesterTabNavigator';
@@ -55,6 +56,7 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+      <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
 
       {/* Main Tab Portals */}
       <Stack.Screen name="RequesterMain" component={RequesterTabNavigator} />
