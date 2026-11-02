@@ -49,15 +49,20 @@ export default function DonorDashboard() {
   const [togglingTelegramConsent, setTogglingTelegramConsent] = useState(false);
   const [unlinkingTelegram, setUnlinkingTelegram] = useState(false);
 
+  // Incoming blood coordination requests
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [respondingToRequestId, setRespondingToRequestId] = useState(null);
+
   const fetchDonorData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [profileRes, cooldownRes, creditRes, telegramRes] = await Promise.all([
+      const [profileRes, cooldownRes, creditRes, telegramRes, contactRequestsRes] = await Promise.all([
         api.donors.getProfile().catch((e) => (e.status === 404 ? { donor: null } : Promise.reject(e))),
         api.donors.getCooldownStatus().catch(() => null),
         api.credits.getHistory().catch(() => ({ balance: 0, history: [] })),
-        api.telegram.getStatus().catch(() => null)
+        api.telegram.getStatus().catch(() => null),
+        api.donors.getContactRequests().catch(() => ({ notifications: [] }))
       ]);
 
       if (profileRes && profileRes.donor) {
@@ -77,10 +82,34 @@ export default function DonorDashboard() {
       if (telegramRes && telegramRes.success) {
         setTelegramStatus(telegramRes);
       }
+
+      if (contactRequestsRes && contactRequestsRes.notifications) {
+        setIncomingRequests(contactRequestsRes.notifications);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load donor dashboard data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRespondToRequest = async (requestId, action) => {
+    setRespondingToRequestId(requestId);
+    try {
+      const res = await api.donors.respondToContactRequest(requestId, action);
+      if (res.success) {
+        alert(res.message);
+        const updated = await api.donors.getContactRequests().catch(() => null);
+        if (updated && updated.notifications) {
+          setIncomingRequests(updated.notifications);
+        }
+      } else {
+        alert(res.error || 'Failed to update response.');
+      }
+    } catch (err) {
+      alert(`Response error: ${err.message}`);
+    } finally {
+      setRespondingToRequestId(null);
     }
   };
 
@@ -308,8 +337,108 @@ export default function DonorDashboard() {
               Eligible for Emergency Notifications
             </strong>
             <p className="leading-relaxed">
-              No active recovery cooldown. As long as your availability toggle is ON and consent is granted, you will receive WhatsApp/email alerts when compatible emergency requests arise in your area.
+              No active recovery cooldown. As long as your availability toggle is ON and consent is granted, you will receive Telegram alerts when compatible emergency requests arise in your area.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Incoming Emergency Blood Requests (Telegram / Web) */}
+      {incomingRequests.length > 0 && (
+        <div className="bg-white rounded-3xl border border-rose-200 p-6 sm:p-7 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Heart className="w-5 h-5 text-rose-600 fill-rose-600" />
+              <span>Incoming Emergency Blood Requests ({incomingRequests.length})</span>
+            </h2>
+            <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+              Synchronized with Telegram Bot
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {incomingRequests.map((req) => {
+              const isAccepted = req.donor_response === 'accepted';
+              const isDeclined = req.donor_response === 'declined';
+              const isPending = !isAccepted && !isDeclined;
+
+              return (
+                <div
+                  key={req.notification_id || req.request_id}
+                  className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                    isAccepted
+                      ? 'bg-emerald-50/70 border-emerald-300'
+                      : isDeclined
+                      ? 'bg-slate-50 border-slate-200 opacity-60'
+                      : 'bg-rose-50/40 border-rose-200 ring-2 ring-rose-500/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 h-10 rounded-2xl bg-rose-600 text-white font-black flex items-center justify-center text-sm shadow-sm">
+                        {req.blood_group}
+                      </span>
+                      <div>
+                        <div className="font-extrabold text-slate-900 text-sm">
+                          {req.patient_name || 'Emergency Patient'}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {req.hospital_name || 'Hospital'}, {req.city}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                      {req.urgency || 'Urgent'}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-slate-600 flex items-center gap-3 pt-1">
+                    <span>Required Units: <strong>{req.units_needed || 1}</strong></span>
+                    <span>•</span>
+                    <span className="text-slate-400">
+                      Received: {new Date(req.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {isPending ? (
+                    <div className="pt-2 border-t border-rose-100/60 space-y-2">
+                      <p className="text-xs font-semibold text-slate-700">
+                        Can you respond to this request?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRespondToRequest(req.request_id, 'accept')}
+                          disabled={respondingToRequestId === req.request_id}
+                          className="flex-1 py-2 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{respondingToRequestId === req.request_id ? 'Responding...' : 'Accept Request'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRespondToRequest(req.request_id, 'decline')}
+                          disabled={respondingToRequestId === req.request_id}
+                          className="py-2 px-3 text-xs font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition-all disabled:opacity-50"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ) : isAccepted ? (
+                    <div className="pt-2 border-t border-emerald-100 text-xs text-emerald-800 font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>You accepted this request. Requester has access to coordinate with you.</span>
+                    </div>
+                  ) : (
+                    <div className="pt-2 border-t border-slate-200 text-xs text-slate-500 italic">
+                      You declined this request.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

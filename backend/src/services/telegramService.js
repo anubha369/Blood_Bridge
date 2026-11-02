@@ -259,17 +259,18 @@ async function editMessageText(chatId, messageId, text, replyMarkup = null) {
  * Format emergency blood alert text with clinical disclaimer
  */
 function formatEmergencyMessage(donor, bloodRequest, distanceBand) {
-  const urgencyLabel = (bloodRequest.urgency || 'emergency').toUpperCase();
+  const urgencyRaw = (bloodRequest.urgency || 'high').toLowerCase();
+  const urgencyLabel = urgencyRaw === 'emergency' ? 'Emergency' : urgencyRaw === 'urgent' ? 'Urgent' : 'High';
+  const locationText = bloodRequest.city ? bloodRequest.city.split(',')[0].trim() : 'Local Area';
+
   return (
-    `🚨 *BLOODBRIDGE EMERGENCY ALERT* 🚨\n\n` +
-    `A verified urgent blood requirement has been issued matching your blood group (*${bloodRequest.blood_group}*).\n\n` +
-    `🏥 *Hospital:* ${bloodRequest.hospital_name}\n` +
-    `📍 *Location:* ${bloodRequest.city}${bloodRequest.hospital_address ? ` (${bloodRequest.hospital_address})` : ''}\n` +
-    `🩸 *Units Needed:* ${bloodRequest.units_needed} unit(s)\n` +
-    `⚡ *Urgency Level:* ${urgencyLabel}\n` +
-    `📏 *Proximity:* ${distanceBand}\n\n` +
-    `⚠️ *Clinical Safety Disclaimer:* Tapping Accept indicates your immediate availability and voluntary willingness to donate. It is *not* a clinical guarantee of compatibility. Final cross-matching and transfusion compatibility belong exclusively to authorized medical professionals at the hospital.\n\n` +
-    `Are you feeling healthy, available, and able to donate?`
+    `🩸 *BloodBridge — New Blood Request*\n\n` +
+    `*Blood Group:* ${bloodRequest.blood_group}\n` +
+    `*Location:* ${locationText}${bloodRequest.hospital_name ? ` (${bloodRequest.hospital_name})` : ''}\n` +
+    `*Required Units:* ${bloodRequest.units_needed || 1}\n` +
+    `*Urgency:* ${urgencyLabel}\n\n` +
+    `Can you respond to this request?\n\n` +
+    `_Clinical Disclaimer: Tapping Accept confirms your voluntary willingness and availability. Medical cross-matching will be verified by authorized hospital professionals._`
   );
 }
 
@@ -333,11 +334,11 @@ async function sendEmergencyBloodRequestNotification(donor, bloodRequest) {
     inline_keyboard: [
       [
         {
-          text: '✅ Accept Request',
+          text: 'Accept Request',
           callback_data: `accept_req_${bloodRequest.id}`
         },
         {
-          text: '❌ Decline Request',
+          text: 'Decline Request',
           callback_data: `decline_req_${bloodRequest.id}`
         }
       ]
@@ -651,30 +652,21 @@ async function handleTelegramCallbackQuery(callbackQuery) {
   const responseType = action === 'accept' ? 'accepted' : 'declined';
   await updateTelegramNotificationResponse(requestId, donor.id, responseType);
 
-  // 5. Also record in localStore.whatsapp_notifications (shared response tracking)
-  // so /api/requests/:id/accepted-donors sees this donor!
-  if (!localStore.whatsapp_notifications) localStore.whatsapp_notifications = [];
-  const existingShared = localStore.whatsapp_notifications.find(
-    (n) => n.request_id === requestId && n.donor_id === donor.id
-  );
-  if (existingShared) {
-    existingShared.donor_response = responseType;
-    existingShared.responded_at = new Date().toISOString();
-  } else {
-    localStore.whatsapp_notifications.push({
-      id: crypto.randomUUID(),
-      request_id: requestId,
-      donor_id: donor.id,
-      donor_name: donor.name,
-      recipient_phone: donor.phone || 'Telegram User',
-      template_name: 'telegram_emergency_alert',
-      message_body: originalText,
-      status: 'responded',
-      donor_response: responseType,
-      responded_at: new Date().toISOString(),
-      action_token: `tg_${donor.id}_${requestId}`,
-      created_at: new Date().toISOString()
-    });
+  // 5. Update blood request status if accepted
+  if (action === 'accept' && bloodRequest.status === 'active') {
+    bloodRequest.status = 'responses_received';
+    bloodRequest.updated_at = new Date().toISOString();
+    if (isPostgresConnected()) {
+      const pool = getPool();
+      if (pool) {
+        try {
+          await pool.query(
+            "UPDATE public.blood_requests SET status = 'responses_received', updated_at = NOW() WHERE id = $1 AND status = 'active'",
+            [requestId]
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   // 6. Update request_matches table in PostgreSQL if available

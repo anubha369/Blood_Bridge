@@ -219,10 +219,10 @@ export default function Signup() {
                 <div>{error}</div>
                 {(error.toLowerCase().includes('already exists') || error.toLowerCase().includes('conflict') || error.toLowerCase().includes('registered')) && (
                   <Link
-                    to={`/login?role=${role}`}
+                    to={`/login?role=${role}&email=${encodeURIComponent(email)}`}
                     className="mt-1.5 inline-flex items-center gap-1 font-bold text-rose-800 hover:underline"
                   >
-                    Account already exists? Click here to Log In →
+                    Account already exists? Click here to Log In with this email →
                   </Link>
                 )}
               </div>

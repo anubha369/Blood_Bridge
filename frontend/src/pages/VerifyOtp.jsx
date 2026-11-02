@@ -18,7 +18,7 @@ export default function VerifyOtp() {
   const location = useLocation();
 
   const searchParams = new URLSearchParams(location.search);
-  const phoneParam = searchParams.get('phone') || location.state?.phone || '+91 98765 00000';
+  const phoneParam = searchParams.get('phone') || location.state?.phone || user?.phone || '';
   const roleParam = searchParams.get('role') || location.state?.role || user?.role || 'donor';
   const initialChallengeId = searchParams.get('challenge_id') || location.state?.challenge_id || '';
 

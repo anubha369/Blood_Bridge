@@ -335,74 +335,363 @@ router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
   }
 });
 
-// GET /api/requests/:id/accepted-donors
-// Returns ONLY donors who explicitly accepted this specific request
-// Contact phone is revealed ONLY for the selected donor (Sections 8 & 9)
-router.get('/:id/accepted-donors', authenticateUser, (req, res) => {
-  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
-  if (!request) {
-    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+// Helper to get donor by ID from memory or PostgreSQL with phone details
+async function getDonorWithContact(donorId) {
+  let donor = (localStore.donors || []).find((d) => d.id === donorId);
+  if ((!donor || !donor.phone) && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const res = await pool.query('SELECT * FROM public.donors WHERE id = $1 LIMIT 1', [donorId]);
+      if (res.rows.length > 0) {
+        donor = res.rows[0];
+      }
+    } catch (_) {}
   }
+  return donor || null;
+}
 
-  // Only requester of this request or an admin can access accepted donors
-  if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
-    return res.status(403).json({ success: false, error: 'Unauthorized to view accepted donors for this request.' });
-  }
-
-  // Find notification jobs for this request that have donor_response === 'accepted'
-  const whatsappAccepted = (localStore.whatsapp_notifications || []).filter(
-    (j) => j.request_id === request.id && j.donor_response === 'accepted'
-  );
-  const telegramAccepted = (localStore.telegram_notifications || []).filter(
-    (j) => j.request_id === request.id && j.donor_response === 'accepted'
-  );
-  const acceptedJobs = [...whatsappAccepted];
-  for (const tgJob of telegramAccepted) {
-    if (!acceptedJobs.some((j) => j.donor_id === tgJob.donor_id)) {
-      acceptedJobs.push(tgJob);
+// POST /api/requests/:id/send-donor-request
+// Requester dispatches an emergency contact request to an individual matched donor via Telegram
+router.post('/:id/send-donor-request', authenticateUser, async (req, res, next) => {
+  try {
+    const { donor_id } = req.body;
+    if (!donor_id) {
+      return res.status(400).json({ success: false, error: 'donor_id is required.' });
     }
-  }
 
-  const acceptedDonors = acceptedJobs.map((job) => {
-    const donor = (localStore.donors || []).find((d) => d.id === job.donor_id);
-    const isSelected = request.selected_donor_id === job.donor_id;
+    let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+    if (!request && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+        if (dbRes.rows.length > 0) request = dbRes.rows[0];
+      } catch (_) {}
+    }
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Blood request not found.' });
+    }
 
+    if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to manage this blood request.' });
+    }
+
+    const donor = await getDonorWithContact(donor_id);
+    if (!donor) {
+      return res.status(404).json({ success: false, error: 'Donor profile not found.' });
+    }
+
+    if (donor.consent_to_contact === false || donor.consent_status === 'withdrawn') {
+      return res.status(400).json({ success: false, error: 'Donor has withdrawn contact consent.' });
+    }
+    if (donor.availability_status && donor.availability_status !== 'available') {
+      return res.status(400).json({ success: false, error: 'Donor is currently marked unavailable.' });
+    }
+
+    // Check existing contact request
+    const existing = await getTelegramNotificationByRequestAndDonor(request.id, donor.id);
+    if (existing && existing.donor_response && ['accepted', 'declined'].includes(existing.donor_response)) {
+      return res.status(400).json({
+        success: false,
+        error: `Donor has already responded (${existing.donor_response}) to this request.`
+      });
+    }
+
+    // Calculate distance band
     let distanceBand = 'Proximity verified';
-    if (donor && donor.latitude && donor.longitude && request.latitude && request.longitude) {
+    if (request.latitude && request.longitude && donor.latitude && donor.longitude) {
       const dist = calculateHaversineDistanceKm(request.latitude, request.longitude, donor.latitude, donor.longitude);
       distanceBand = getPrivacySafeDistanceBand(dist);
     }
 
-    return {
-      donor_id: job.donor_id,
-      name: job.donor_name || (donor ? donor.name : 'Voluntary Donor'),
-      blood_group: donor ? donor.blood_group : request.blood_group,
-      city: donor ? donor.city : request.city,
-      area: donor ? donor.area : null,
-      distance_band: distanceBand,
-      responded_at: job.responded_at,
-      action_token: job.action_token,
-      is_selected: isSelected,
-      // CRITICAL PRIVACY RULE: phone number is ONLY exposed if this donor is selected!
-      phone: isSelected && donor ? donor.phone : undefined
-    };
-  });
+    // Send Telegram Notification
+    let notificationResult = null;
+    if (donor.telegram_chat_id && donor.telegram_opt_in === true) {
+      notificationResult = await sendEmergencyBloodRequestNotification(donor, request);
+    } else {
+      // Record pending notification entry in DB/memory even if Telegram bot isn't connected yet
+      const messageText = `Blood request for ${request.patient_name} (${request.blood_group}) at ${request.hospital_name}, ${request.city}`;
+      notificationResult = await saveTelegramNotification({
+        request_id: request.id,
+        donor_id: donor.id,
+        telegram_chat_id: donor.telegram_chat_id || 0,
+        message_text: messageText,
+        status: 'pending',
+        donor_response: 'pending'
+      });
+    }
 
-  return res.json({
-    success: true,
-    request_id: request.id,
-    request_status: request.status,
-    selected_donor_id: request.selected_donor_id || null,
-    selected_at: request.selected_at || null,
-    count: acceptedDonors.length,
-    donors: acceptedDonors
-  });
+    return res.json({
+      success: true,
+      message: donor.telegram_chat_id && donor.telegram_opt_in
+        ? `Emergency Telegram request sent to ${donor.name}. Waiting for donor response.`
+        : `Contact request initiated for ${donor.name}. Waiting for donor response.`,
+      status: 'pending',
+      donor_id: donor.id,
+      distance_band: distanceBand
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/requests/:id/contact-requests
+// Returns all contact requests for this blood request with strict contact disclosure enforcement
+router.get('/:id/contact-requests', authenticateUser, async (req, res, next) => {
+  try {
+    let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+    if (!request && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+        if (dbRes.rows.length > 0) request = dbRes.rows[0];
+      } catch (_) {}
+    }
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Blood request not found.' });
+    }
+
+    if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to view contact requests for this request.' });
+    }
+
+    let notifications = [];
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const q = `
+          SELECT 
+            tn.id, tn.request_id, tn.donor_id, tn.status, tn.donor_response, tn.responded_at, tn.created_at,
+            d.name, d.blood_group, d.city, d.area, d.phone, d.verification_status, d.availability_status,
+            d.latitude, d.longitude, d.consent_to_contact, d.consent_status
+          FROM public.telegram_notifications tn
+          JOIN public.donors d ON tn.donor_id = d.id
+          WHERE tn.request_id = $1
+          ORDER BY tn.created_at DESC
+        `;
+        const dbRes = await pool.query(q, [request.id]);
+        notifications = dbRes.rows;
+      } catch (e) {
+        console.warn('DB contact-requests query warning:', e.message);
+      }
+    }
+
+    // Merge with localStore if empty
+    if (notifications.length === 0 && localStore.telegram_notifications) {
+      const memoryNotifs = localStore.telegram_notifications.filter((n) => n.request_id === request.id);
+      for (const mn of memoryNotifs) {
+        const d = await getDonorWithContact(mn.donor_id);
+        if (d) {
+          notifications.push({
+            id: mn.id,
+            request_id: mn.request_id,
+            donor_id: mn.donor_id,
+            status: mn.status,
+            donor_response: mn.donor_response,
+            responded_at: mn.responded_at,
+            created_at: mn.created_at,
+            name: d.name,
+            blood_group: d.blood_group,
+            city: d.city,
+            area: d.area,
+            phone: d.phone,
+            verification_status: d.verification_status,
+            availability_status: d.availability_status,
+            latitude: d.latitude,
+            longitude: d.longitude,
+            consent_to_contact: d.consent_to_contact,
+            consent_status: d.consent_status
+          });
+        }
+      }
+    }
+
+    const items = notifications.map((n) => {
+      const responseStatus = n.donor_response || n.status || 'pending';
+      const isAccepted = responseStatus === 'accepted';
+      const isDeclined = responseStatus === 'declined';
+      const isExpired = responseStatus === 'expired' || n.status === 'expired';
+
+      let distanceBand = 'Proximity verified';
+      if (request.latitude && request.longitude && n.latitude && n.longitude) {
+        const dist = calculateHaversineDistanceKm(request.latitude, request.longitude, n.latitude, n.longitude);
+        distanceBand = getPrivacySafeDistanceBand(dist);
+      }
+
+      const isSelected = request.selected_donor_id === n.donor_id;
+
+      // Status message per Section 6
+      let statusMessage = 'Waiting for donor response.';
+      if (isAccepted) {
+        statusMessage = 'Donor accepted your contact request. You can now view the available contact information.';
+      } else if (isDeclined) {
+        statusMessage = 'Donor declined this request.';
+      } else if (isExpired) {
+        statusMessage = 'Contact request expired.';
+      }
+
+      // CRITICAL PRIVACY & AUTHORIZATION ENFORCEMENT (Section 5):
+      // Phone is revealed ONLY if donor explicitly accepted!
+      // If no valid phone exists, null is returned with has_phone: false. Never a fake number!
+      const validPhone = isAccepted && n.phone && String(n.phone).trim().length >= 8 ? String(n.phone).trim() : null;
+
+      return {
+        id: n.id,
+        donor_id: n.donor_id,
+        name: n.name || 'Voluntary Donor',
+        blood_group: n.blood_group,
+        city: n.city,
+        area: n.area,
+        distance_band: distanceBand,
+        verification_status: n.verification_status,
+        availability_status: n.availability_status,
+        status: isAccepted ? 'accepted' : isDeclined ? 'declined' : isExpired ? 'expired' : 'pending',
+        status_message: statusMessage,
+        responded_at: n.responded_at,
+        created_at: n.created_at,
+        is_selected: isSelected,
+        phone: validPhone,
+        has_phone: Boolean(validPhone),
+        phone_message: isAccepted
+          ? validPhone ? null : 'No contact phone number provided by donor.'
+          : 'Waiting for donor response.'
+      };
+    });
+
+    return res.json({
+      success: true,
+      request_id: request.id,
+      request_status: request.status,
+      selected_donor_id: request.selected_donor_id || null,
+      selected_at: request.selected_at || null,
+      count: items.length,
+      contact_requests: items
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/requests/:id/accepted-donors (Maintained for backward-compatibility)
+router.get('/:id/accepted-donors', authenticateUser, async (req, res, next) => {
+  try {
+    let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+    if (!request && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+        if (dbRes.rows.length > 0) request = dbRes.rows[0];
+      } catch (_) {}
+    }
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Blood request not found.' });
+    }
+
+    if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to view accepted donors for this request.' });
+    }
+
+    let acceptedRows = [];
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const q = `
+          SELECT 
+            tn.id, tn.request_id, tn.donor_id, tn.donor_response, tn.responded_at,
+            d.name, d.blood_group, d.city, d.area, d.phone, d.verification_status, d.availability_status,
+            d.latitude, d.longitude
+          FROM public.telegram_notifications tn
+          JOIN public.donors d ON tn.donor_id = d.id
+          WHERE tn.request_id = $1 AND tn.donor_response = 'accepted'
+          ORDER BY tn.responded_at DESC
+        `;
+        const dbRes = await pool.query(q, [request.id]);
+        acceptedRows = dbRes.rows;
+      } catch (e) {
+        console.warn('DB accepted-donors query warning:', e.message);
+      }
+    }
+
+    if (acceptedRows.length === 0) {
+      const memoryAccepted = [
+        ...(localStore.telegram_notifications || []).filter(
+          (n) => n.request_id === request.id && n.donor_response === 'accepted'
+        ),
+        ...(localStore.whatsapp_notifications || []).filter(
+          (n) => n.request_id === request.id && n.donor_response === 'accepted'
+        )
+      ];
+      for (const ma of memoryAccepted) {
+        const d = await getDonorWithContact(ma.donor_id);
+        if (d) {
+          acceptedRows.push({
+            id: ma.id,
+            request_id: ma.request_id,
+            donor_id: ma.donor_id,
+            donor_response: 'accepted',
+            responded_at: ma.responded_at,
+            name: d.name,
+            blood_group: d.blood_group,
+            city: d.city,
+            area: d.area,
+            phone: d.phone,
+            verification_status: d.verification_status,
+            availability_status: d.availability_status,
+            latitude: d.latitude,
+            longitude: d.longitude
+          });
+        }
+      }
+    }
+
+    const acceptedDonors = acceptedRows.map((row) => {
+      let distanceBand = 'Proximity verified';
+      if (request.latitude && request.longitude && row.latitude && row.longitude) {
+        const dist = calculateHaversineDistanceKm(request.latitude, request.longitude, row.latitude, row.longitude);
+        distanceBand = getPrivacySafeDistanceBand(dist);
+      }
+      const isSelected = request.selected_donor_id === row.donor_id;
+      const validPhone = row.phone && String(row.phone).trim().length >= 8 ? String(row.phone).trim() : null;
+
+      return {
+        donor_id: row.donor_id,
+        name: row.name || 'Voluntary Donor',
+        blood_group: row.blood_group || request.blood_group,
+        city: row.city || request.city,
+        area: row.area || null,
+        distance_band: distanceBand,
+        responded_at: row.responded_at,
+        is_selected: isSelected,
+        phone: isSelected ? validPhone : undefined,
+        has_phone: Boolean(validPhone),
+        phone_message: isSelected ? (validPhone ? null : 'No contact phone number provided by donor.') : 'Phone protected until selected'
+      };
+    });
+
+    return res.json({
+      success: true,
+      request_id: request.id,
+      request_status: request.status,
+      selected_donor_id: request.selected_donor_id || null,
+      selected_at: request.selected_at || null,
+      count: acceptedDonors.length,
+      donors: acceptedDonors
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/requests/:id/select-donor
 // Select one accepting donor for coordination and reveal contact info
 router.post('/:id/select-donor', authenticateUser, async (req, res) => {
-  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (dbRes.rows.length > 0) request = dbRes.rows[0];
+    } catch (_) {}
+  }
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
   }
@@ -417,11 +706,19 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
   }
 
   // Validate that this donor actually accepted this specific request!
-  const acceptedJob = (localStore.whatsapp_notifications || []).find(
+  let acceptedJob = (localStore.telegram_notifications || []).find(
     (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
-  ) || (localStore.telegram_notifications || []).find(
+  ) || (localStore.whatsapp_notifications || []).find(
     (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
   );
+  if (!acceptedJob && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const q = "SELECT * FROM public.telegram_notifications WHERE request_id = $1 AND donor_id = $2 AND donor_response = 'accepted' LIMIT 1";
+      const dbRes = await pool.query(q, [request.id, donor_id]);
+      if (dbRes.rows.length > 0) acceptedJob = dbRes.rows[0];
+    } catch (_) {}
+  }
 
   if (!acceptedJob) {
     return res.status(400).json({
@@ -430,7 +727,7 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
     });
   }
 
-  const donor = (localStore.donors || []).find((d) => d.id === donor_id);
+  const donor = await getDonorWithContact(donor_id);
   if (!donor) {
     return res.status(404).json({ success: false, error: 'Donor record not found.' });
   }

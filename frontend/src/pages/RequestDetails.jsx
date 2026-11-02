@@ -28,15 +28,17 @@ export default function RequestDetails() {
 
   const [request, setRequest] = useState(null);
   const [acceptedDonors, setAcceptedDonors] = useState([]);
+  const [contactRequests, setContactRequests] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [radiusKm, setRadiusKm] = useState(30);
   const [loading, setLoading] = useState(true);
   const [acceptedLoading, setAcceptedLoading] = useState(false);
+  const [contactRequestsLoading, setContactRequestsLoading] = useState(false);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [selectingDonorId, setSelectingDonorId] = useState(null);
-  const [selectedDonorForContact, setSelectedDonorForContact] = useState(null);
+  const [sendingToDonorId, setSendingToDonorId] = useState(null);
 
   const fetchRequest = async () => {
     try {
@@ -63,10 +65,23 @@ export default function RequestDetails() {
         setAcceptedDonors(res.donors || []);
       }
     } catch (err) {
-      // Non-fatal if unauthorized or no notifications yet
       console.warn('Accepted donors fetch notice:', err.message);
     } finally {
       setAcceptedLoading(false);
+    }
+  };
+
+  const fetchContactRequests = async () => {
+    try {
+      setContactRequestsLoading(true);
+      const res = await api.requests.getContactRequests(id);
+      if (res.success) {
+        setContactRequests(res.contact_requests || []);
+      }
+    } catch (err) {
+      console.warn('Contact requests fetch notice:', err.message);
+    } finally {
+      setContactRequestsLoading(false);
     }
   };
 
@@ -88,6 +103,7 @@ export default function RequestDetails() {
     if (id) {
       fetchRequest();
       fetchAcceptedDonors();
+      fetchContactRequests();
       fetchCandidates();
     }
   }, [id]);
@@ -98,7 +114,7 @@ export default function RequestDetails() {
       const res = await api.requests.selectDonor(id, donorId);
       if (res.success) {
         setRequest(res.request);
-        await fetchAcceptedDonors();
+        await Promise.all([fetchAcceptedDonors(), fetchContactRequests()]);
         alert(res.message);
       } else {
         alert(res.error || 'Failed to select donor.');
@@ -116,7 +132,7 @@ export default function RequestDetails() {
       const res = await api.requests.reselectDonor(id);
       if (res.success) {
         setRequest(res.request);
-        await fetchAcceptedDonors();
+        await Promise.all([fetchAcceptedDonors(), fetchContactRequests()]);
       }
     } catch (err) {
       alert(`Reselection error: ${err.message}`);
@@ -129,7 +145,7 @@ export default function RequestDetails() {
       const res = await api.requests.updateStatus(id, newStatus);
       if (res.success && res.request) {
         setRequest(res.request);
-        await fetchAcceptedDonors();
+        await Promise.all([fetchAcceptedDonors(), fetchContactRequests()]);
       }
     } catch (err) {
       alert(err.message || 'Failed to update request status.');
@@ -138,27 +154,21 @@ export default function RequestDetails() {
     }
   };
 
-  const handleOpenWhatsAppForDonor = (donor) => {
-    if (!donor || !donor.phone) {
-      alert('Donor contact phone number is missing or protected. You must select this donor first.');
-      return;
+  const handleSendTelegramToCandidate = async (donorId) => {
+    setSendingToDonorId(donorId);
+    try {
+      const res = await api.requests.sendDonorRequest(id, donorId);
+      if (res.success) {
+        alert(res.message || 'Telegram notification dispatched to donor.');
+        await fetchContactRequests();
+      } else {
+        alert(res.error || 'Failed to dispatch Telegram request.');
+      }
+    } catch (err) {
+      alert(`Dispatch error: ${err.message}`);
+    } finally {
+      setSendingToDonorId(null);
     }
-    const cleanDigits = String(donor.phone).replace(/[^0-9]/g, '');
-    if (cleanDigits.length < 10) {
-      alert('A valid phone number (minimum 10 digits) is required to open WhatsApp.');
-      return;
-    }
-    const normalizedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
-    const emergencyMsg = 
-      `*BloodBridge Emergency Blood Coordination*\n\n` +
-      `Hello ${donor.name},\n` +
-      `We urgently need ${request?.units_needed || 1} unit(s) of ${request?.blood_group || donor.blood_group} blood for patient ${request?.patient_name || 'an emergency patient'} at ${request?.hospital_name || 'hospital'}, ${request?.city || donor.city}.\n\n` +
-      `You accepted our coordination request on BloodBridge.\n` +
-      `Please let us know your current availability or call us directly at: ${request?.contact_phone || '+91 98765 00000'}.\n\n` +
-      `_This coordination request is sent via BloodBridge Vision-X._`;
-
-    const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(emergencyMsg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -297,21 +307,25 @@ export default function RequestDetails() {
               <span>Accepted Donors for This Request ({acceptedDonors.length})</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Only voluntary donors who explicitly tapped &quot;Accept&quot; on their WhatsApp notification appear here.
+              Only voluntary donors who explicitly tapped &quot;Accept Request&quot; on their Telegram notification reveal contact information here.
             </p>
           </div>
 
           <button
-            onClick={fetchAcceptedDonors}
-            disabled={acceptedLoading}
+            onClick={() => {
+              fetchAcceptedDonors();
+              fetchContactRequests();
+            }}
+            disabled={acceptedLoading || contactRequestsLoading}
             className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 self-start sm:self-auto"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${acceptedLoading ? 'animate-spin' : ''}`} />
-            <span>Check for New Responses</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${acceptedLoading || contactRequestsLoading ? 'animate-spin' : ''}`} />
+            <span>Check for Responses</span>
           </button>
         </div>
 
-        {acceptedDonors.length === 0 ? (
+        {/* Contact Requests (Pending, Accepted, Declined) */}
+        {contactRequests.length === 0 && acceptedDonors.length === 0 ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4 shadow-sm">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
               <Clock className="w-6 h-6 animate-pulse" />
@@ -321,12 +335,15 @@ export default function RequestDetails() {
                 Awaiting Voluntary Donor Responses
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Emergency notifications have been sent to eligible nearby donors. To maintain strict medical privacy, donor contact details appear here only after a donor explicitly taps &quot;Accept&quot;.
+                Emergency Telegram requests have been dispatched to matched nearby donors. To maintain strict medical privacy, donor contact details appear here only after a donor explicitly taps &quot;Accept Request&quot;.
               </p>
             </div>
             <div className="pt-2 flex justify-center gap-3">
               <button
-                onClick={fetchAcceptedDonors}
+                onClick={() => {
+                  fetchAcceptedDonors();
+                  fetchContactRequests();
+                }}
                 className="py-2 px-4 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all"
               >
                 Refresh Responses
@@ -341,100 +358,109 @@ export default function RequestDetails() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {acceptedDonors.map((donor) => {
-              const isSelected = donor.is_selected;
+            {contactRequests.map((cr) => {
+              const isAccepted = cr.status === 'accepted';
+              const isDeclined = cr.status === 'declined';
+              const isPending = !isAccepted && !isDeclined;
 
               return (
                 <div
-                  key={donor.donor_id}
+                  key={cr.donor_id}
                   className={`p-5 rounded-3xl border transition-all space-y-4 ${
-                    isSelected
-                      ? 'bg-emerald-50/60 border-emerald-400 ring-2 ring-emerald-500/30 shadow-md'
-                      : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
+                    isAccepted
+                      ? 'bg-emerald-50/60 border-emerald-400 ring-2 ring-emerald-500/20 shadow-md'
+                      : isDeclined
+                      ? 'bg-slate-50/70 border-slate-200 opacity-70'
+                      : 'bg-white border-amber-200 shadow-sm'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <span className="w-10 h-10 rounded-2xl bg-rose-600 text-white font-black flex items-center justify-center text-sm shadow-sm">
-                        {donor.blood_group}
+                        {cr.blood_group}
                       </span>
                       <div>
                         <div className="font-black text-slate-900 text-sm flex items-center gap-1.5">
-                          <span>{donor.name}</span>
-                          {isSelected && (
-                            <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white rounded-full">
-                              Selected Donor
-                            </span>
-                          )}
+                          <span>{cr.name}</span>
                         </div>
                         <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                          <span>{donor.city} {donor.area ? `(${donor.area})` : ''}</span>
+                          <span>{cr.city} {cr.area ? `(${cr.area})` : ''}</span>
                           <span>•</span>
-                          <span className="font-bold text-rose-600">{donor.distance_band}</span>
+                          <span className="font-bold text-rose-600">{cr.distance_band}</span>
                         </div>
                       </div>
                     </div>
 
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Accepted
-                    </span>
+                    {isAccepted && (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full flex items-center gap-1 whitespace-nowrap">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Accepted
+                      </span>
+                    )}
+                    {isPending && (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full flex items-center gap-1 whitespace-nowrap">
+                        <Clock className="w-3 h-3 text-amber-600 animate-pulse" /> Pending response
+                      </span>
+                    )}
+                    {isDeclined && (
+                      <span className="text-[10px] font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-full flex items-center gap-1 whitespace-nowrap">
+                        Declined
+                      </span>
+                    )}
                   </div>
 
-                  {/* Actions & Revealed Contact details */}
-                  {isSelected ? (
+                  {/* Status description & privacy-safe contact reveal */}
+                  {isAccepted ? (
                     <div className="p-4 bg-white rounded-2xl border border-emerald-200 space-y-3">
+                      <p className="text-[11px] font-medium text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+                        {cr.phone_message || 'Donor accepted your contact request. You can now view the available contact information.'}
+                      </p>
+
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-500 font-semibold">Verified Contact Phone:</span>
-                        <span className="font-mono font-bold text-slate-900 text-sm">{donor.phone || 'Available'}</span>
+                        <span className="font-mono font-bold text-slate-900 text-sm">
+                          {cr.phone || 'No contact phone number provided by donor.'}
+                        </span>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenWhatsAppForDonor(donor)}
-                          className="flex-1 py-2 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span>Open WhatsApp to Send Request</span>
-                        </button>
+                      {cr.phone ? (
+                        <div className="pt-1 flex gap-2">
+                          <a
+                            href={`tel:${cr.phone}`}
+                            className="flex-1 py-2 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all text-center shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>Call Donor Now</span>
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-400 italic">
+                          No direct phone number provided by donor.
+                        </div>
+                      )}
 
-                        <a
-                          href={`tel:${donor.phone}`}
-                          className="py-2 px-4 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 text-center"
-                        >
-                          Call
-                        </a>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={handleReselectDonor}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline"
-                        >
-                          Change Selected Donor
-                        </button>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
                         <button
                           type="button"
                           onClick={() => handleStatusChange('fulfilled')}
                           className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
                         >
-                          Mark Donated & Fulfilled &rarr;
+                          Mark Donated &amp; Fulfilled &rarr;
                         </button>
                       </div>
                     </div>
+                  ) : isPending ? (
+                    <div className="p-3 bg-amber-50/50 rounded-2xl border border-amber-200/60 space-y-1.5 text-xs">
+                      <div className="text-[11px] text-amber-800 font-medium flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Waiting for donor response.</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 italic">
+                        Phone number is protected until the donor explicitly accepts via Telegram or Dashboard.
+                      </div>
+                    </div>
                   ) : (
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <span className="text-[11px] text-slate-400 italic">
-                        Phone protected until selected
-                      </span>
-                      <button
-                        onClick={() => handleSelectDonor(donor.donor_id)}
-                        disabled={selectingDonorId === donor.donor_id}
-                        className="py-2 px-4 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-sm disabled:opacity-50"
-                      >
-                        {selectingDonorId === donor.donor_id ? 'Selecting...' : 'Select This Donor'}
-                      </button>
+                    <div className="p-3 bg-slate-100/70 rounded-2xl border border-slate-200 text-xs text-slate-500 italic">
+                      Donor declined this request.
                     </div>
                   )}
                 </div>
@@ -450,7 +476,7 @@ export default function RequestDetails() {
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Heart className="w-4 h-4 text-rose-600" />
-              Regional Candidate Donors Filtered by ABO/Rh & Cooldown ({candidates.length})
+              Regional Candidate Donors Filtered by ABO/Rh &amp; Cooldown ({candidates.length})
             </h3>
             <p className="text-[11px] text-slate-400">
               Only donors who have granted notification consent and are outside the 3-month cooldown period are surfaced.
@@ -476,26 +502,41 @@ export default function RequestDetails() {
         </div>
 
         <div className="space-y-2">
-          {candidates.slice(0, 5).map((cand, idx) => (
-            <div
-              key={cand.donor_id || idx}
-              className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs"
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-lg bg-rose-600 text-white font-bold flex items-center justify-center text-xs">
-                  {cand.blood_group}
-                </span>
-                <div>
-                  <div className="font-bold text-slate-800">{cand.name}</div>
-                  <div className="text-[11px] text-slate-500">{cand.city} • <span className="font-semibold text-rose-600">{cand.distance_band}</span></div>
-                </div>
-              </div>
+          {candidates.slice(0, 5).map((cand, idx) => {
+            const hasSent = contactRequests.some((cr) => cr.donor_id === cand.donor_id);
 
-              <span className="text-[10px] font-semibold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
-                Awaiting Broadcast Response
-              </span>
-            </div>
-          ))}
+            return (
+              <div
+                key={cand.donor_id || idx}
+                className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-rose-600 text-white font-bold flex items-center justify-center text-xs">
+                    {cand.blood_group}
+                  </span>
+                  <div>
+                    <div className="font-bold text-slate-800">{cand.name}</div>
+                    <div className="text-[11px] text-slate-500">{cand.city} • <span className="font-semibold text-rose-600">{cand.distance_band}</span></div>
+                  </div>
+                </div>
+
+                {hasSent ? (
+                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                    Telegram Dispatched
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleSendTelegramToCandidate(cand.donor_id)}
+                    disabled={sendingToDonorId === cand.donor_id}
+                    className="py-1.5 px-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>{sendingToDonorId === cand.donor_id ? 'Sending...' : 'Send Telegram Request'}</span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

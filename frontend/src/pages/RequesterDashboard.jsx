@@ -13,6 +13,7 @@ export default function RequesterDashboard() {
   const [activeCandidatesModal, setActiveCandidatesModal] = useState(null);
   const [candidates, setCandidates] = useState([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [sendingToDonorId, setSendingToDonorId] = useState(null);
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -53,6 +54,22 @@ export default function RequesterDashboard() {
       fetchRequests();
     } catch (err) {
       alert(`Could not update status: ${err.message}`);
+    }
+  };
+
+  const handleSendTelegramToCandidate = async (requestId, donorId) => {
+    setSendingToDonorId(donorId);
+    try {
+      const res = await api.requests.sendDonorRequest(requestId, donorId);
+      if (res.success) {
+        alert(res.message || 'Telegram notification dispatched to donor.');
+      } else {
+        alert(res.error || 'Failed to dispatch Telegram request.');
+      }
+    } catch (err) {
+      alert(`Dispatch error: ${err.message}`);
+    } finally {
+      setSendingToDonorId(null);
     }
   };
 
@@ -299,10 +316,11 @@ export default function RequesterDashboard() {
 
                     <div className="pt-2 flex justify-end">
                       <button
-                        onClick={() => alert(`Coordination request dispatched to ${c.name}. In-app notification sent.`)}
-                        className="py-1.5 px-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm"
+                        onClick={() => handleSendTelegramToCandidate(activeCandidatesModal.id, c.donor_id)}
+                        disabled={sendingToDonorId === c.donor_id}
+                        className="py-1.5 px-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm disabled:opacity-50"
                       >
-                        Ping Potential Donor
+                        {sendingToDonorId === c.donor_id ? 'Sending...' : 'Send Telegram Request'}
                       </button>
                     </div>
                   </div>

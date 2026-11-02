@@ -141,7 +141,9 @@ export const api = {
     confirmDonation: (payload) => request('/donors/confirm-donation', { method: 'POST', body: JSON.stringify(payload) }),
     getCooldownStatus: () => request('/donors/cooldown-status'),
     withdrawConsent: () => request('/donors/consent/withdraw', { method: 'POST' }),
-    grantConsent: () => request('/donors/consent/grant', { method: 'POST' })
+    grantConsent: () => request('/donors/consent/grant', { method: 'POST' }),
+    getContactRequests: () => request('/donors/contact-requests'),
+    respondToContactRequest: (requestId, action) => request(`/donors/contact-requests/${requestId}/respond`, { method: 'POST', body: JSON.stringify({ action }) })
   },
 
   // Credits & Recognition
@@ -149,15 +151,6 @@ export const api = {
     getBalance: () => request('/credits/balance'),
     getHistory: () => request('/credits/history'),
     earn: (payload) => request('/credits/earn', { method: 'POST', body: JSON.stringify(payload) })
-  },
-
-  // WhatsApp Notifications
-  whatsapp: {
-    sendRequestNotifications: (payload) => request('/whatsapp/send-request-notifications', { method: 'POST', body: JSON.stringify(payload) }),
-    getJobs: (requestId) => request(`/whatsapp/jobs/${requestId}`),
-    getAction: (token) => request(`/whatsapp/action/${token}`),
-    submitAction: (token, action) => request(`/whatsapp/action/${token}`, { method: 'POST', body: JSON.stringify({ action }) }),
-    getManualLink: (payload) => request('/whatsapp/manual-link', { method: 'POST', body: JSON.stringify(payload) })
   },
 
   // Telegram Emergency Alerts & Account Linking
@@ -178,6 +171,8 @@ export const api = {
     },
     getById: (id) => request(`/requests/${id}`),
     getCandidates: (id, radiusKm = 30) => request(`/requests/${id}/candidates?radius_km=${radiusKm}`),
+    getContactRequests: (id) => request(`/requests/${id}/contact-requests`),
+    sendDonorRequest: (id, donorId) => request(`/requests/${id}/send-donor-request`, { method: 'POST', body: JSON.stringify({ donor_id: donorId }) }),
     getAcceptedDonors: (id) => request(`/requests/${id}/accepted-donors`),
     selectDonor: (id, donorId) => request(`/requests/${id}/select-donor`, { method: 'POST', body: JSON.stringify({ donor_id: donorId }) }),
     reselectDonor: (id) => request(`/requests/${id}/reselect-donor`, { method: 'POST' }),

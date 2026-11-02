@@ -40,6 +40,11 @@ export default function Login() {
     if (searchParams.get('role')) {
       setActiveRole(searchParams.get('role'));
     }
+    if (searchParams.get('email')) {
+      setIdentifier(searchParams.get('email'));
+    } else if (searchParams.get('identifier')) {
+      setIdentifier(searchParams.get('identifier'));
+    }
   }, [location.search]);
 
   const showToast = (msg) => {

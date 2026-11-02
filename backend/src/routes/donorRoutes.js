@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { localStore, isPostgresConnected, getPool, getDonorByUserId } = require('../db/db');
+const {
+  localStore,
+  isPostgresConnected,
+  getPool,
+  getDonorByUserId,
+  getTelegramNotificationByRequestAndDonor,
+  updateTelegramNotificationResponse
+} = require('../db/db');
 const { authenticateUser, optionalAuth, requireRole } = require('../middleware/auth');
 const { findNearbyDonors, resolveCityCoordinates, getAllSupportedCities } = require('../services/spatialService');
 const { calculateCooldownDate, recordCompletedDonation, isDonorEligibleForNotification, checkAndUpdateCooldownExpiry } = require('../services/cooldownService');
@@ -476,6 +483,140 @@ router.post('/consent/grant', authenticateUser, (req, res) => {
     consent_to_contact: true,
     consent_status: 'consented'
   });
+});
+
+// GET /api/donors/contact-requests
+// Donor views all emergency contact requests addressed to them
+router.get('/contact-requests', authenticateUser, async (req, res, next) => {
+  try {
+    const donor = await getDonorByUserId(req.user.id);
+    if (!donor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Donor profile not found for this account.'
+      });
+    }
+
+    let notifications = [];
+    if (isPostgresConnected() && getPool()) {
+      const pool = getPool();
+      try {
+        const query = `
+          SELECT 
+            tn.id AS notification_id,
+            tn.request_id,
+            tn.donor_id,
+            tn.status,
+            tn.donor_response,
+            tn.responded_at,
+            tn.created_at,
+            br.patient_name,
+            br.blood_group,
+            br.units_needed,
+            br.hospital_name,
+            br.city,
+            br.urgency,
+            br.status AS request_status
+          FROM public.telegram_notifications tn
+          JOIN public.blood_requests br ON tn.request_id = br.id
+          WHERE tn.donor_id = $1
+          ORDER BY tn.created_at DESC
+        `;
+        const dbRes = await pool.query(query, [donor.id]);
+        notifications = dbRes.rows;
+      } catch (e) {
+        console.warn('DB donor contact-requests query warning:', e.message);
+      }
+    }
+
+    // Merge with localStore
+    if (notifications.length === 0 && localStore.telegram_notifications) {
+      const matchingNotifs = localStore.telegram_notifications.filter((n) => n.donor_id === donor.id);
+      notifications = matchingNotifs.map((n) => {
+        const br = (localStore.blood_requests || []).find((r) => r.id === n.request_id) || {};
+        return {
+          notification_id: n.id,
+          request_id: n.request_id,
+          donor_id: n.donor_id,
+          status: n.status,
+          donor_response: n.donor_response || 'pending',
+          responded_at: n.responded_at,
+          created_at: n.created_at,
+          patient_name: br.patient_name || 'Emergency Patient',
+          blood_group: br.blood_group || donor.blood_group,
+          units_needed: br.units_needed || 1,
+          hospital_name: br.hospital_name || 'Hospital',
+          city: br.city || donor.city,
+          urgency: br.urgency || 'urgent',
+          request_status: br.status || 'active'
+        };
+      });
+    }
+
+    return res.json({
+      success: true,
+      count: notifications.length,
+      requests: notifications
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/donors/contact-requests/:requestId/respond
+// Donor clicks Accept or Decline from web dashboard
+router.post('/contact-requests/:requestId/respond', authenticateUser, async (req, res, next) => {
+  try {
+    const { action } = req.body; // 'accept' or 'decline'
+    if (!['accept', 'decline'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'Valid action (accept or decline) is required.' });
+    }
+
+    const donor = await getDonorByUserId(req.user.id);
+    if (!donor) {
+      return res.status(404).json({ success: false, error: 'Donor profile not found.' });
+    }
+
+    const requestId = req.params.requestId;
+    const responseType = action === 'accept' ? 'accepted' : 'declined';
+
+    // Verify existing notification
+    const existing = await getTelegramNotificationByRequestAndDonor(requestId, donor.id);
+    if (existing && existing.donor_response && ['accepted', 'declined'].includes(existing.donor_response)) {
+      return res.status(400).json({
+        success: false,
+        error: `You have already ${existing.donor_response} this request.`
+      });
+    }
+
+    // Update response in telegram_notifications
+    await updateTelegramNotificationResponse(requestId, donor.id, responseType);
+
+    // Update request status if accepted
+    if (action === 'accept') {
+      let br = (localStore.blood_requests || []).find((r) => r.id === requestId);
+      if (br && br.status === 'active') br.status = 'responses_received';
+      if (isPostgresConnected() && getPool()) {
+        try {
+          const pool = getPool();
+          await pool.query(
+            "UPDATE public.blood_requests SET status = 'responses_received', updated_at = NOW() WHERE id = $1 AND status = 'active'",
+            [requestId]
+          );
+        } catch (_) {}
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: action === 'accept'
+        ? 'Thank you! You have accepted this emergency contact request. The requester has been notified and can view your contact information.'
+        : 'You have declined this request. The requester has been notified.',
+      status: responseType
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

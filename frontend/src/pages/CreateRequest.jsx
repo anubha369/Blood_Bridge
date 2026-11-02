@@ -54,10 +54,11 @@ export default function CreateRequest() {
   const [radiusKm, setRadiusKm] = useState(30);
   const [resultsLoading, setResultsLoading] = useState(false);
 
-  // Step 4: WhatsApp Notification Job State
-  const [dispatchingWa, setDispatchingWa] = useState(false);
-  const [waResult, setWaResult] = useState(null);
-  const [selectedDonorForCall, setSelectedDonorForCall] = useState(null);
+  // Step 4: Telegram Coordination State
+  const [dispatchingTg, setDispatchingTg] = useState(false);
+  const [tgResult, setTgResult] = useState(null);
+  const [contactedDonorIds, setContactedDonorIds] = useState(new Set());
+  const [sendingToDonorId, setSendingToDonorId] = useState(null);
 
   const [locations, setLocations] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -174,49 +175,45 @@ export default function CreateRequest() {
     }
   };
 
-  // Step 4: Dispatch WhatsApp Notification Jobs
-  const handleDispatchWhatsApp = async () => {
+  // Step 4: Dispatch Telegram Emergency Notification Requests
+  const handleDispatchTelegram = async () => {
     if (!createdRequest) return;
-    setDispatchingWa(true);
+    setDispatchingTg(true);
     try {
-      const res = await api.whatsapp.sendRequestNotifications({
+      const res = await api.telegram.sendRequestNotifications({
         request_id: createdRequest.id,
         radius_km: radiusKm,
         max_recipients: 10
       });
       if (res.success) {
-        setWaResult(res);
+        setTgResult(res);
+        // Mark all candidate IDs as contacted
+        const ids = new Set(candidates.map((c) => c.donor_id));
+        setContactedDonorIds(ids);
         setCurrentStep(4);
       }
     } catch (err) {
-      setError(err.message || 'Failed to dispatch WhatsApp notifications.');
+      setError(err.message || 'Failed to dispatch Telegram notifications.');
     } finally {
-      setDispatchingWa(false);
+      setDispatchingTg(false);
     }
   };
 
-  // Open manual WhatsApp click-to-chat link for donor
-  const handleOpenWhatsAppForDonor = (donor) => {
-    if (!donor || !donor.phone) {
-      alert('Donor contact phone number is missing or protected.');
-      return;
+  // Send Telegram contact request to a single matched candidate
+  const handleSendSingleTelegramRequest = async (donor) => {
+    if (!createdRequest) return;
+    setSendingToDonorId(donor.donor_id);
+    try {
+      const res = await api.requests.sendDonorRequest(createdRequest.id, donor.donor_id);
+      if (res.success) {
+        setContactedDonorIds((prev) => new Set([...prev, donor.donor_id]));
+        alert(`Coordination request dispatched to ${donor.name} via Telegram bot. When the donor taps [Accept Request], their contact phone will be revealed on your Track Journey page.`);
+      }
+    } catch (err) {
+      alert(`Could not send request: ${err.message}`);
+    } finally {
+      setSendingToDonorId(null);
     }
-    const cleanDigits = String(donor.phone).replace(/[^0-9]/g, '');
-    if (cleanDigits.length < 10) {
-      alert('A valid phone number (minimum 10 digits) is required to open WhatsApp.');
-      return;
-    }
-    const normalizedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
-    const emergencyMsg = 
-      `*BloodBridge Emergency Blood Coordination*\n\n` +
-      `Hello ${donor.name},\n` +
-      `We urgently need ${createdRequest?.units_needed || 1} unit(s) of ${createdRequest?.blood_group || donor.blood_group} blood for patient ${createdRequest?.patient_name || 'an emergency patient'} at ${createdRequest?.hospital_name || 'hospital'}, ${createdRequest?.city || donor.city}.\n\n` +
-      `You are registered as a willing donor in ${donor.city}.\n` +
-      `Please let us know if you are available to donate or call us at: ${contactPhone || '+91 98765 00000'}.\n\n` +
-      `_This coordination request is sent via BloodBridge Vision-X._`;
-
-    const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(emergencyMsg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const stepsList = [
@@ -566,12 +563,12 @@ export default function CreateRequest() {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={handleDispatchWhatsApp}
-                disabled={dispatchingWa || candidates.length === 0}
-                className="py-2.5 px-5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl shadow transition-all flex items-center gap-2"
+                onClick={handleDispatchTelegram}
+                disabled={dispatchingTg || candidates.length === 0}
+                className="py-2.5 px-5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-50 rounded-xl shadow transition-all flex items-center gap-2"
               >
                 <Send className="w-3.5 h-3.5" />
-                {dispatchingWa ? 'Dispatching Alerts...' : `Send WhatsApp Alerts (${candidates.length})`}
+                {dispatchingTg ? 'Dispatching Telegram Alerts...' : `Notify Donors via Telegram (${candidates.length})`}
               </button>
             </div>
           </div>
@@ -643,13 +640,22 @@ export default function CreateRequest() {
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => setSelectedDonorForCall(cand)}
-                          className="py-1.5 px-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl flex items-center gap-1.5"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>Contact</span>
-                        </button>
+                        {contactedDonorIds.has(cand.donor_id) ? (
+                          <span className="py-1.5 px-3 text-[11px] font-bold text-sky-800 bg-sky-50 border border-sky-200 rounded-xl flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-sky-600" />
+                            <span>Request Sent</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendSingleTelegramRequest(cand)}
+                            disabled={sendingToDonorId === cand.donor_id}
+                            className="py-1.5 px-3 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>{sendingToDonorId === cand.donor_id ? 'Sending...' : 'Send Telegram Request'}</span>
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -697,72 +703,53 @@ export default function CreateRequest() {
             </button>
 
             <button
-              onClick={handleDispatchWhatsApp}
-              disabled={dispatchingWa}
-              className="py-3 px-6 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all flex items-center gap-2"
+              onClick={handleDispatchTelegram}
+              disabled={dispatchingTg}
+              className="py-3 px-6 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-md transition-all flex items-center gap-2"
             >
-              <span>Proceed to Request Coordination</span>
+              <span>Dispatch Telegram Emergency Requests</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 4: Request Coordination & WhatsApp Tracking */}
+      {/* STEP 4: Telegram Coordination & Response Tracking */}
       {currentStep === 4 && createdRequest && (
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                Active Coordination Session
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-100 text-sky-800">
+                <CheckCircle2 className="w-3 h-3 text-sky-600" />
+                Telegram Coordination Initiated
               </div>
               <h2 className="text-xl font-bold text-slate-900 mt-1">
-                WhatsApp Emergency Alerts Dispatched
+                Emergency Requests Dispatched to Verified Donors
               </h2>
             </div>
 
             <button
               onClick={() => navigate(`/requests/${createdRequest.id}`)}
-              className="py-2 px-4 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+              className="py-2 px-4 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-all"
             >
-              Track in Full Dashboard &rarr;
+              Track Journey & View Responses &rarr;
             </button>
           </div>
 
-          {/* WhatsApp Alert Status Box */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-2 text-xs text-emerald-900">
-            <h3 className="font-bold flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-emerald-600" />
-              Notifications Queued ({waResult?.dispatched_count || candidates.length} Donors)
+          {/* Telegram Alert Status Box */}
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5 space-y-3 text-xs text-sky-950">
+            <h3 className="font-bold flex items-center gap-2 text-sky-900">
+              <Send className="w-4 h-4 text-sky-600" />
+              Telegram Bot Requests Dispatched ({tgResult?.sent_count || contactedDonorIds.size || candidates.length} Donors)
             </h3>
-            <p className="leading-relaxed text-emerald-800">
-              Approved WhatsApp notification templates containing tokenized response links have been generated and queued. Donors can accept, decline, or mark unavailable directly through WhatsApp without creating an account.
+            <p className="leading-relaxed text-sky-900">
+              Emergency requests have been sent via the official BloodBridge Telegram bot (<strong>@Blood_Bridgebot</strong>) with interactive <strong>[Accept Request]</strong> and <strong>[Decline Request]</strong> buttons.
             </p>
-          </div>
-
-          {/* Manual WhatsApp Fallback */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2 text-xs">
-            <h4 className="font-bold text-slate-900">Manual WhatsApp Deep-Link Fallback</h4>
-            <p className="text-slate-600 leading-relaxed">
-              If you wish to message friends, family, or hospital coordinators directly, use this prefilled emergency message:
-            </p>
-            <div className="pt-1">
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(
-                  `URGENT: Blood requirement for ${createdRequest.patient_name}.\nBlood Group: ${createdRequest.blood_group}\nUnits: ${createdRequest.units_needed}\nHospital: ${createdRequest.hospital_name}, ${createdRequest.city}\nContact: ${contactPhone || '+91 98765 00000'}`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 py-2.5 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Open WhatsApp Broadcast (Click-to-Chat)</span>
-              </a>
+            <div className="bg-white/80 p-3.5 rounded-xl border border-sky-200/80 space-y-1.5 text-[11px] text-slate-700">
+              <p><strong>1. Privacy Shield:</strong> Donor phone numbers and personal contact details are completely concealed at this stage.</p>
+              <p><strong>2. Immediate Disclosure Upon Acceptance:</strong> The moment a donor clicks [Accept Request], their verified phone number will be unlocked and displayed on your Request Journey Tracker.</p>
+              <p><strong>3. Transparent Status:</strong> You will see live updates (&quot;Waiting for donor response&quot;, &quot;Accepted&quot;, &quot;Declined&quot;).</p>
             </div>
-            <p className="text-[11px] text-slate-500 pt-1 leading-normal">
-              <strong>Notice:</strong> Click-to-chat links prefill the message in your personal WhatsApp app. Due to WhatsApp security policies, you must manually tap the green &quot;Send&quot; arrow in WhatsApp to send the message.
-            </p>
           </div>
 
           <div className="pt-2 flex justify-between">
@@ -773,81 +760,11 @@ export default function CreateRequest() {
               &larr; View Candidate Donors
             </button>
             <button
-              onClick={() => navigate('/requester/dashboard')}
-              className="py-2.5 px-5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md"
+              onClick={() => navigate(`/requests/${createdRequest.id}`)}
+              className="py-2.5 px-5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md"
             >
-              Go to Requester Dashboard
+              Go to Request Tracking &rarr;
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Contact Donor Modal */}
-      {selectedDonorForCall && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in duration-150">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
-                  Consent-Gated Contact
-                </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">
-                  Contact {selectedDonorForCall.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedDonorForCall(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Blood Group:</span>
-                <span className="font-bold text-rose-600">{selectedDonorForCall.blood_group}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Proximity:</span>
-                <span className="font-medium text-slate-800">{selectedDonorForCall.distance_band}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Phone:</span>
-                <span className="font-mono font-bold text-slate-900">{selectedDonorForCall.phone || '+91 98765 00000'}</span>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-[11px] text-amber-800">
-              <strong>Coordination etiquette:</strong> Please introduce yourself politely, state patient details and hospital name, and verify the donor's current wellness before scheduling travel.
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={() => handleOpenWhatsAppForDonor(selectedDonorForCall)}
-                className="flex-1 py-2.5 px-3 text-xs font-bold text-center text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Open WhatsApp to Send Request</span>
-              </button>
-              <a
-                href={`tel:${selectedDonorForCall.phone}`}
-                className="py-2.5 px-4 text-xs font-bold text-center text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all border border-rose-200"
-              >
-                Call
-              </a>
-              <button
-                type="button"
-                onClick={() => setSelectedDonorForCall(null)}
-                className="py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
-              >
-                Close
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 text-center leading-normal">
-              Notice: Click-to-chat opens your WhatsApp app with a prefilled request. You must tap &quot;Send&quot; inside WhatsApp to dispatch the message.
-            </p>
           </div>
         </div>
       )}

@@ -1369,6 +1369,11 @@ async function saveTelegramNotification(job) {
           telegram_message_id, status, donor_response, responded_at, error_message
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (request_id, donor_id) DO UPDATE SET
+          message_text = EXCLUDED.message_text,
+          telegram_message_id = COALESCE(EXCLUDED.telegram_message_id, telegram_notifications.telegram_message_id),
+          status = EXCLUDED.status,
+          updated_at = NOW()
         RETURNING *
       `;
       const res = await pool.query(q, [
@@ -1416,6 +1421,7 @@ async function updateTelegramNotificationResponse(requestId, donorId, donorRespo
   );
   if (local) {
     local.donor_response = donorResponse;
+    local.status = donorResponse;
     local.responded_at = now;
     local.updated_at = now;
   }
@@ -1424,7 +1430,7 @@ async function updateTelegramNotificationResponse(requestId, donorId, donorRespo
     try {
       const res = await pool.query(
         `UPDATE public.telegram_notifications
-         SET donor_response = $3, responded_at = NOW(), updated_at = NOW()
+         SET donor_response = $3, status = $3, responded_at = NOW(), updated_at = NOW()
          WHERE request_id = $1 AND donor_id = $2
          RETURNING *`,
         [requestId, donorId, donorResponse]
