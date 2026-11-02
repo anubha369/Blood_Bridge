@@ -11,7 +11,7 @@ export default function HowItWorks() {
           Architecture & Verification Guide
         </span>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-          How BloodBridge Vision-X Coordinates Emergencies
+          How BloodBridge Coordinates Emergencies
         </h1>
         <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
           BloodBridge replaces chaotic social media requests and manual phone calling with a deterministic, privacy-first coordination platform.

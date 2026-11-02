@@ -12,12 +12,11 @@ import {
   ArrowLeft,
   Shield,
   AlertCircle,
-  CheckCircle2,
-  Sparkles
+  CheckCircle2
 } from 'lucide-react';
 
 export default function Login() {
-  const { login, loginAsDemo } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -67,35 +66,6 @@ export default function Login() {
   const handleRoleSelect = (role) => {
     setActiveRole(role);
     setError(null);
-  };
-
-  const handleQuickDemo = async (role) => {
-    setActiveRole(role);
-    setError(null);
-    setLoading(true);
-    try {
-      let user;
-      if (role === 'donor') {
-        setIdentifier('donor.sarah@bloodbridge.org');
-        setPassword('DonorPass2026!');
-        user = await login('donor.sarah@bloodbridge.org', 'DonorPass2026!', 'donor');
-      } else if (role === 'patient') {
-        setIdentifier('dr.mehta@cityhospital.org');
-        setPassword('HospitalPass2026!');
-        user = await login('dr.mehta@cityhospital.org', 'HospitalPass2026!', 'requester');
-      } else {
-        setIdentifier('admin@bloodbridge.org');
-        setPassword('AdminPass2026!');
-        user = await login('admin@bloodbridge.org', 'AdminPass2026!', 'admin');
-      }
-
-      showToast(`Signed in successfully as ${user.name}`);
-      redirectUser(user);
-    } catch (err) {
-      setError(sanitizeError(err));
-    } finally {
-      setLoading(false);
-    }
   };
 
   const redirectUser = (user) => {
@@ -221,43 +191,6 @@ export default function Login() {
             >
               Administrator
             </button>
-          </div>
-
-          {/* Quick Demo Evaluation Access */}
-          <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-200/80 space-y-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="font-bold text-slate-600 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#D71935]" />
-                1-Click Demonstration Login:
-              </span>
-              <span className="text-[10px] text-slate-400">Pre-seeded</span>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('donor')}
-                className="py-1.5 px-2 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 hover:border-[#D71935] hover:text-[#D71935] rounded-xl transition-all text-center truncate"
-                title="Log in as Sarah (O- Donor)"
-              >
-                Sarah (Donor)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('patient')}
-                className="py-1.5 px-2 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 hover:border-[#0F172A] hover:text-[#0F172A] rounded-xl transition-all text-center truncate"
-                title="Log in as Dr. Mehta (City Trauma ICU)"
-              >
-                Dr. Mehta (Hospital)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('admin')}
-                className="py-1.5 px-2 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 hover:border-[#0F172A] hover:text-[#0F172A] rounded-xl transition-all text-center truncate"
-                title="Log in as Operations Admin"
-              >
-                Central Admin
-              </button>
-            </div>
           </div>
 
           {/* Error Banner */}

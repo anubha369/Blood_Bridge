@@ -14,9 +14,6 @@ export default function Footer() {
                 <Heart className="w-4 h-4 fill-white" />
               </div>
               <span className="text-lg font-bold text-white tracking-tight">BloodBridge</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-900/60 text-rose-300 px-1.5 py-0.5 rounded">
-                Vision-X
-              </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               Real-time emergency blood coordination powered by PostGIS spatial indexing, intelligent request parsing, and approved medical knowledge retrieval.
@@ -32,9 +29,8 @@ export default function Footer() {
           <div>
             <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Coordination & Help</h4>
             <ul className="space-y-2 text-xs">
-              <li><Link to="/donors/nearby" className="hover:text-white transition-colors">Find Nearby Donors</Link></li>
-              <li><Link to="/blood-banks" className="hover:text-white transition-colors">Verified Blood Banks</Link></li>
               <li><Link to="/requests/create" className="hover:text-white transition-colors">Create Blood Request</Link></li>
+              <li><Link to="/blood-banks" className="hover:text-white transition-colors">Verified Blood Banks</Link></li>
               <li><Link to="/blood-donation-info" className="hover:text-white transition-colors">Blood Donation Guide</Link></li>
               <li><Link to="/how-it-works" className="hover:text-white transition-colors">How BloodBridge Works</Link></li>
             </ul>
@@ -69,7 +65,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 BloodBridge Vision-X. Built for rapid emergency coordination across Uttar Pradesh.</p>
+          <p>© 2026 BloodBridge. Built for rapid emergency coordination across Uttar Pradesh.</p>
           <p className="text-slate-400 text-[11px]">
             SRID 4326 PostGIS GiST Indexing • Privacy-Preserving Matching • Approved Medical Knowledge Base
           </p>

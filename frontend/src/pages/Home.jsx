@@ -85,25 +85,6 @@ export default function Home({ onOpenAI }) {
             </button>
             <button
               type="button"
-              onClick={(e) => openModalWithTab('tab-how', e)}
-              className="text-sm font-semibold text-slate-600 hover:text-[#D71935] transition-colors py-1"
-            >
-              How It Works
-            </button>
-            <Link
-              to="/login?role=donor"
-              className="text-sm font-semibold text-slate-600 hover:text-[#D71935] transition-colors py-1"
-            >
-              Donor
-            </Link>
-            <Link
-              to="/login?role=patient"
-              className="text-sm font-semibold text-slate-600 hover:text-[#D71935] transition-colors py-1"
-            >
-              Patient
-            </Link>
-            <button
-              type="button"
               onClick={(e) => openModalWithTab('tab-contact', e)}
               className="text-sm font-semibold text-slate-600 hover:text-[#D71935] transition-colors py-1"
             >
@@ -111,21 +92,12 @@ export default function Home({ onOpenAI }) {
             </button>
           </nav>
 
-          {/* Login / Dashboard button — top right */}
-          <div className="flex items-center gap-3">
-            <Link
-              to={isAuthenticated ? dashboardPath : '/login'}
-              className="hidden sm:inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-full shadow-sm hover:shadow-md shadow-rose-200 transition-all group"
-            >
-              <span>{isAuthenticated ? 'Dashboard' : 'Login'}</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-
-            {/* Mobile hamburger toggle button */}
+          {/* Mobile hamburger toggle button (only on mobile) */}
+          <div className="flex md:hidden items-center">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-slate-700 hover:text-[#D71935] rounded-xl hover:bg-slate-100"
+              className="p-2 text-slate-700 hover:text-[#D71935] rounded-xl hover:bg-slate-100"
               aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -152,42 +124,11 @@ export default function Home({ onOpenAI }) {
             </button>
             <button
               type="button"
-              onClick={(e) => openModalWithTab('tab-how', e)}
-              className="block w-full text-left py-2 text-sm font-semibold text-slate-700"
-            >
-              How It Works
-            </button>
-            <Link
-              to="/login?role=donor"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-semibold text-slate-700"
-            >
-              Donor
-            </Link>
-            <Link
-              to="/login?role=patient"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-semibold text-slate-700"
-            >
-              Patient
-            </Link>
-            <button
-              type="button"
               onClick={(e) => openModalWithTab('tab-contact', e)}
               className="block w-full text-left py-2 text-sm font-semibold text-slate-700"
             >
               Contact
             </button>
-            <div className="pt-2">
-              <Link
-                to="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full inline-flex items-center justify-center gap-2 py-3 text-sm font-bold text-white bg-[#D71935] rounded-full shadow-md shadow-rose-200"
-              >
-                <span>Login</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
           </div>
         )}
       </header>
@@ -231,16 +172,8 @@ export default function Home({ onOpenAI }) {
                 A platform that connects blood donors with those in need, helping save lives, one drop at a time.
               </p>
 
-              {/* Additional Quick Access Link for Mobile / Accessibility */}
+              {/* Additional Quick Access Link for Emergency Action */}
               <div className="pt-2 flex flex-wrap items-center gap-3">
-                <Link
-                  to="/donors/nearby"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D71935] hover:underline"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Search Nearby Donors</span>
-                </Link>
-                <span className="text-slate-300">•</span>
                 <Link
                   to="/requests/create"
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#D71935]"
@@ -248,138 +181,46 @@ export default function Home({ onOpenAI }) {
                   <Activity className="w-3.5 h-3.5 text-[#D71935]" />
                   <span>Post Urgent Request</span>
                 </Link>
+                <span className="text-slate-300">•</span>
+                <Link
+                  to="/blood-banks"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#D71935]"
+                >
+                  <Heart className="w-3.5 h-3.5 text-[#D71935]" />
+                  <span>Regional Blood Centres</span>
+                </Link>
               </div>
             </div>
 
-            {/* Right Column: Minimalist Blood-Drop Parabolic Animation & Action Buttons */}
+            {/* Right Column: High-Quality Static Hero Image & Single Login Button */}
             <div className="lg:col-span-7 flex flex-col items-center justify-center space-y-6 lg:pl-4">
-              {/* Animation Hero Stage */}
+              {/* Static Hero Image */}
               <div
-                className="w-full max-w-[620px] bg-slate-50/60 rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-sm relative overflow-hidden"
-                aria-label="Visual animation of blood droplet traveling along a parabolic arc between connection nodes"
+                className="w-full max-w-[620px] bg-slate-50/60 rounded-3xl p-3 sm:p-4 border border-slate-100 shadow-sm relative overflow-hidden group"
+                aria-label="Healthcare coordination and blood donation"
               >
-                <svg
-                  id="bloodBridgeHeroSvg"
-                  className="w-full h-auto drop-shadow-sm select-none"
-                  viewBox="0 0 620 360"
-                  preserveAspectRatio="xMidYMid meet"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <defs>
-                    {/* Linear Gradient for Parabolic Arc */}
-                    <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.4" />
-                      <stop offset="50%" stopColor="#94A3B8" stopOpacity="0.5" />
-                      <stop offset="100%" stopColor="#D71935" stopOpacity="0.7" />
-                    </linearGradient>
-
-                    {/* Radial Glow for Destination Node */}
-                    <radialGradient id="destGlow" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stopColor="#D71935" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="#D71935" stopOpacity="0" />
-                    </radialGradient>
-                  </defs>
-
-                  {/* 1. Curved Trajectory Arc: Upward-curving parabolic line */}
-                  <path
-                    id="trajectoryPath"
-                    d="M 80 240 C 200 40, 420 40, 540 240"
-                    fill="none"
-                    stroke="url(#arcGradient)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeDasharray="4 6"
-                    className="opacity-80"
-                  />
-
-                  {/* 2. Starting Point: Stationary circular node on left (80, 240) */}
-                  <g id="startNode">
-                    {/* Very subtle translucent halo (diameter ~64px) */}
-                    <circle cx="80" cy="240" r="32" fill="#E0F2FE" opacity="0.6" />
-                    {/* Thin pale-blue outer ring */}
-                    <circle cx="80" cy="240" r="24" fill="none" stroke="#38BDF8" strokeWidth="1.5" />
-                    {/* Dark navy-blue stationary center (diameter 22px) */}
-                    <circle cx="80" cy="240" r="11" fill="#0F172A" />
-                    <circle cx="80" cy="240" r="3" fill="#FFFFFF" />
-                  </g>
-
-                  {/* 3. Destination Point: Stationary circular node on right (540, 240) */}
-                  <g id="destNode">
-                    {/* Soft outward halo */}
-                    <circle cx="540" cy="240" r="44" fill="url(#destGlow)">
-                      <animate
-                        attributeName="r"
-                        values="40;48;40"
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                    </circle>
-                    {/* Outer ring */}
-                    <circle cx="540" cy="240" r="30" fill="none" stroke="#FDA4AF" strokeWidth="1.5" />
-                    {/* Secondary thin ring */}
-                    <circle cx="540" cy="240" r="22" fill="none" stroke="#FB7185" strokeWidth="1" strokeDasharray="3 3" />
-                    {/* Destination center */}
-                    <circle cx="540" cy="240" r="13" fill="#D71935" />
-                    {/* Central core dot */}
-                    <circle cx="540" cy="240" r="4.5" fill="#FFFFFF" />
-                  </g>
-
-                  {/* 4. Moving Blood Droplet: Teardrop-shaped SVG Blood Droplet traveling smoothly along the parabolic arc */}
-                  <g id="bloodDropletGroup">
-                    {/* Teardrop shape with refined crimson-red fill */}
-                    <path
-                      d="M 0 -13 C 3.2 -6.5, 7.5 -0.5, 7.5 6.5 A 7.5 7.5 0 1 1 -7.5 6.5 C -7.5 -0.5, -3.2 -6.5, 0 -13 Z"
-                      fill="#D71935"
-                      filter="drop-shadow(0 4px 6px rgba(215, 25, 53, 0.45))"
-                    />
-                    {/* Subtle highlight sheens */}
-                    <ellipse
-                      cx="-2.2"
-                      cy="4.8"
-                      rx="2.1"
-                      ry="3.8"
-                      fill="#FFFFFF"
-                      opacity="0.65"
-                      transform="rotate(-20 -2.2 4.8)"
-                    />
-                    <circle cx="2.5" cy="8.2" r="1.1" fill="#FFFFFF" opacity="0.8" />
-
-                    {/* Native Smooth 60fps Hardware-Accelerated Path Animation */}
-                    <animateMotion
-                      path="M 80 240 C 200 40, 420 40, 540 240"
-                      dur="3.2s"
-                      repeatCount="indefinite"
-                      rotate="auto"
-                      calcMode="spline"
-                      keySplines="0.4 0.0 0.2 1"
-                      keyTimes="0;1"
-                    />
-                  </g>
-                </svg>
+                <img
+                  src="/images/blood-donation-hero.jpg"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/images/blood-donation-hero.svg';
+                  }}
+                  alt="Healthcare professional and blood donor in modern clinic"
+                  className="w-full h-auto max-h-[380px] object-cover rounded-2xl shadow-sm transition-transform duration-500 group-hover:scale-[1.01]"
+                  loading="eager"
+                />
               </div>
 
-              {/* Login and Learn More buttons moved to the right column */}
-              <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-4 pt-1">
-                {/* Primary Button: Solid crimson-red pill */}
+              {/* Single, Clearly Visible Login Option */}
+              <div className="w-full flex items-center justify-center pt-1">
                 <Link
                   to={isAuthenticated ? dashboardPath : '/login'}
                   id="heroLoginBtn"
-                  className="w-full sm:w-auto min-w-[170px] inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-[#D71935] hover:bg-[#be123c] text-white font-bold text-sm rounded-full shadow-lg shadow-rose-200 transition-all group"
+                  className="w-full sm:w-auto min-w-[200px] inline-flex items-center justify-center gap-2.5 px-9 py-4 bg-[#D71935] hover:bg-[#be123c] text-white font-bold text-sm sm:text-base rounded-full shadow-lg shadow-rose-200 transition-all group"
                 >
                   <span>{isAuthenticated ? 'Go to Dashboard' : 'Login'}</span>
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
-
-                {/* Secondary Button: White background with thin navy outline */}
-                <button
-                  type="button"
-                  id="heroLearnMoreBtn"
-                  onClick={(e) => openModalWithTab('tab-about', e)}
-                  className="w-full sm:w-auto min-w-[170px] inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-white hover:bg-slate-50 text-[#0F172A] border border-[#0F172A] font-bold text-sm rounded-full transition-all group"
-                >
-                  <span>Learn More</span>
-                  <ArrowRight className="w-4 h-4 text-[#0F172A] transition-transform group-hover:translate-x-1" />
-                </button>
               </div>
             </div>
           </div>

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FFF1F2" />
+      <stop offset="50%" stopColor="#FFFFFF" />
+      <stop offset="100%" stopColor="#F8FAFC" />
+    </linearGradient>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#E11D48" />
+      <stop offset="100%" stopColor="#9F1239" />
+    </linearGradient>
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.2" />
+      <stop offset="50%" stopColor="#E11D48" stopOpacity="0.8" />
+      <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.2" />
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#9F1239" flood-opacity="0.18" />
+    </filter>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.08" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" rx="32" fill="url(#bgGrad)" />
+
+  <!-- Subtle Ambient Glows -->
+  <circle cx="400" cy="230" r="180" fill="#FFE4E6" opacity="0.6" filter="blur(30px)" />
+  <circle cx="160" cy="120" r="100" fill="#E0F2FE" opacity="0.5" filter="blur(25px)" />
+
+  <!-- Grid / Health Wave Line in Background -->
+  <path d="M 50 360 L 220 360 L 260 310 L 290 410 L 330 330 L 360 380 L 390 360 L 750 360" 
+        fill="none" stroke="url(#pulseGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" />
+
+  <!-- Hands Holding Heart / Blood Drop Composition -->
+  <g transform="translate(400, 230)">
+    <!-- Central Blood Drop / Heart -->
+    <path d="M 0 -100 C 50 -35, 95 15, 95 75 A 95 95 0 1 1 -95 75 C -95 15, -50 -35, 0 -100 Z" 
+          fill="url(#heartGrad)" filter="url(#softShadow)" />
+
+    <!-- Glossy Highlight on Blood Drop -->
+    <path d="M -35 -40 C -15 -70, -5 -80, 0 -92 C -25 -50, -65 15, -60 65 C -75 25, -60 -10, -35 -40 Z" 
+          fill="#FFFFFF" opacity="0.35" />
+    
+    <!-- Cross Symbol inside Heart / Drop -->
+    <rect x="-14" y="25" width="28" height="60" rx="8" fill="#FFFFFF" opacity="0.95" />
+    <rect x="-30" y="41" width="60" height="28" rx="8" fill="#FFFFFF" opacity="0.95" />
+
+    <!-- Supporting Hand Silhouettes (Stylized Healthcare Hands) -->
+    <!-- Left Hand -->
+    <path d="M -160 120 C -140 100, -90 120, -50 145 C -40 152, -25 155, 0 155 C -25 170, -60 170, -100 160 C -140 150, -170 145, -190 160 Z" 
+          fill="#FDA4AF" opacity="0.75" />
+    <!-- Right Hand -->
+    <path d="M 160 120 C 140 100, 90 120, 50 145 C 40 152, 25 155, 0 155 C 25 170, 60 170, 100 160 C 140 150, 170 145, 190 160 Z" 
+          fill="#FB7185" opacity="0.75" />
+  </g>
+
+  <!-- Floating Feature Card 1: Verified Donors (Top Left) -->
+  <g transform="translate(90, 80)" filter="url(#cardShadow)">
+    <rect width="210" height="68" rx="18" fill="#FFFFFF" stroke="#F1F5F9" stroke-width="1.5" />
+    <circle cx="36" cy="34" r="18" fill="#DCFCE7" />
+    <path d="M 28 34 L 33 39 L 44 28" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="66" y="29" font-family="-apple-system, sans-serif" font-size="12" font-weight="800" fill="#0F172A">100% Verified Donors</text>
+    <text x="66" y="46" font-family="-apple-system, sans-serif" font-size="10" font-weight="500" fill="#64748B">Pre-screened &amp; safe</text>
+  </g>
+
+  <!-- Floating Feature Card 2: Emergency Response (Bottom Right) -->
+  <g transform="translate(500, 350)" filter="url(#cardShadow)">
+    <rect width="220" height="72" rx="18" fill="#FFFFFF" stroke="#F1F5F9" stroke-width="1.5" />
+    <circle cx="38" cy="36" r="18" fill="#FFE4E6" />
+    <path d="M 38 24 L 38 48 M 26 36 L 50 36" fill="none" stroke="#E11D48" stroke-width="3" stroke-linecap="round" />
+    <text x="68" y="30" font-family="-apple-system, sans-serif" font-size="12" font-weight="800" fill="#0F172A">Hospital Coordinated</text>
+    <text x="68" y="47" font-family="-apple-system, sans-serif" font-size="10" font-weight="500" fill="#64748B">Trauma centers &amp; ICU</text>
+  </g>
+
+  <!-- Floating Badge: Urgent Need Matching (Top Right) -->
+  <g transform="translate(530, 95)" filter="url(#cardShadow)">
+    <rect width="180" height="54" rx="16" fill="#0F172A" />
+    <circle cx="28" cy="27" r="7" fill="#E11D48" />
+    <text x="44" y="32" font-family="-apple-system, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Real-Time Dispatch</text>
+  </g>
+</svg>

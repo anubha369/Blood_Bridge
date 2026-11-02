@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 
 // Components
@@ -58,13 +58,13 @@ export default function App() {
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfUse />} />
 
-              {/* Finding Donors - Primary & Aliases */}
-              <Route path="/donors/nearby" element={<NearbyDonors />} />
-              <Route path="/find-donors" element={<NearbyDonors />} />
-              <Route path="/finding-donors" element={<NearbyDonors />} />
-              <Route path="/donors" element={<NearbyDonors />} />
-              <Route path="/donors/search" element={<NearbyDonors />} />
-              <Route path="/nearby-donors" element={<NearbyDonors />} />
+              {/* Donor matching is coordinated through verified emergency requests */}
+              <Route path="/donors/nearby" element={<Navigate to="/requests/create" replace />} />
+              <Route path="/find-donors" element={<Navigate to="/requests/create" replace />} />
+              <Route path="/finding-donors" element={<Navigate to="/requests/create" replace />} />
+              <Route path="/donors" element={<Navigate to="/requests/create" replace />} />
+              <Route path="/donors/search" element={<Navigate to="/requests/create" replace />} />
+              <Route path="/nearby-donors" element={<Navigate to="/requests/create" replace />} />
 
               {/* Blood Banks - Primary & Aliases */}
               <Route path="/blood-banks" element={<BloodBanks />} />

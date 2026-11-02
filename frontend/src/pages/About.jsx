@@ -15,7 +15,7 @@ export default function About() {
           Bridging the Critical Minutes in Emergency Blood Coordination
         </h1>
         <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-          BloodBridge Vision-X is an emergency blood coordination infrastructure engineered to connect patients, voluntary donors, and certified blood centres rapidly, transparently, and safely across Uttar Pradesh.
+          BloodBridge is an emergency blood coordination infrastructure engineered to connect patients, voluntary donors, and certified blood centres rapidly, transparently, and safely across Uttar Pradesh.
         </p>
       </div>
 

@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Heart, Search, Shield, LogOut, Menu, X, Sparkles, Building2, PlusCircle, BookOpen, Award } from 'lucide-react';
+import {
+  Heart,
+  Shield,
+  LogOut,
+  Menu,
+  X,
+  Sparkles,
+  Building2,
+  PlusCircle,
+  BookOpen,
+  Award,
+  User as UserIcon,
+  Activity,
+  ChevronDown
+} from 'lucide-react';
 import { api } from '../api/client';
 
 export default function Navbar({ onOpenAI }) {
@@ -15,7 +29,7 @@ export default function Navbar({ onOpenAI }) {
     if (isAuthenticated && isDonor) {
       api.credits.getBalance()
         .then((res) => {
-          if (res.success) {
+          if (res.success && res.balance !== undefined) {
             setCreditPoints(res.balance);
           }
         })
@@ -39,199 +53,203 @@ export default function Navbar({ onOpenAI }) {
     return null;
   }
 
+  // Derive initials for avatar
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
   return (
-    <header className="sticky top-0 z-40 bg-navy-950/95 backdrop-blur border-b border-navy-800 text-white shadow-md">
+    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white shadow-lg transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white shadow-md shadow-rose-950 group-hover:scale-105 transition-transform">
+        <div className="flex items-center justify-between h-20">
+          
+          {/* Logo & Brand Identity (Clean BloodBridge without "Vision-X") */}
+          <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white shadow-lg shadow-rose-950/60 group-hover:scale-105 transition-transform duration-300">
               <Heart className="w-5 h-5 fill-white" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg font-black tracking-tight text-white">
-                  BloodBridge
-                </span>
-                <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-md">
-                  Vision-X
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium hidden sm:block">Emergency Blood Coordination</p>
+              <span className="text-xl font-black tracking-tight text-white block">
+                BloodBridge
+              </span>
+              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
+                Emergency Blood Coordination
+              </p>
             </div>
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-2">
-            <Link
-              to="/donors/nearby"
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
-                isActive('/donors/nearby')
-                  ? 'bg-navy-800 text-rose-400 border border-navy-700'
-                  : 'text-slate-300 hover:text-white hover:bg-navy-900'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5 text-rose-400" />
-              Find Donors
-            </Link>
+          <nav className="hidden lg:flex items-center gap-2 xl:gap-3" aria-label="Dashboard Navigation">
+            {/* Primary Action: Create Request for Requesters & Patients */}
+            {isAuthenticated && (
+              <Link
+                to="/requests/create"
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                  isActive('/requests/create')
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-950'
+                    : 'bg-rose-500/10 text-rose-300 hover:bg-rose-600 hover:text-white border border-rose-500/20'
+                }`}
+              >
+                <PlusCircle className="w-4 h-4 flex-shrink-0" />
+                <span>Create Request</span>
+              </Link>
+            )}
 
+            {/* Dashboard Link for Requesters */}
+            {isAuthenticated && (isRequester || isAdmin) && (
+              <Link
+                to="/requester/dashboard"
+                className={`px-3.5 py-2 text-xs font-semibold rounded-xl transition-all ${
+                  isActive('/requester/dashboard')
+                    ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                My Requests
+              </Link>
+            )}
+
+            {/* Dashboard Link for Donors */}
+            {isAuthenticated && (isDonor || isAdmin) && (
+              <Link
+                to="/donor/dashboard"
+                className={`px-3.5 py-2 text-xs font-semibold rounded-xl transition-all ${
+                  isActive('/donor/dashboard')
+                    ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                Donor Portal
+              </Link>
+            )}
+
+            {/* Regional Blood Banks Directory */}
             <Link
               to="/blood-banks"
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
                 isActive('/blood-banks')
-                  ? 'bg-navy-800 text-rose-400 border border-navy-700'
-                  : 'text-slate-300 hover:text-white hover:bg-navy-900'
+                  ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-900'
               }`}
             >
               <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              Blood Banks
+              <span>Blood Banks</span>
             </Link>
 
-            <Link
-              to="/how-it-works"
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                isActive('/how-it-works')
-                  ? 'bg-navy-800 text-rose-400 border border-navy-700'
-                  : 'text-slate-300 hover:text-white hover:bg-navy-900'
-              }`}
-            >
-              How It Works
-            </Link>
-
-            {/* Role Specific Navigation */}
-            {isAuthenticated && (
+            {/* Admin Console Links */}
+            {isAdmin && (
               <>
                 <Link
-                  to="/requests/create"
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-                    isActive('/requests/create')
-                      ? 'bg-rose-600 text-white'
-                      : 'text-rose-400 hover:text-rose-300 hover:bg-navy-900'
+                  to="/admin/dashboard"
+                  className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                    isActive('/admin/dashboard')
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-amber-400 hover:bg-slate-900'
                   }`}
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  Create Request
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Admin</span>
                 </Link>
-
                 <Link
-                  to="/requester/dashboard"
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                    isActive('/requester/dashboard')
-                      ? 'bg-navy-800 text-rose-400 border border-navy-700'
-                      : 'text-slate-300 hover:text-white hover:bg-navy-900'
+                  to="/admin/rag"
+                  className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                    isActive('/admin/rag')
+                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                      : 'text-indigo-400 hover:bg-slate-900'
                   }`}
                 >
-                  My Requests
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Knowledge</span>
                 </Link>
-
-                <Link
-                  to="/donor/dashboard"
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                    isActive('/donor/dashboard')
-                      ? 'bg-navy-800 text-rose-400 border border-navy-700'
-                      : 'text-slate-300 hover:text-white hover:bg-navy-900'
-                  }`}
-                >
-                  Donor Portal
-                </Link>
-
-                {isAdmin && (
-                  <>
-                    <Link
-                      to="/admin/dashboard"
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 ${
-                        isActive('/admin/dashboard')
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'text-amber-400 hover:bg-navy-900'
-                      }`}
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      Admin
-                    </Link>
-                    <Link
-                      to="/admin/rag"
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 ${
-                        isActive('/admin/rag')
-                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                          : 'text-indigo-400 hover:bg-navy-900'
-                      }`}
-                    >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      RAG
-                    </Link>
-                  </>
-                )}
               </>
             )}
           </nav>
 
-          {/* Right Action buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Right Area: AI Assistant, Points, User Profile & Visible Logout */}
+          <div className="hidden md:flex items-center gap-3.5 lg:gap-5">
             {/* AI Assistant Pill */}
             <button
+              type="button"
               onClick={onOpenAI}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-950/60 border border-rose-800/60 rounded-full hover:bg-rose-900/60 transition-all shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded-xl hover:bg-rose-900/50 transition-all shadow-sm"
+              title="Open Clinical AI Assistant"
             >
               <Sparkles className="w-3.5 h-3.5 text-rose-400" />
               <span>AI Assistant</span>
             </button>
 
             {isAuthenticated ? (
-              <div className="flex items-center gap-3 pl-2 border-l border-navy-800">
-                {/* Credit Points Badge */}
+              <div className="flex items-center gap-3.5 lg:gap-4 pl-3 border-l border-slate-800">
+                {/* Neatly Framed Points Display for Donors */}
                 {isDonor && creditPoints !== null && (
                   <Link
                     to="/donor/dashboard"
                     title="Non-monetary volunteer participation points"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-full hover:bg-amber-950/80 transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl hover:bg-amber-500/20 transition-all shadow-sm"
                   >
-                    <Award className="w-3 h-3 text-amber-400" />
+                    <Award className="w-4 h-4 text-amber-400 flex-shrink-0" />
                     <span>{creditPoints} Pts</span>
                   </Link>
                 )}
 
-                <div className="text-right">
-                  <div className="text-xs font-bold text-white">{user.name}</div>
-                  <div className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">{user.role}</div>
+                {/* User Identity Avatar & Role */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-extrabold text-white shadow-inner">
+                    {getInitials(user?.name)}
+                  </div>
+                  <div className="text-left hidden sm:block">
+                    <div className="text-xs font-bold text-white max-w-[130px] truncate leading-tight">
+                      {user?.name || 'User'}
+                    </div>
+                    <div className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">
+                      {user?.role || 'Member'}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Clearly Visible & Accessible Logout Button */}
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  title="Log out"
-                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-navy-900 rounded-lg transition-colors"
+                  title="Sign out of your account"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-rose-900/60 border border-slate-700 hover:border-rose-700/60 rounded-xl transition-all shadow-sm group"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-3.5 h-3.5 text-rose-400 transition-transform group-hover:-translate-x-0.5" />
+                  <span>Logout</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Link
                   to="/login"
-                  className="px-3.5 py-1.5 text-xs font-bold text-slate-300 hover:text-white hover:bg-navy-900 rounded-lg transition-colors"
+                  className="px-4 py-2 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md transition-all shadow-rose-950"
                 >
                   Log In
-                </Link>
-                <Link
-                  to="/signup"
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-all shadow-rose-950"
-                >
-                  Register
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Mobile menu toggle */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Mobile Menu & AI Toggle */}
+          <div className="flex lg:hidden items-center gap-2">
             <button
+              type="button"
               onClick={onOpenAI}
-              className="p-2 text-rose-400 hover:bg-navy-900 rounded-lg"
+              className="p-2 text-rose-400 hover:bg-slate-900 rounded-xl border border-slate-800"
               title="BloodBridge Assistant"
             >
               <Sparkles className="w-5 h-5" />
             </button>
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-300 hover:text-white hover:bg-navy-900 rounded-lg"
+              className="p-2 text-slate-200 hover:text-white hover:bg-slate-900 rounded-xl border border-slate-800"
+              aria-label="Toggle Dashboard Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -239,107 +257,115 @@ export default function Navbar({ onOpenAI }) {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer (Clean, Spacious & Responsive) */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-navy-800 bg-navy-950 px-4 pt-3 pb-6 space-y-2">
-          <Link
-            to="/donors/nearby"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 text-sm font-semibold rounded-lg text-slate-200 hover:bg-navy-900"
-          >
-            Find Donors
-          </Link>
-          <Link
-            to="/blood-banks"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 text-sm font-semibold rounded-lg text-slate-200 hover:bg-navy-900"
-          >
-            Blood Banks
-          </Link>
-          <Link
-            to="/how-it-works"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 text-sm font-semibold rounded-lg text-slate-200 hover:bg-navy-900"
-          >
-            How It Works
-          </Link>
-
+        <div className="lg:hidden border-t border-slate-800 bg-slate-950 px-4 pt-4 pb-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2">
           {isAuthenticated ? (
             <>
-              <Link
-                to="/requests/create"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 text-sm font-bold text-rose-400 hover:bg-navy-900 rounded-lg"
-              >
-                + Create Emergency Request
-              </Link>
-              <Link
-                to="/requester/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-navy-900 rounded-lg"
-              >
-                My Requests
-              </Link>
-              <Link
-                to="/donor/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-navy-900 rounded-lg flex items-center justify-between"
-              >
-                <span>Donor Portal</span>
-                {creditPoints !== null && (
-                  <span className="text-xs font-black text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-500/30">
-                    {creditPoints} Pts
-                  </span>
-                )}
-              </Link>
-              {isAdmin && (
-                <>
-                  <Link
-                    to="/admin/dashboard"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-sm font-bold text-amber-300 hover:bg-navy-900 rounded-lg"
-                  >
-                    Admin Console
-                  </Link>
-                  <Link
-                    to="/admin/rag"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-sm font-bold text-indigo-300 hover:bg-navy-900 rounded-lg"
-                  >
-                    RAG Knowledge Base
-                  </Link>
-                </>
-              )}
-              <div className="pt-4 border-t border-navy-800">
-                <div className="px-3 text-xs font-semibold text-slate-300">
-                  {user.name} <span className="text-rose-400 uppercase font-bold text-[10px]">({user.role})</span>
+              {/* User Identity Header */}
+              <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-bold text-white">
+                    {getInitials(user?.name)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">{user?.name}</div>
+                    <div className="text-[11px] uppercase font-bold text-rose-400 tracking-wider">
+                      {user?.role}
+                    </div>
+                  </div>
                 </div>
+
+                {isDonor && creditPoints !== null && (
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <Award className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{creditPoints} Pts</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Navigation Links */}
+              <div className="space-y-1 pt-1">
+                <Link
+                  to="/requests/create"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3.5 py-2.5 text-xs font-bold text-rose-300 hover:bg-slate-900 rounded-xl border border-rose-500/20 bg-rose-500/10 flex items-center gap-2"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Create Emergency Request</span>
+                </Link>
+
+                {(isRequester || isAdmin) && (
+                  <Link
+                    to="/requester/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-900 rounded-xl"
+                  >
+                    My Requests
+                  </Link>
+                )}
+
+                {(isDonor || isAdmin) && (
+                  <Link
+                    to="/donor/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-900 rounded-xl"
+                  >
+                    Donor Portal
+                  </Link>
+                )}
+
+                <Link
+                  to="/blood-banks"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-900 rounded-xl"
+                >
+                  Regional Blood Banks
+                </Link>
+
+                {isAdmin && (
+                  <>
+                    <Link
+                      to="/admin/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3.5 py-2 text-xs font-bold text-amber-400 hover:bg-slate-900 rounded-xl"
+                    >
+                      Admin Console
+                    </Link>
+                    <Link
+                      to="/admin/rag"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3.5 py-2 text-xs font-bold text-indigo-400 hover:bg-slate-900 rounded-xl"
+                    >
+                      Knowledge Base (RAG)
+                    </Link>
+                  </>
+                )}
+              </div>
+
+              {/* Prominent Full-Width Logout for Mobile */}
+              <div className="pt-3 border-t border-slate-800">
                 <button
+                  type="button"
                   onClick={() => {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="mt-2 w-full text-left px-3 py-2 text-xs font-bold text-rose-400 hover:bg-navy-900 rounded-lg"
+                  className="w-full py-2.5 px-4 text-xs font-bold text-white bg-rose-600/90 hover:bg-rose-600 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-950"
                 >
-                  Log Out
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
                 </button>
               </div>
             </>
           ) : (
-            <div className="pt-4 border-t border-navy-800 space-y-2">
+            <div className="space-y-2">
               <Link
                 to="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2 text-xs font-bold text-slate-200 border border-navy-700 rounded-lg hover:bg-navy-900"
+                className="block w-full text-center py-2.5 text-xs font-bold text-white bg-rose-600 rounded-xl shadow-md"
               >
                 Log In
-              </Link>
-              <Link
-                to="/signup"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2 text-xs font-bold text-white bg-rose-600 rounded-lg shadow-sm"
-              >
-                Register
               </Link>
             </div>
           )}

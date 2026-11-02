@@ -15,7 +15,7 @@ export default function TermsOfUse() {
           BloodBridge Terms of Use & Clinical Boundaries
         </h1>
         <p className="text-xs text-slate-500">
-          Effective date: October 2026 • Applicable across all BloodBridge Vision-X web and mobile services
+          Effective date: October 2026 • Applicable across all BloodBridge web and mobile services
         </p>
       </div>
 
@@ -52,7 +52,7 @@ export default function TermsOfUse() {
         <section className="space-y-2">
           <h2 className="text-base font-bold text-slate-900">1. Acceptance of Terms</h2>
           <p>
-            By accessing, creating an account, registering as a donor, or submitting an emergency blood request on BloodBridge Vision-X, you agree to be bound by these Terms of Use and our Privacy Policy. If you do not agree with any provision, you must not use the platform.
+            By accessing, creating an account, registering as a donor, or submitting an emergency blood request on BloodBridge, you agree to be bound by these Terms of Use and our Privacy Policy. If you do not agree with any provision, you must not use the platform.
           </p>
         </section>
 

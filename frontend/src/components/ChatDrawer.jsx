@@ -6,7 +6,7 @@ export default function ChatDrawer({ isOpen, onClose }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: "Hello! I am the BloodBridge Vision-X Assistant. How can I help you today? You can ask about donor eligibility, platform workflows, or how to locate verified blood banks.",
+      content: "Hello! I am the BloodBridge Assistant. How can I help you today? You can ask about donor eligibility, platform workflows, or how to locate verified blood banks.",
       sources: []
     }
   ]);

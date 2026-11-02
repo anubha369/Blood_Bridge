@@ -447,7 +447,7 @@ export default function VerifyOtp() {
 
       {/* Footer */}
       <footer className="w-full py-6 text-center text-xs text-slate-400 border-t border-slate-200/80 bg-white">
-        © 2026 BloodBridge Vision-X • Healthcare Emergency Coordination Network
+        © 2026 BloodBridge • Healthcare Emergency Coordination Network
       </footer>
     </div>
   );

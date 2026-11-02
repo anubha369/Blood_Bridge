@@ -272,7 +272,7 @@ export default function DonorResponse() {
           to="/"
           className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
         >
-          &larr; Back to BloodBridge Vision-X Homepage
+          &larr; Back to BloodBridge Homepage
         </Link>
       </div>
     </div>
