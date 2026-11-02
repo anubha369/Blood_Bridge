@@ -34,7 +34,6 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2.5 text-[16px] sm:text-[17px]">
               <li><Link to="/requests/create" className="hover:text-rose-400 transition-colors">Create Blood Request</Link></li>
-              <li><Link to="/donors/nearby" className="hover:text-rose-400 transition-colors">Find Compatible Donors</Link></li>
               <li><Link to="/blood-banks" className="hover:text-rose-400 transition-colors">Verified Blood Banks</Link></li>
               <li><Link to="/donor/registration" className="hover:text-rose-400 transition-colors">Register as a Donor</Link></li>
               <li><Link to="/blood-donation-info" className="hover:text-rose-400 transition-colors">Blood Donation Guide</Link></li>

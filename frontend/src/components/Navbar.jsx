@@ -86,19 +86,6 @@ export default function Navbar({ onOpenAI }) {
 
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2.5" aria-label="Main Navigation">
-            {/* Find Donors (Public / Universal) */}
-            <Link
-              to="/donors/nearby"
-              className={`px-3.5 py-2 text-[17px] font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
-                isActive('/donors/nearby')
-                  ? 'bg-slate-800 text-rose-400 border border-slate-700'
-                  : 'text-slate-200 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Search className="w-4 h-4 text-rose-400" />
-              <span>Find Donors</span>
-            </Link>
-
             {/* Regional Blood Banks Directory */}
             <Link
               to="/blood-banks"
@@ -327,15 +314,6 @@ export default function Navbar({ onOpenAI }) {
                   <span>Create Emergency Request</span>
                 </Link>
 
-                <Link
-                  to="/donors/nearby"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 text-[17px] font-semibold text-slate-200 hover:bg-slate-900 rounded-xl flex items-center gap-2"
-                >
-                  <Search className="w-4 h-4 text-rose-400" />
-                  <span>Find Donors</span>
-                </Link>
-
                 {(isRequester || isAdmin) && (
                   <Link
                     to="/requester/dashboard"
@@ -425,13 +403,6 @@ export default function Navbar({ onOpenAI }) {
                 className="block w-full text-center py-2.5 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
               >
                 Register
-              </Link>
-              <Link
-                to="/donors/nearby"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2.5 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
-              >
-                Find Donors
               </Link>
               <Link
                 to="/blood-banks"

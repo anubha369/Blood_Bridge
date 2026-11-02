@@ -22,8 +22,7 @@ import {
   AlertTriangle,
   Sparkles,
   Lock,
-  ArrowUpRight,
-  Search
+  ArrowUpRight
 } from 'lucide-react';
 
 export default function Home({ onOpenAI }) {
@@ -109,7 +108,7 @@ export default function Home({ onOpenAI }) {
             </div>
           </Link>
 
-          {/* Center Navigation Links: Home, Find Donors, Blood Banks, How It Works, About, FAQ */}
+          {/* Center Navigation Links: Home, Blood Banks, How It Works, About, FAQ */}
           <nav className="hidden md:flex items-center gap-6 lg:gap-8" aria-label="Primary Navigation">
             <Link
               to="/"
@@ -117,13 +116,6 @@ export default function Home({ onOpenAI }) {
               aria-current="page"
             >
               Home
-            </Link>
-            <Link
-              to="/donors/nearby"
-              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-1.5"
-            >
-              <Search className="w-4 h-4 text-slate-400 group-hover:text-[#D71935]" />
-              <span>Find Donors</span>
             </Link>
             <Link
               to="/blood-banks"
@@ -179,13 +171,6 @@ export default function Home({ onOpenAI }) {
               className="block py-2 text-[17px] font-bold text-[#D71935]"
             >
               Home
-            </Link>
-            <Link
-              to="/donors/nearby"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-[17px] font-semibold text-slate-700"
-            >
-              Find Donors
             </Link>
             <Link
               to="/blood-banks"
@@ -743,11 +728,6 @@ export default function Home({ onOpenAI }) {
                     className="hover:text-[#D71935] transition-colors"
                   >
                     Log In to Coordinate Blood
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/donors/nearby" className="hover:text-[#D71935] transition-colors">
-                    Find Compatible Donors
                   </Link>
                 </li>
                 <li>
