@@ -16,13 +16,23 @@ export function getErrorMessage(err: any, fallback = 'Operation failed.'): strin
   return fallback;
 }
 
+// Dynamic failover candidates to guarantee connectivity across Cloudflare tunnel, Wi-Fi LAN, and local emulators
+let activeBaseUrl = CONFIG.API_BASE_URL;
+
+const CANDIDATE_URLS: string[] = [
+  CONFIG.API_BASE_URL,
+  'https://impose-philip-flour-compared.trycloudflare.com/api',
+  'http://10.10.147.38:5001/api',
+  'http://localhost:5001/api',
+  'http://10.0.2.2:5001/api'
+].filter((url, index, arr) => Boolean(url) && arr.indexOf(url) === index);
+
 /**
  * Robust HTTP client that communicates with the shared BloodBridge Express backend
  */
 async function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   const token = await storage.getToken();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${CONFIG.API_BASE_URL}${cleanEndpoint}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -31,28 +41,58 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
     ...((options.headers as Record<string, string>) || {})
   };
 
-  let response: Response;
-  try {
+  const tryFetch = async (targetBase: string, timeoutMs = 15000): Promise<Response> => {
+    const targetUrl = `${targetBase}${cleanEndpoint}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for clinical resilience
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    response = await fetch(url, {
-      ...options,
-      headers,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-  } catch (networkErr: any) {
-    if (networkErr?.name === 'AbortError') {
+    try {
+      const res = await fetch(targetUrl, {
+        ...options,
+        headers,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  };
+
+  let response: Response | null = null;
+  let lastNetworkErr: any = null;
+
+  // 1. Attempt using currently active base URL
+  try {
+    response = await tryFetch(activeBaseUrl, 12000);
+  } catch (err: any) {
+    lastNetworkErr = err;
+
+    // 2. Network failover: cycle through candidate endpoints (tunnel, LAN IP, emulator)
+    for (const candidate of CANDIDATE_URLS) {
+      if (candidate === activeBaseUrl) continue;
+      try {
+        response = await tryFetch(candidate, 4000);
+        activeBaseUrl = candidate; // Cache successful endpoint
+        break;
+      } catch (_) {
+        // try next candidate
+      }
+    }
+  }
+
+  if (!response) {
+    if (lastNetworkErr?.name === 'AbortError') {
       const err = new Error('Network request timed out. Please check your internet connection.');
       (err as any).status = 408;
       throw err;
     }
     const err = new Error(
-      `Unable to reach the BloodBridge server at ${CONFIG.API_BASE_URL}. Please check your connection or backend status.`
+      `Unable to reach the BloodBridge server (tried ${activeBaseUrl}). Please check your connection or backend status.`
     );
     (err as any).status = 0;
-    (err as any).originalError = networkErr;
+    (err as any).originalError = lastNetworkErr;
     throw err;
   }
 

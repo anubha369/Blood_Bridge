@@ -1,7 +1,13 @@
-const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.API_URL || '/api').replace(/\/$/, '');
+let activeApiBase = (import.meta.env.VITE_API_URL || import.meta.env.API_URL || '/api').replace(/\/$/, '');
+
+const CANDIDATE_API_URLS = [
+  activeApiBase,
+  'https://impose-philip-flour-compared.trycloudflare.com/api',
+  'http://localhost:5001/api'
+].filter((url, index, arr) => Boolean(url) && arr.indexOf(url) === index);
 
 /**
- * Core HTTP Request Wrapper with safe JSON / HTML content inspection
+ * Core HTTP Request Wrapper with safe JSON / HTML content inspection & resilient failover
  */
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('bloodbridge_token');
@@ -12,16 +18,42 @@ async function request(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
-  let response;
-  try {
-    response = await fetch(`${API_BASE}${endpoint}`, {
+  const executeFetch = async (targetBase) => {
+    return await fetch(`${targetBase}${endpoint}`, {
       ...options,
       headers
     });
+  };
+
+  let response;
+  let lastNetworkErr = null;
+
+  try {
+    response = await executeFetch(activeApiBase);
   } catch (networkErr) {
-    const error = new Error(`Unable to reach the server at ${API_BASE}. Please ensure your backend is running.`);
+    lastNetworkErr = networkErr;
+  }
+
+  // If initial base failed with network error or 502/503/504 Bad Gateway, try fallbacks
+  if (!response || [502, 503, 504].includes(response.status)) {
+    for (const candidate of CANDIDATE_API_URLS) {
+      if (candidate === activeApiBase) continue;
+      try {
+        const candidateRes = await executeFetch(candidate);
+        if (candidateRes && candidateRes.status !== 502 && candidateRes.status !== 503 && candidateRes.status !== 504) {
+          response = candidateRes;
+          activeApiBase = candidate;
+          lastNetworkErr = null;
+          break;
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (!response) {
+    const error = new Error(`Unable to reach the server at ${activeApiBase}. Please ensure your backend is running.`);
     error.status = 0;
-    error.originalError = networkErr;
+    error.originalError = lastNetworkErr;
     throw error;
   }
 
