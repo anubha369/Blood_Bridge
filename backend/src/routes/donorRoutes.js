@@ -29,20 +29,23 @@ router.get('/nearby', optionalAuth, async (req, res, next) => {
     let searchLat = latitude;
     let searchLon = longitude;
 
+    let searchCity = city || null;
+
     // If city supplied instead of coordinates, resolve coordinates
     if ((!searchLat || !searchLon) && city) {
       const coords = resolveCityCoordinates(city);
       if (coords) {
         searchLat = coords.lat;
         searchLon = coords.lon;
+        searchCity = coords.name;
       }
     }
 
+    // Graceful default: if no coordinates or city given, default to Lucknow regional hub
     if (!searchLat || !searchLon) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please provide either latitude and longitude or a supported city name.'
-      });
+      searchLat = 26.8467;
+      searchLon = 80.9462;
+      searchCity = searchCity || 'Lucknow';
     }
 
     const donors = await findNearbyDonors({

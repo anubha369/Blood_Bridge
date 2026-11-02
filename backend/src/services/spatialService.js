@@ -147,6 +147,7 @@ const CITY_COORDINATES = {
   gurugram: { lat: 28.4595, lon: 77.0266, name: 'Gurugram, Haryana', state: 'Haryana' },
   faridabad: { lat: 28.4089, lon: 77.3178, name: 'Faridabad, Haryana', state: 'Haryana' },
   jaipur: { lat: 26.9124, lon: 75.7873, name: 'Jaipur, Rajasthan', state: 'Rajasthan' },
+  jodhpur: { lat: 26.2389, lon: 73.0243, name: 'Jodhpur, Rajasthan', state: 'Rajasthan' },
   patna: { lat: 25.5941, lon: 85.1376, name: 'Patna, Bihar', state: 'Bihar' },
   gwalior: { lat: 26.2183, lon: 78.1828, name: 'Gwalior, Madhya Pradesh', state: 'Madhya Pradesh' },
   mumbai: { lat: 19.0760, lon: 72.8777, name: 'Mumbai, Maharashtra', state: 'Maharashtra' },
@@ -159,9 +160,27 @@ const CITY_COORDINATES = {
 };
 
 function resolveCityCoordinates(cityName) {
-  if (!cityName) return null;
-  const key = cityName.trim().toLowerCase().replace(/[.,]/g, '');
-  return CITY_COORDINATES[key] || null;
+  if (!cityName || typeof cityName !== 'string') return null;
+  const raw = cityName.trim().toLowerCase();
+
+  // 1. Exact key match
+  const directKey = raw.replace(/[.,()]/g, '').trim();
+  if (CITY_COORDINATES[directKey]) return CITY_COORDINATES[directKey];
+
+  // 2. City prefix before comma or parenthesis (e.g. "Lucknow, Uttar Pradesh" -> "lucknow")
+  const firstPart = raw.split(/[,(]/)[0].trim().replace(/[.,]/g, '');
+  if (CITY_COORDINATES[firstPart]) return CITY_COORDINATES[firstPart];
+
+  // 3. Search by matching entry name or state
+  for (const [key, entry] of Object.entries(CITY_COORDINATES)) {
+    if (key === raw || key === firstPart) return entry;
+    if (entry.name && entry.name.toLowerCase() === raw) return entry;
+    if (raw.startsWith(key) || key.startsWith(raw)) return entry;
+    const entryBase = entry.name.split(',')[0].toLowerCase().trim();
+    if (entryBase === firstPart || entryBase === raw) return entry;
+  }
+
+  return null;
 }
 
 function getAllSupportedCities() {

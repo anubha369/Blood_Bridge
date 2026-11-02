@@ -705,9 +705,10 @@ async function searchNearbyDonors({
   // Local fallback with exact spherical PostGIS logic
   return localStore.donors
     .filter((d) => {
-      if (!d.consent_to_contact) return false;
+      if (!d.consent_to_contact || d.consent_status === 'withdrawn') return false;
       if (d.availability_status !== 'available') return false;
-      if (d.verification_status !== 'verified' && d.verification_status !== 'pending_verification') return false;
+      const validStatuses = ['verified', 'pending_verification', 'self_reported', 'verified_by_authorized_personnel'];
+      if (!validStatuses.includes(d.verification_status)) return false;
       if (bloodGroup && d.blood_group !== bloodGroup) return false;
       if (d.latitude == null || d.longitude == null) return false;
 

@@ -267,7 +267,22 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // Deterministic candidate matching and ranking for a request
 router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
   try {
-    const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+    let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+    if (!request && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const resDb = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+        if (resDb.rows.length > 0) {
+          request = resDb.rows[0];
+          if (!localStore.blood_requests.find((r) => r.id === request.id)) {
+            localStore.blood_requests.push(request);
+          }
+        }
+      } catch (e) {
+        console.warn('PostgreSQL blood request candidate lookup notice:', e.message);
+      }
+    }
+
     if (!request) {
       return res.status(404).json({ success: false, error: 'Blood request not found.' });
     }
@@ -284,16 +299,15 @@ router.get('/:id/candidates', optionalAuth, async (req, res, next) => {
       }
     }
 
+    // Graceful fallback to primary hub if coordinates cannot be resolved
     if (
       searchLat == null ||
       searchLon == null ||
       !Number.isFinite(Number(searchLat)) ||
       !Number.isFinite(Number(searchLon))
     ) {
-      return res.status(400).json({
-        success: false,
-        error: 'Valid request coordinates or a supported city location are required for candidate matching.'
-      });
+      searchLat = 26.8467;
+      searchLon = 80.9462;
     }
 
     const nearbyDonors = await findNearbyDonors({

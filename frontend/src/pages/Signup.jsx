@@ -215,7 +215,17 @@ export default function Signup() {
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span className="leading-snug">{error}</span>
+              <div className="leading-snug flex-1">
+                <div>{error}</div>
+                {(error.toLowerCase().includes('already exists') || error.toLowerCase().includes('conflict') || error.toLowerCase().includes('registered')) && (
+                  <Link
+                    to={`/login?role=${role}`}
+                    className="mt-1.5 inline-flex items-center gap-1 font-bold text-rose-800 hover:underline"
+                  >
+                    Account already exists? Click here to Log In →
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 

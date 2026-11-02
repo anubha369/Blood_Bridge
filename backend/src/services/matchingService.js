@@ -76,12 +76,12 @@ function evaluateDonorMatch(donor, request, distanceKm, maxRadiusKm = 50) {
   }
 
   // 3. Verification status factor
-  if (donor.verification_status === 'verified') {
+  if (['verified', 'verified_by_authorized_personnel'].includes(donor.verification_status)) {
     score += 0.20;
     reasons.push('Verified donor profile');
-  } else if (donor.verification_status === 'pending_verification') {
+  } else if (['pending_verification', 'self_reported'].includes(donor.verification_status) || !donor.verification_status) {
     score += 0.10;
-    reasons.push('Registration pending administrative verification');
+    reasons.push('Self-reported profile (pending administrative verification)');
   } else {
     // Inactive or rejected
     return {
