@@ -252,17 +252,16 @@ export default function Navbar({ onOpenAI }) {
             ) : (
               <div className="flex items-center gap-3">
                 <Link
-                  to="/requests/create"
-                  className="px-4 py-2 text-[16px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md transition-all shadow-rose-950 flex items-center gap-1.5"
-                >
-                  <Activity className="w-4 h-4" />
-                  <span>Request Blood</span>
-                </Link>
-                <Link
                   to="/login"
-                  className="px-4 py-2 text-[16px] font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all"
+                  className="px-5 py-2.5 text-[16px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md transition-all shadow-rose-950 flex items-center gap-1.5"
                 >
                   Log In
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-4 py-2.5 text-[16px] font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all"
+                >
+                  Register
                 </Link>
               </div>
             )}
@@ -414,11 +413,18 @@ export default function Navbar({ onOpenAI }) {
           ) : (
             <div className="space-y-2.5 pt-2">
               <Link
-                to="/requests/create"
+                to="/login"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block w-full text-center py-3 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md"
               >
-                Request Blood
+                Log In
+              </Link>
+              <Link
+                to="/signup"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block w-full text-center py-2.5 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
+              >
+                Register
               </Link>
               <Link
                 to="/donors/nearby"
@@ -433,13 +439,6 @@ export default function Navbar({ onOpenAI }) {
                 className="block w-full text-center py-2.5 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
               >
                 Blood Banks
-              </Link>
-              <Link
-                to="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-3 text-[17px] font-bold text-slate-900 bg-white hover:bg-slate-100 rounded-xl shadow-md"
-              >
-                Log In
               </Link>
             </div>
           )}
