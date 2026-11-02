@@ -52,6 +52,7 @@ const config = {
   brevoApiKey: process.env.BREVO_API_KEY || '',
   brevoSenderEmail: process.env.BREVO_SENDER_EMAIL || 'vedikadubey16@gmail.com',
   brevoSenderName: process.env.BREVO_SENDER_NAME || 'Blood Bridge',
+  brevoSmtpLogin: process.env.BREVO_SMTP_LOGIN || 'c108fd001@smtp-brevo.com',
 
   // Spatial search defaults
   defaultSearchRadiusKm: 25,
