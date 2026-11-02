@@ -628,11 +628,39 @@ function getPrivacySafeDistanceBand(distanceKm) {
 async function initDb() {
   if (config.databaseUrl) {
     try {
-      // Connect to external PostgreSQL (e.g. Supabase)
-      pool = new Pool({ connectionString: config.databaseUrl, ssl: { rejectUnauthorized: false } });
+      // Connect to external PostgreSQL (e.g. Supabase) with active keepalive & stale socket eviction
+      pool = new Pool({
+        connectionString: config.databaseUrl,
+        ssl: { rejectUnauthorized: false },
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000
+      });
+
+      // Evict stale idle clients automatically if severed by Supabase pooler / firewall
+      pool.on('error', (err) => {
+        console.warn('[PostgreSQL Pool Notice] Idle client error caught and evicted:', err.message);
+      });
+
       const client = await pool.connect();
       console.log('PostgreSQL connection established successfully.');
       isPostgres = true;
+
+      // Keepalive heartbeat ping: prevents Supabase transaction pooler from dropping connection during 2-3 hr idle times
+      if (!global.__dbKeepAliveStarted) {
+        global.__dbKeepAliveStarted = true;
+        setInterval(async () => {
+          if (pool && isPostgres) {
+            try {
+              await pool.query('SELECT 1');
+            } catch (pingErr) {
+              console.warn('[PostgreSQL Keepalive] Re-establishing connection...', pingErr.message);
+            }
+          }
+        }, 3 * 60 * 1000); // Every 3 minutes
+      }
 
       // 1. Check PostGIS extension
       try {
