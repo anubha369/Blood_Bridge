@@ -231,16 +231,32 @@ export default function Home({ onOpenAI }) {
       {/* ======================================================================
           SECTION A: HERO (Balanced Two-Column: 46% Expanded Text, 54% Dominant Right Artwork)
           ====================================================================== */}
-      <section className="relative pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 overflow-hidden" aria-labelledby="heroHeadline">
+      <section className="relative pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 overflow-hidden bg-gradient-to-b from-[#FAF9F6] via-[#FFF5F5]/60 to-[#FAF9F6]" aria-labelledby="heroHeadline">
+        {/* Subtle Ambient Red Gradient Accent Wash */}
+        <div
+          className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(215,25,53,0.06),rgba(250,249,246,0))] pointer-events-none -z-10"
+          aria-hidden="true"
+        />
+        {/* Soft upper-right blush glow blending towards hero artwork */}
+        <div
+          className="absolute -top-32 right-[-5%] w-[600px] lg:w-[750px] h-[600px] lg:h-[750px] bg-gradient-to-bl from-rose-200/35 via-red-100/20 to-transparent rounded-full blur-3xl pointer-events-none -z-10"
+          aria-hidden="true"
+        />
+        {/* Subtle bottom-left deep burgundy-to-crimson ambient glow */}
+        <div
+          className="absolute -bottom-24 left-[-5%] w-[450px] lg:w-[550px] h-[450px] lg:h-[550px] bg-gradient-to-tr from-[#881337]/08 via-[#D71935]/05 to-transparent rounded-full blur-3xl pointer-events-none -z-10"
+          aria-hidden="true"
+        />
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-10 lg:gap-8 xl:gap-14">
             
             {/* Left Column: Expanded Text Area (approx 46-48% width) */}
             <div className="w-full lg:w-[48%] xl:w-[46%] flex flex-col justify-center space-y-6 sm:space-y-7 xl:space-y-8 text-left">
               
-              {/* Trust-oriented Eyebrow Badge */}
-              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#881337] self-start">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#D71935] animate-pulse" aria-hidden="true"></span>
+              {/* Trust-oriented Eyebrow Badge with subtle burgundy/crimson glow */}
+              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-rose-50/95 via-red-50/80 to-rose-50/95 border border-rose-200/80 text-[#881337] shadow-[0_2px_10px_rgba(215,25,53,0.05)] self-start">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#D71935] shadow-[0_0_8px_rgba(215,25,53,0.5)] animate-pulse" aria-hidden="true"></span>
                 <span className="text-[13px] sm:text-[14px] font-extrabold tracking-wider uppercase">
                   Emergency Blood Coordination
                 </span>
@@ -252,7 +268,7 @@ export default function Home({ onOpenAI }) {
                   id="heroHeadline"
                   className="text-5xl sm:text-6xl lg:text-[70px] xl:text-[76px] font-black tracking-tight leading-[1.0] text-[#0F172A]"
                 >
-                  Blood<span className="text-[#D71935]">Bridge</span>
+                  Blood<span className="bg-gradient-to-r from-[#D71935] via-[#BE123C] to-[#881337] bg-clip-text text-transparent">Bridge</span>
                 </h1>
               </div>
 
@@ -264,7 +280,7 @@ export default function Home({ onOpenAI }) {
                 <div className="text-3xl sm:text-4xl lg:text-[38px] xl:text-[42px] font-extrabold tracking-tight leading-[1.18]">
                   <span className="text-[#0F172A]">Need</span>{' '}
                   <span className="text-slate-400 font-normal">and</span>{' '}
-                  <span className="text-[#D71935]">Hope</span>
+                  <span className="bg-gradient-to-r from-[#D71935] to-[#881337] bg-clip-text text-transparent">Hope</span>
                 </div>
               </div>
 
@@ -273,12 +289,12 @@ export default function Home({ onOpenAI }) {
                 A platform that connects blood donors with those in need, helping save lives, one drop at a time.
               </p>
 
-              {/* Single, Clearly Visible Login Option */}
+              {/* Single, Clearly Visible Login Option with subtle burgundy-to-crimson gradient & gentle glow */}
               <div className="pt-2 flex items-center">
                 <Link
                   to="/login"
                   id="heroLoginBtn"
-                  className="inline-flex items-center justify-center gap-3 px-10 py-4 text-[18px] sm:text-[19px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/35 transition-all group"
+                  className="inline-flex items-center justify-center gap-3 px-10 py-4 text-[18px] sm:text-[19px] font-bold text-white bg-gradient-to-r from-[#881337] via-[#D71935] to-[#BE123C] hover:from-[#70102b] hover:via-[#c0152e] hover:to-[#a81034] rounded-2xl shadow-[0_10px_25px_-5px_rgba(215,25,53,0.30)] hover:shadow-[0_15px_30px_-5px_rgba(136,19,55,0.38)] hover:-translate-y-0.5 transition-all duration-300 group"
                 >
                   <Lock className="w-5 h-5 text-white" />
                   <span>Log In</span>
@@ -286,8 +302,8 @@ export default function Home({ onOpenAI }) {
                 </Link>
               </div>
 
-              {/* Trust Indicators */}
-              <div className="pt-6 border-t border-slate-200/90 grid grid-cols-2 sm:grid-cols-4 gap-4 text-[14px] sm:text-[15px] text-slate-600 font-semibold">
+              {/* Trust Indicators with soft rose-tinted divider */}
+              <div className="pt-6 border-t border-rose-200/60 grid grid-cols-2 sm:grid-cols-4 gap-4 text-[14px] sm:text-[15px] text-slate-600 font-semibold">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>Verified Donors</span>
@@ -309,9 +325,13 @@ export default function Home({ onOpenAI }) {
 
             {/* Right Column: Dominant Naturally Blended Hero Emblem (approx 52-54% width, shifted to right) */}
             <div className="w-full lg:w-[52%] xl:w-[54%] relative flex flex-col items-center lg:items-end justify-center">
-              {/* Soft ambient lighting glow matching #FAF9F6 background */}
+              {/* Soft burgundy-to-crimson radial glow behind and around emblem */}
               <div
-                className="absolute inset-0 bg-gradient-to-tr from-rose-200/40 via-red-100/25 to-transparent rounded-full blur-3xl pointer-events-none -z-10"
+                className="absolute -inset-4 sm:-inset-8 bg-gradient-to-tr from-[#881337]/16 via-[#D71935]/14 to-rose-200/25 rounded-full blur-3xl pointer-events-none -z-10"
+                aria-hidden="true"
+              />
+              <div
+                className="absolute inset-2 sm:inset-6 bg-[radial-gradient(circle_at_50%_50%,rgba(215,25,53,0.12)_0%,rgba(136,19,55,0.06)_45%,transparent_75%)] rounded-full blur-2xl pointer-events-none -z-10"
                 aria-hidden="true"
               />
 
@@ -331,15 +351,15 @@ export default function Home({ onOpenAI }) {
                       e.currentTarget.src = '/images/bloodbridge-hero-emblem.jpg';
                     }}
                     alt="BloodBridge official emblem: Donate • Connect • Save Lives"
-                    className="w-full h-full object-contain filter drop-shadow-sm select-none"
+                    className="w-full h-full object-contain filter drop-shadow-[0_8px_24px_rgba(136,19,55,0.08)] select-none"
                     style={{ mixBlendMode: 'multiply' }}
                     loading="eager"
                   />
                 </div>
 
-                {/* Floating Tasteful Trust Pill */}
-                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/70 shadow-sm text-slate-700 mt-3 self-center lg:self-end">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
+                {/* Floating Tasteful Trust Pill with soft rose-tinted glass */}
+                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/90 backdrop-blur-md border border-rose-100/80 shadow-[0_4px_20px_rgba(136,19,55,0.06)] text-slate-700 mt-3 self-center lg:self-end">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" aria-hidden="true"></span>
                   <span className="text-[14px] sm:text-[15px] font-bold text-[#0F172A]">
                     Clinical Coordination Active
                   </span>
