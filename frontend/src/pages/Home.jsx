@@ -242,33 +242,44 @@ export default function Home({ onOpenAI }) {
           ====================================================================== */}
       <section className="relative pt-8 sm:pt-12 lg:pt-16 pb-16 sm:pb-20 overflow-hidden" aria-labelledby="heroHeadline">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-center">
             
-            {/* Left Column: Memorable Headline, Prominent Emergency CTAs & Trust Badges */}
-            <div className="lg:col-span-7 space-y-6 sm:space-y-7 text-left">
+            {/* Left Column: Exact Content Hierarchy & Single Clearly Visible Login */}
+            <div className="lg:col-span-5 space-y-6 sm:space-y-7 text-left">
               
               {/* Trust-oriented Eyebrow Badge */}
-              <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-rose-50 border border-rose-200 text-[#881337]">
+              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#881337]">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#D71935] animate-pulse" aria-hidden="true"></span>
-                <span className="text-[14px] sm:text-[15px] font-extrabold tracking-wider uppercase">
-                  Emergency Blood Coordination Network
+                <span className="text-[13px] sm:text-[14px] font-extrabold tracking-wider uppercase">
+                  Emergency Blood Coordination
                 </span>
               </div>
 
-              {/* Memorable Headline (56–68px Desktop, 38–44px Mobile) */}
-              <div className="space-y-1">
+              {/* 1. Brand Heading */}
+              <div>
                 <h1
                   id="heroHeadline"
-                  className="text-4xl sm:text-5xl lg:text-[62px] xl:text-[66px] font-black text-[#0F172A] tracking-tight leading-[1.08]"
+                  className="text-5xl sm:text-6xl lg:text-[68px] xl:text-[72px] font-black tracking-tight leading-[1.02] text-[#0F172A]"
                 >
-                  Every Drop Matters.<br />
-                  <span className="text-[#881337]">Every Connection Counts.</span>
+                  Blood<span className="text-[#D71935]">Bridge</span>
                 </h1>
               </div>
 
-              {/* Supporting Copy (18–19px) */}
-              <p className="text-[18px] sm:text-[19px] text-slate-700 leading-relaxed font-normal max-w-xl">
-                Connecting urgent blood requirements with verified regional blood centres and consenting voluntary donors through a rapid, privacy-conscious workflow.
+              {/* 2. Main Hero Heading */}
+              <div className="space-y-1">
+                <h2 className="text-2xl sm:text-3xl lg:text-[34px] xl:text-[38px] font-extrabold text-slate-800 tracking-tight leading-snug">
+                  Bridging the Gap Between
+                </h2>
+                <div className="text-2xl sm:text-3xl lg:text-[34px] xl:text-[38px] font-extrabold tracking-tight">
+                  <span className="text-[#0F172A]">Need</span>{' '}
+                  <span className="text-slate-400 font-normal">and</span>{' '}
+                  <span className="text-[#D71935]">Hope</span>
+                </div>
+              </div>
+
+              {/* 3. Supporting Description */}
+              <p className="text-[18px] sm:text-[19px] text-slate-600 leading-relaxed font-normal max-w-xl">
+                A platform that connects blood donors with those in need, helping save lives, one drop at a time.
               </p>
 
               {/* Single, Clearly Visible Login Option */}
@@ -325,21 +336,21 @@ export default function Home({ onOpenAI }) {
               </div>
             </div>
 
-            {/* Right Column: Art-Directed Naturally Blended Hero Emblem */}
-            <div className="lg:col-span-5 relative w-full flex flex-col items-center justify-center">
+            {/* Right Column: Dominant Naturally Blended Hero Emblem (50–55% desktop width) */}
+            <div className="lg:col-span-7 relative w-full flex flex-col items-center justify-center lg:pl-2">
               {/* Soft ambient lighting glow matching #FAF9F6 background */}
               <div
                 className="absolute inset-0 bg-gradient-to-tr from-rose-200/40 via-red-100/25 to-transparent rounded-full blur-3xl pointer-events-none -z-10"
                 aria-hidden="true"
               />
 
-              {/* Soft-Edge Blended Emblem Container */}
-              <div className="relative w-full max-w-[540px] flex flex-col items-center justify-center p-2 sm:p-4">
+              {/* Soft-Edge Blended Emblem Container — Dominant Visual Element */}
+              <div className="relative w-full max-w-[680px] xl:max-w-[740px] flex flex-col items-center justify-center p-2 sm:p-4">
                 <div
-                  className="relative w-full aspect-[16/9] flex items-center justify-center transition-transform duration-700 hover:scale-[1.02]"
+                  className="relative w-full aspect-[16/9] flex items-center justify-center transition-transform duration-700 hover:scale-[1.015]"
                   style={{
-                    maskImage: 'radial-gradient(ellipse 92% 88% at 50% 50%, black 72%, transparent 100%)',
-                    WebkitMaskImage: 'radial-gradient(ellipse 92% 88% at 50% 50%, black 72%, transparent 100%)'
+                    maskImage: 'radial-gradient(ellipse 95% 90% at 50% 50%, black 75%, transparent 100%)',
+                    WebkitMaskImage: 'radial-gradient(ellipse 95% 90% at 50% 50%, black 75%, transparent 100%)'
                   }}
                 >
                   <img
@@ -356,7 +367,7 @@ export default function Home({ onOpenAI }) {
                 </div>
 
                 {/* Floating Tasteful Trust Pill */}
-                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/70 shadow-sm text-slate-700 mt-2">
+                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/70 shadow-sm text-slate-700 mt-3">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
                   <span className="text-[14px] sm:text-[15px] font-bold text-[#0F172A]">
                     Clinical Coordination Active
