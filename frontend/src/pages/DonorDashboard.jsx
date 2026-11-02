@@ -83,9 +83,8 @@ export default function DonorDashboard() {
         setTelegramStatus(telegramRes);
       }
 
-      if (contactRequestsRes && contactRequestsRes.notifications) {
-        setIncomingRequests(contactRequestsRes.notifications);
-      }
+      const notifs = contactRequestsRes?.notifications || contactRequestsRes?.requests || [];
+      setIncomingRequests(notifs);
     } catch (err) {
       setError(err.message || 'Failed to load donor dashboard data.');
     } finally {
@@ -100,9 +99,8 @@ export default function DonorDashboard() {
       if (res.success) {
         alert(res.message);
         const updated = await api.donors.getContactRequests().catch(() => null);
-        if (updated && updated.notifications) {
-          setIncomingRequests(updated.notifications);
-        }
+        const updatedNotifs = updated?.notifications || updated?.requests || [];
+        setIncomingRequests(updatedNotifs);
       } else {
         alert(res.error || 'Failed to update response.');
       }

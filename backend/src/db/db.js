@@ -1189,16 +1189,18 @@ async function markTelegramLinkCodeUsed(code_hash) {
 }
 
 async function getDonorByTelegramChatId(chatId) {
+  if (!chatId) return null;
+  const strId = String(chatId).trim();
   const numId = Number(chatId);
   if (isPostgres && pool) {
     try {
-      const res = await pool.query('SELECT * FROM public.donors WHERE telegram_chat_id = $1 LIMIT 1', [numId]);
+      const res = await pool.query('SELECT * FROM public.donors WHERE telegram_chat_id = $1::bigint LIMIT 1', [strId]);
       if (res.rows.length > 0) return res.rows[0];
     } catch (err) {
       console.warn('DB getDonorByTelegramChatId warning:', err.message);
     }
   }
-  return (localStore.donors || []).find((d) => Number(d.telegram_chat_id) === numId) || null;
+  return (localStore.donors || []).find((d) => String(d.telegram_chat_id) === strId || Number(d.telegram_chat_id) === numId) || null;
 }
 
 async function getDonorByUserId(userId) {
@@ -1395,6 +1397,23 @@ async function saveTelegramNotification(job) {
   return entry;
 }
 
+async function getTelegramNotificationById(notificationId) {
+  if (!notificationId) return null;
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query(
+        'SELECT * FROM public.telegram_notifications WHERE id = $1 LIMIT 1',
+        [notificationId]
+      );
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB getTelegramNotificationById warning:', err.message);
+    }
+  }
+  if (!localStore.telegram_notifications) localStore.telegram_notifications = [];
+  return localStore.telegram_notifications.find((n) => n.id === notificationId) || null;
+}
+
 async function getTelegramNotificationByRequestAndDonor(requestId, donorId) {
   if (isPostgres && pool) {
     try {
@@ -1413,11 +1432,11 @@ async function getTelegramNotificationByRequestAndDonor(requestId, donorId) {
   ) || null;
 }
 
-async function updateTelegramNotificationResponse(requestId, donorId, donorResponse) {
+async function updateTelegramNotificationResponse(requestId, donorId, donorResponse, notificationId = null) {
   const now = new Date().toISOString();
   if (!localStore.telegram_notifications) localStore.telegram_notifications = [];
   const local = localStore.telegram_notifications.find(
-    (n) => n.request_id === requestId && n.donor_id === donorId
+    (n) => (notificationId && n.id === notificationId) || (n.request_id === requestId && n.donor_id === donorId)
   );
   if (local) {
     local.donor_response = donorResponse;
@@ -1428,19 +1447,38 @@ async function updateTelegramNotificationResponse(requestId, donorId, donorRespo
 
   if (isPostgres && pool) {
     try {
-      const res = await pool.query(
-        `UPDATE public.telegram_notifications
-         SET donor_response = $3, status = $3, responded_at = NOW(), updated_at = NOW()
-         WHERE request_id = $1 AND donor_id = $2
-         RETURNING *`,
-        [requestId, donorId, donorResponse]
-      );
-      if (res.rows.length > 0) return res.rows[0];
+      let query;
+      let params;
+      if (notificationId) {
+        query = `UPDATE public.telegram_notifications
+                 SET donor_response = $2, status = $2, responded_at = NOW(), updated_at = NOW()
+                 WHERE id = $1 AND (donor_response IS NULL OR donor_response = 'pending' OR status IN ('sent', 'pending'))
+                 RETURNING *`;
+        params = [notificationId, donorResponse];
+      } else {
+        query = `UPDATE public.telegram_notifications
+                 SET donor_response = $3, status = $3, responded_at = NOW(), updated_at = NOW()
+                 WHERE request_id = $1 AND donor_id = $2 AND (donor_response IS NULL OR donor_response = 'pending' OR status IN ('sent', 'pending'))
+                 RETURNING *`;
+        params = [requestId, donorId, donorResponse];
+      }
+      const res = await pool.query(query, params);
+      if (res.rows.length > 0) return { updated: true, notification: res.rows[0] };
+
+      // If 0 rows updated, verify if it was already responded to
+      const checkQuery = notificationId
+        ? 'SELECT * FROM public.telegram_notifications WHERE id = $1 LIMIT 1'
+        : 'SELECT * FROM public.telegram_notifications WHERE request_id = $1 AND donor_id = $2 LIMIT 1';
+      const checkParams = notificationId ? [notificationId] : [requestId, donorId];
+      const checkRes = await pool.query(checkQuery, checkParams);
+      if (checkRes.rows.length > 0) {
+        return { updated: false, already_responded: true, notification: checkRes.rows[0] };
+      }
     } catch (err) {
       console.warn('DB updateTelegramNotificationResponse warning:', err.message);
     }
   }
-  return local;
+  return { updated: true, notification: local };
 }
 
 module.exports = {
@@ -1468,6 +1506,7 @@ module.exports = {
   unlinkDonorTelegramAccount,
   setDonorTelegramConsent,
   saveTelegramNotification,
+  getTelegramNotificationById,
   getTelegramNotificationByRequestAndDonor,
   updateTelegramNotificationResponse
 };

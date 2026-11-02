@@ -111,6 +111,13 @@ export default function RequestDetails() {
       fetchAcceptedDonors();
       fetchContactRequests();
       fetchCandidates();
+
+      // Realtime polling: refresh contact requests and accepted donors every 5s while viewing
+      const pollTimer = setInterval(() => {
+        fetchAcceptedDonors();
+        fetchContactRequests();
+      }, 5000);
+      return () => clearInterval(pollTimer);
     }
   }, [id]);
 

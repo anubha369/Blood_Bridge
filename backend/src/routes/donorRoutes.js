@@ -586,7 +586,8 @@ router.get('/contact-requests', authenticateUser, async (req, res, next) => {
     return res.json({
       success: true,
       count: notifications.length,
-      requests: notifications
+      requests: notifications,
+      notifications: notifications
     });
   } catch (err) {
     next(err);

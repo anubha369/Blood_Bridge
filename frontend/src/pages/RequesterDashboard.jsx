@@ -37,6 +37,10 @@ export default function RequesterDashboard() {
 
   useEffect(() => {
     fetchRequests();
+    const interval = setInterval(() => {
+      fetchRequests();
+    }, 8000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleViewCandidates = async (reqItem) => {

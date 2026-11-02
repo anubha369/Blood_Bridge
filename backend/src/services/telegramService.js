@@ -12,6 +12,7 @@ const {
   unlinkDonorTelegramAccount,
   setDonorTelegramConsent,
   saveTelegramNotification,
+  getTelegramNotificationById,
   getTelegramNotificationByRequestAndDonor,
   updateTelegramNotificationResponse,
   calculateHaversineDistanceKm,
@@ -230,19 +231,28 @@ async function sendTelegramMessage(chatId, text, inlineKeyboard = null) {
 
 /**
  * Answer Telegram callback query (from inline buttons)
+ * Guarantees that buttons never remain in a permanent loading state.
  */
 async function answerCallbackQuery(callbackQueryId, text, showAlert = false) {
-  return await callTelegramApi('answerCallbackQuery', {
-    callback_query_id: callbackQueryId,
-    text,
-    show_alert: showAlert
-  });
+  if (!callbackQueryId) return;
+  try {
+    return await callTelegramApi('answerCallbackQuery', {
+      callback_query_id: callbackQueryId,
+      text: text ? String(text).slice(0, 200) : '',
+      show_alert: Boolean(showAlert)
+    });
+  } catch (err) {
+    console.warn(`[Telegram answerCallbackQuery Notice]: ${err.message}`);
+    return null;
+  }
 }
 
 /**
  * Edit an existing Telegram message text (e.g. to reflect action taken)
+ * Falls back safely to plain text if Markdown formatting causes entity parsing issues.
  */
 async function editMessageText(chatId, messageId, text, replyMarkup = null) {
+  if (!chatId || !messageId) return null;
   const payload = {
     chat_id: chatId,
     message_id: messageId,
@@ -252,7 +262,22 @@ async function editMessageText(chatId, messageId, text, replyMarkup = null) {
   if (replyMarkup !== undefined) {
     payload.reply_markup = replyMarkup;
   }
-  return await callTelegramApi('editMessageText', payload);
+
+  try {
+    return await callTelegramApi('editMessageText', payload);
+  } catch (err) {
+    if (err.message && (err.message.includes("can't parse entities") || err.message.includes('entity'))) {
+      delete payload.parse_mode;
+      try {
+        return await callTelegramApi('editMessageText', payload);
+      } catch (retryErr) {
+        console.warn(`[Telegram editMessageText plain fallback notice]: ${retryErr.message}`);
+        return null;
+      }
+    }
+    console.warn(`[Telegram editMessageText notice]: ${err.message}`);
+    return null;
+  }
 }
 
 /**
@@ -590,141 +615,244 @@ async function handleTelegramMessage(message) {
 
 /**
  * Handle incoming callback queries from inline buttons (Accept / Decline)
+ * Complete, secure, idempotent workflow with database synchronization and clear user feedback.
  */
 async function handleTelegramCallbackQuery(callbackQuery) {
-  if (!callbackQuery || !callbackQuery.id || !callbackQuery.data) return;
+  if (!callbackQuery || !callbackQuery.id) return;
 
   const callbackId = callbackQuery.id;
-  const data = callbackQuery.data;
-  const chatId = callbackQuery.message ? callbackQuery.message.chat.id : null;
+  const rawData = String(callbackQuery.data || '').trim();
+  const fromUser = callbackQuery.from || {};
+  const fromId = fromUser.id ? String(fromUser.id) : null;
+  const messageChatId = callbackQuery.message?.chat?.id ? String(callbackQuery.message.chat.id) : null;
+  const effectiveChatId = messageChatId || fromId;
   const messageId = callbackQuery.message ? callbackQuery.message.message_id : null;
-  const originalText = callbackQuery.message ? callbackQuery.message.text : '';
+  const originalText = callbackQuery.message?.text || '';
 
-  const match = data.match(/^(accept|decline)_req_(.+)$/);
+  console.log(`[Telegram Callback] Received query id=${callbackId} data="${rawData}" from=${fromId} chat=${maskChatId(effectiveChatId)}`);
+
+  // 1. Flexible regex to support donor_accept:<id>, donor_decline:<id>, accept_req_<id>, decline_req_<id>, accept:<id>, decline:<id>
+  const match = rawData.match(/^(?:donor_)?(accept|decline)[:_](?:req_)?(.+)$/i);
   if (!match) {
-    await answerCallbackQuery(callbackId, 'Unrecognized action.');
+    console.warn(`[Telegram Callback Warning] Malformed callback data received: "${rawData}"`);
+    await answerCallbackQuery(callbackId, '⚠️ Unrecognized button action.', true);
     return;
   }
 
-  const action = match[1]; // 'accept' or 'decline'
-  const requestId = match[2];
+  const action = match[1].toLowerCase(); // 'accept' or 'decline'
+  const refId = match[2].trim(); // either requestId or notificationId
 
-  // 1. Verify donor by Telegram Chat ID
-  const donor = await getDonorByTelegramChatId(chatId);
-  if (!donor) {
-    await answerCallbackQuery(callbackId, 'Donor account not found. Please link your account first.', true);
-    return;
-  }
+  try {
+    // 2. Identify the linked donor by Telegram user/chat ID
+    let donor = null;
+    if (effectiveChatId) {
+      donor = await getDonorByTelegramChatId(effectiveChatId);
+    }
+    if (!donor && fromId && fromId !== effectiveChatId) {
+      donor = await getDonorByTelegramChatId(fromId);
+    }
 
-  // 2. Verify blood request existence and active status
-  let bloodRequest = (localStore.blood_requests || []).find((r) => r.id === requestId);
-  if (!bloodRequest && isPostgresConnected()) {
-    const pool = getPool();
-    if (pool) {
-      try {
-        const res = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [requestId]);
-        if (res.rows.length > 0) bloodRequest = res.rows[0];
-      } catch (err) {
-        console.warn('DB bloodRequest lookup error:', err.message);
+    if (!donor) {
+      console.warn(`[Telegram Callback Warning] Unregistered Telegram user ${maskChatId(effectiveChatId)} clicked button`);
+      await answerCallbackQuery(
+        callbackId,
+        '⚠️ Donor account not found. Please link your Telegram account on BloodBridge before responding.',
+        true
+      );
+      return;
+    }
+
+    // 3. Retrieve corresponding notification from Supabase / PostgreSQL / Memory
+    let notification = await getTelegramNotificationById(refId);
+    if (!notification) {
+      notification = await getTelegramNotificationByRequestAndDonor(refId, donor.id);
+    }
+    if (!notification && isPostgresConnected()) {
+      const pool = getPool();
+      if (pool) {
+        try {
+          const res = await pool.query(
+            'SELECT * FROM public.telegram_notifications WHERE (id = $1::uuid OR request_id = $1::uuid) AND donor_id = $2::uuid LIMIT 1',
+            [refId, donor.id]
+          );
+          if (res.rows.length > 0) notification = res.rows[0];
+        } catch (_) {}
       }
     }
-  }
 
-  if (!bloodRequest) {
-    await answerCallbackQuery(callbackId, 'Blood request not found.', true);
-    return;
-  }
-
-  if (['fulfilled', 'cancelled', 'closed', 'expired'].includes(bloodRequest.status)) {
-    await answerCallbackQuery(callbackId, 'This emergency request has concluded or is no longer active.', true);
-    if (chatId && messageId) {
-      await editMessageText(
-        chatId,
-        messageId,
-        `${originalText}\n\n⚠️ *Update:* This emergency request has concluded or is no longer active.`,
-        { inline_keyboard: [] }
+    if (!notification) {
+      console.warn(`[Telegram Callback Warning] Notification not found for ref=${refId} donor=${donor.id}`);
+      await answerCallbackQuery(
+        callbackId,
+        '⚠️ This notification record was not found or has expired.',
+        true
       );
+      return;
     }
-    return;
-  }
 
-  // 3. Duplicate response prevention
-  const existingNotification = await getTelegramNotificationByRequestAndDonor(requestId, donor.id);
-  if (existingNotification && existingNotification.donor_response) {
-    await answerCallbackQuery(
-      callbackId,
-      `You have already ${existingNotification.donor_response.toUpperCase()} this request.`,
-      false
+    // 4. Verify donor ownership & authorization
+    if (notification.donor_id !== donor.id) {
+      console.warn(`[Telegram Callback Warning] Donor ID mismatch: notification=${notification.donor_id} clicking_donor=${donor.id}`);
+      await answerCallbackQuery(
+        callbackId,
+        '⚠️ Unauthorized: This notification belongs to another registered donor.',
+        true
+      );
+      return;
+    }
+
+    // 5. Verify blood request active status first
+    const requestId = notification.request_id;
+    let bloodRequest = (localStore.blood_requests || []).find((r) => r.id === requestId);
+    if (!bloodRequest && isPostgresConnected()) {
+      const pool = getPool();
+      if (pool) {
+        try {
+          const res = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [requestId]);
+          if (res.rows.length > 0) bloodRequest = res.rows[0];
+        } catch (err) {
+          console.warn('DB bloodRequest lookup error:', err.message);
+        }
+      }
+    }
+
+    if (!bloodRequest) {
+      await answerCallbackQuery(callbackId, '⚠️ Emergency blood request record not found.', true);
+      return;
+    }
+
+    if (['fulfilled', 'cancelled', 'closed', 'expired'].includes(bloodRequest.status)) {
+      console.log(`[Telegram Callback] Blood request ${requestId} is already ${bloodRequest.status}`);
+      await answerCallbackQuery(
+        callbackId,
+        '⚠️ This emergency blood request has concluded and is no longer active.',
+        true
+      );
+      if (effectiveChatId && messageId) {
+        await editMessageText(
+          effectiveChatId,
+          messageId,
+          `${originalText}\n\n⚠️ *Update:* This emergency blood request has concluded and is no longer active.`,
+          { inline_keyboard: [] }
+        );
+      }
+      return;
+    }
+
+    // 6. Check if notification is already finalized (idempotency & prevent state flipping)
+    if (notification.donor_response && ['accepted', 'declined'].includes(notification.donor_response)) {
+      const pastResponse = notification.donor_response.toUpperCase();
+      console.log(`[Telegram Callback] Duplicate response ignored: already ${pastResponse} for notif ${notification.id}`);
+      await answerCallbackQuery(
+        callbackId,
+        `ℹ️ You have already ${pastResponse} this request. Status remains saved.`,
+        false
+      );
+      // Remove inline keyboard if still present
+      if (effectiveChatId && messageId) {
+        await editMessageText(
+          effectiveChatId,
+          messageId,
+          `${originalText}\n\nℹ️ *Response already recorded:* ${pastResponse}`,
+          { inline_keyboard: [] }
+        );
+      }
+      return;
+    }
+
+    // 7. Atomic update in Database & localStore
+    const responseType = action === 'accept' ? 'accepted' : 'declined';
+    const updateResult = await updateTelegramNotificationResponse(
+      requestId,
+      donor.id,
+      responseType,
+      notification.id
     );
-    return;
-  }
 
-  // 4. Record response in telegram notifications
-  const responseType = action === 'accept' ? 'accepted' : 'declined';
-  await updateTelegramNotificationResponse(requestId, donor.id, responseType);
+    if (updateResult && updateResult.already_responded) {
+      const past = updateResult.notification.donor_response.toUpperCase();
+      await answerCallbackQuery(
+        callbackId,
+        `ℹ️ You have already ${past} this request.`,
+        false
+      );
+      return;
+    }
 
-  // 5. Update blood request status if accepted
-  if (action === 'accept' && bloodRequest.status === 'active') {
-    bloodRequest.status = 'responses_received';
-    bloodRequest.updated_at = new Date().toISOString();
+    console.log(`[Telegram Callback SUCCESS] Updated notif=${notification.id} donor=${donor.name} response=${responseType}`);
+
+    // 8. Synchronize blood request and request_matches
+    if (action === 'accept') {
+      if (bloodRequest.status === 'active') {
+        bloodRequest.status = 'responses_received';
+        bloodRequest.updated_at = new Date().toISOString();
+        if (isPostgresConnected()) {
+          const pool = getPool();
+          if (pool) {
+            try {
+              await pool.query(
+                "UPDATE public.blood_requests SET status = 'responses_received', updated_at = NOW() WHERE id = $1 AND status = 'active'",
+                [requestId]
+              );
+            } catch (_) {}
+          }
+        }
+      }
+    }
+
+    // Synchronize request_matches status in PostgreSQL if table row exists
     if (isPostgresConnected()) {
       const pool = getPool();
       if (pool) {
         try {
           await pool.query(
-            "UPDATE public.blood_requests SET status = 'responses_received', updated_at = NOW() WHERE id = $1 AND status = 'active'",
-            [requestId]
+            `UPDATE public.request_matches
+             SET status = $1, evaluated_at = NOW()
+             WHERE request_id = $2 AND donor_id = $3`,
+            [responseType, requestId, donor.id]
           );
         } catch (_) {}
       }
     }
-  }
 
-  // 6. Update request_matches table in PostgreSQL if available
-  if (isPostgresConnected()) {
-    const pool = getPool();
-    if (pool) {
-      try {
-        await pool.query(
-          `UPDATE public.request_matches
-           SET status = $1, evaluated_at = NOW()
-           WHERE request_id = $2 AND donor_id = $3`,
-          [responseType, requestId, donor.id]
-        );
-      } catch (matchErr) {
-        // Table or row may not exist
+    // 9. Answer Telegram callback query and edit original message UI
+    if (action === 'accept') {
+      await answerCallbackQuery(
+        callbackId,
+        '✅ You accepted this blood donation contact request. Lifesaving willingness confirmed! The requester has been notified.',
+        false
+      );
+
+      if (effectiveChatId && messageId) {
+        const updatedText =
+          `${originalText}\n\n` +
+          `✅ *Response Recorded: ACCEPTED*\n` +
+          `You accepted this blood donation contact request. The requester has been notified.\n\n` +
+          `_Clinical Cross-Matching Note: Acceptance means willingness to be contacted, not confirmation of blood availability, medical eligibility, compatibility or fulfillment. Clinical cross-matching belongs exclusively to authorized hospital blood bank professionals._`;
+        await editMessageText(effectiveChatId, messageId, updatedText, { inline_keyboard: [] });
+      }
+    } else {
+      await answerCallbackQuery(
+        callbackId,
+        '❌ You declined this contact request. Decline recorded.',
+        false
+      );
+
+      if (effectiveChatId && messageId) {
+        const updatedText =
+          `${originalText}\n\n` +
+          `❌ *Response Recorded: DECLINED*\n` +
+          `You declined this contact request.`;
+        await editMessageText(effectiveChatId, messageId, updatedText, { inline_keyboard: [] });
       }
     }
-  }
-
-  // 7. Acknowledge callback and update message UI
-  if (action === 'accept') {
+  } catch (handlerErr) {
+    console.error(`[Telegram Callback Exception]:`, handlerErr);
     await answerCallbackQuery(
       callbackId,
-      'Lifesaving willingness confirmed! The hospital coordination team has been informed.',
-      false
-    );
-    if (chatId && messageId) {
-      const updatedText =
-        `${originalText}\n\n` +
-        `✅ *Response Recorded: ACCEPTED*\n` +
-        `Thank you for stepping up! The coordination team has been notified. If your donation is selected, you will be contacted immediately.\n\n` +
-        `_Clinical Cross-Matching Note: Acceptance indicates availability; hospital staff will confirm clinical compatibility prior to transfusion._`;
-      await editMessageText(chatId, messageId, updatedText, { inline_keyboard: [] });
-    }
-  } else {
-    await answerCallbackQuery(
-      callbackId,
-      'Decline recorded. Thank you for keeping responders updated.',
-      false
-    );
-    if (chatId && messageId) {
-      const updatedText =
-        `${originalText}\n\n` +
-        `❌ *Response Recorded: DECLINED*\n` +
-        `Thank you for notifying us promptly so alternative voluntary donors can be reached.`;
-      await editMessageText(chatId, messageId, updatedText, { inline_keyboard: [] });
-    }
+      '⚠️ An error occurred while processing your response. Please try again.',
+      true
+    ).catch(() => {});
   }
 }
 
@@ -800,7 +928,8 @@ async function startPolling() {
           : clientTimeoutSignal;
 
         const reqPayload = {
-          timeout: 10
+          timeout: 10,
+          allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member']
         };
         if (currentPollingOffset > 0) {
           reqPayload.offset = currentPollingOffset;
@@ -923,7 +1052,10 @@ async function runOneTimeDiagnostic(timeoutSeconds = 25) {
   let resultMeta = {};
 
   try {
-    const reqPayload = { timeout: timeoutSeconds };
+    const reqPayload = {
+      timeout: timeoutSeconds,
+      allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member']
+    };
     if (currentPollingOffset > 0) {
       reqPayload.offset = currentPollingOffset;
     }
