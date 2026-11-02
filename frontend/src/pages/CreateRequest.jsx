@@ -252,15 +252,15 @@ export default function CreateRequest() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 rounded-full text-xs font-bold tracking-wide uppercase">
-          <Activity className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-rose-50 text-rose-700 rounded-full text-xs font-bold tracking-wide uppercase border border-rose-200">
+          <Activity className="w-4 h-4 text-rose-600 animate-pulse" />
           <span>Emergency Request Journey</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight">
           Coordinate an Urgent Blood Requirement
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 max-w-xl mx-auto">
+        <p className="text-[17px] text-slate-600 max-w-xl mx-auto leading-relaxed">
           Four simple steps to find verified regional blood centres and alert consenting voluntary donors.
         </p>
       </div>

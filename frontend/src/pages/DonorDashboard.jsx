@@ -328,11 +328,11 @@ export default function DonorDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <Heart className="w-7 h-7 text-rose-600 fill-rose-600" />
-            Donor Portal
+          <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Heart className="w-8 h-8 text-rose-600 fill-rose-600" />
+            <span>Donor Portal</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-[17px] text-slate-600 mt-1.5">
             Manage your availability, 3-month recovery cooldown, and participation credit ledger
           </p>
         </div>
@@ -340,7 +340,7 @@ export default function DonorDashboard() {
         {/* Verification Status Pill */}
         <div className="flex items-center gap-2">
           {donor.source === 'google_forms' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-800 bg-blue-100 rounded-full border border-blue-300">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[14px] font-bold text-blue-800 bg-blue-100 rounded-full border border-blue-300">
               📋 Google Forms Linked
             </span>
           )}

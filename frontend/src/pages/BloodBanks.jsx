@@ -34,11 +34,11 @@ export default function BloodBanks() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <Building2 className="w-7 h-7 text-rose-600" />
-            Verified Hospital Blood Banks Directory
+          <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Building2 className="w-8 h-8 text-rose-600" />
+            <span>Verified Hospital Blood Banks Directory</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-[17px] text-slate-600 mt-1.5">
             Official government, Red Cross, and NABH-accredited regional blood transfusion centres
           </p>
         </div>

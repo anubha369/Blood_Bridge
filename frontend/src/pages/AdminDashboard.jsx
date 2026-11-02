@@ -199,18 +199,18 @@ export default function AdminDashboard() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 text-[10px] font-extrabold tracking-wider uppercase rounded-md bg-rose-100 text-rose-800">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider uppercase rounded-md bg-rose-100 text-rose-800">
               Uttar Pradesh State Operations
             </span>
-            <span className="text-xs text-slate-400">|</span>
-            <span className="text-xs font-semibold text-slate-500">Live Coordination Hub</span>
+            <span className="text-sm text-slate-400">|</span>
+            <span className="text-[14px] font-semibold text-slate-500">Live Coordination Hub</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-            <Shield className="w-7 h-7 text-rose-600" />
-            Administrative Operations & Verification Console
+          <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Shield className="w-8 h-8 text-rose-600" />
+            <span>Administrative Operations &amp; Verification Console</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-[17px] text-slate-600 mt-1.5">
             Review donor eligibility, manage 3-month cooldown overrides, inspect WhatsApp queues, and monitor participation ledger.
           </p>
         </div>
@@ -218,10 +218,10 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-3">
           <Link
             to="/admin/rag"
-            className="px-4 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 flex items-center gap-1.5 transition-colors shadow-sm"
+            className="px-5 py-3 text-[16px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 flex items-center gap-2 transition-colors shadow-sm"
           >
-            <BookOpen className="w-3.5 h-3.5" />
-            RAG Knowledge Base
+            <BookOpen className="w-4 h-4" />
+            <span>RAG Knowledge Base</span>
           </Link>
 
           <button

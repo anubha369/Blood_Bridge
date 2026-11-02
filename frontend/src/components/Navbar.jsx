@@ -67,61 +67,64 @@ export default function Navbar({ onOpenAI }) {
   return (
     <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white shadow-lg transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-20 lg:h-24 gap-4 xl:gap-6">
           
-          {/* Logo & Brand Identity (Clean BloodBridge without "Vision-X") */}
-          <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white shadow-lg shadow-rose-950/60 group-hover:scale-105 transition-transform duration-300">
-              <Heart className="w-5 h-5 fill-white" />
+          {/* 1. Left: Brand Identity (24–28px Brand Name) */}
+          <Link to="/" className="flex items-center gap-3.5 group flex-shrink-0" aria-label="BloodBridge Home">
+            <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-2xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-lg shadow-rose-950/60 group-hover:scale-105 transition-transform duration-300">
+              <Heart className="w-6 h-6 fill-white" />
             </div>
-            <div>
-              <span className="text-xl font-black tracking-tight text-white block">
-                BloodBridge
+            <div className="flex flex-col justify-center">
+              <span className="text-[24px] sm:text-[26px] lg:text-[28px] font-black tracking-tight text-white leading-none">
+                Blood<span className="text-[#D71935]">Bridge</span>
               </span>
-              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
+              <p className="text-[12px] sm:text-[13px] text-slate-400 font-semibold tracking-wide mt-1 hidden sm:block leading-none">
                 Emergency Blood Coordination
               </p>
             </div>
           </Link>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2.5" aria-label="Main Navigation">
+          {/* 2. Center: Evenly Spaced & Visually Balanced Navigation Links (18–20px) */}
+          <nav
+            className="hidden lg:flex items-center justify-center gap-2 xl:gap-3 flex-1 mx-2 xl:mx-4"
+            aria-label="Main Navigation"
+          >
             {/* Regional Blood Banks Directory */}
             <Link
               to="/blood-banks"
-              className={`px-3.5 py-2 text-[17px] font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+              className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap ${
                 isActive('/blood-banks')
-                  ? 'bg-slate-800 text-rose-400 border border-slate-700'
-                  : 'text-slate-200 hover:text-white hover:bg-slate-900'
+                  ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
+                  : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              <Building2 className="w-4 h-4 text-slate-400" />
+              <Building2 className="w-5 h-5 text-slate-400" />
               <span>Blood Banks</span>
             </Link>
 
             {/* How It Works */}
             <Link
               to="/how-it-works"
-              className={`px-3.5 py-2 text-[17px] font-semibold rounded-xl transition-all ${
+              className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center justify-center whitespace-nowrap ${
                 isActive('/how-it-works')
-                  ? 'bg-slate-800 text-rose-400 border border-slate-700'
-                  : 'text-slate-200 hover:text-white hover:bg-slate-900'
+                  ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
+                  : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              How It Works
+              <span>How It Works</span>
             </Link>
 
             {/* Primary Action: Create Request for Authenticated Users */}
             {isAuthenticated && (
               <Link
                 to="/requests/create"
-                className={`px-4 py-2 text-[17px] font-bold rounded-xl transition-all flex items-center gap-2 ${
+                className={`h-11 lg:h-12 px-5 text-[18px] xl:text-[19px] font-extrabold rounded-xl transition-all inline-flex items-center gap-2.5 whitespace-nowrap ${
                   isActive('/requests/create')
-                    ? 'bg-rose-600 text-white shadow-md shadow-rose-950'
-                    : 'bg-rose-500/15 text-rose-300 hover:bg-rose-600 hover:text-white border border-rose-500/30'
+                    ? 'bg-gradient-to-r from-rose-600 to-[#D71935] text-white shadow-md shadow-rose-950/60 border border-rose-500'
+                    : 'bg-rose-500/20 text-rose-300 hover:bg-gradient-to-r hover:from-rose-600 hover:to-[#D71935] hover:text-white border border-rose-500/40 shadow-sm'
                 }`}
               >
-                <PlusCircle className="w-4 h-4 flex-shrink-0" />
+                <PlusCircle className="w-5 h-5 flex-shrink-0" />
                 <span>Create Request</span>
               </Link>
             )}
@@ -130,13 +133,13 @@ export default function Navbar({ onOpenAI }) {
             {isAuthenticated && (isRequester || isAdmin) && (
               <Link
                 to="/requester/dashboard"
-                className={`px-3.5 py-2 text-[17px] font-semibold rounded-xl transition-all ${
+                className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center justify-center whitespace-nowrap ${
                   isActive('/requester/dashboard')
-                    ? 'bg-slate-800 text-rose-400 border border-slate-700'
-                    : 'text-slate-200 hover:text-white hover:bg-slate-900'
+                    ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
+                    : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
                 }`}
               >
-                My Requests
+                <span>My Requests</span>
               </Link>
             )}
 
@@ -144,13 +147,13 @@ export default function Navbar({ onOpenAI }) {
             {isAuthenticated && (isDonor || isAdmin) && (
               <Link
                 to="/donor/dashboard"
-                className={`px-3.5 py-2 text-[17px] font-semibold rounded-xl transition-all ${
+                className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center justify-center whitespace-nowrap ${
                   isActive('/donor/dashboard')
-                    ? 'bg-slate-800 text-rose-400 border border-slate-700'
-                    : 'text-slate-200 hover:text-white hover:bg-slate-900'
+                    ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
+                    : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
                 }`}
               >
-                Donor Portal
+                <span>Donor Portal</span>
               </Link>
             )}
 
@@ -159,80 +162,80 @@ export default function Navbar({ onOpenAI }) {
               <>
                 <Link
                   to="/admin/dashboard"
-                  className={`px-3.5 py-2 text-[17px] font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                  className={`h-11 lg:h-12 px-4 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap ${
                     isActive('/admin/dashboard')
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'text-amber-400 hover:bg-slate-900'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                      : 'text-amber-400 hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <Shield className="w-4 h-4" />
+                  <Shield className="w-5 h-5" />
                   <span>Admin</span>
                 </Link>
                 <Link
                   to="/admin/rag"
-                  className={`px-3.5 py-2 text-[17px] font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                  className={`h-11 lg:h-12 px-4 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap ${
                     isActive('/admin/rag')
-                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                      : 'text-indigo-400 hover:bg-slate-900'
+                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
+                      : 'text-indigo-400 hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <BookOpen className="w-4 h-4" />
+                  <BookOpen className="w-5 h-5" />
                   <span>Knowledge</span>
                 </Link>
               </>
             )}
           </nav>
 
-          {/* Right Area: AI Assistant, Points, User Profile, Request Blood & Logout */}
-          <div className="hidden md:flex items-center gap-3 lg:gap-4">
+          {/* 3. Right: User Elements (Points: 17–18px, Profile: 17–18px, Logout: 18–19px) */}
+          <div className="hidden lg:flex items-center gap-3 xl:gap-3.5 flex-shrink-0">
             {/* AI Assistant Pill */}
             <button
               type="button"
               onClick={onOpenAI}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[16px] font-semibold text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded-xl hover:bg-rose-900/50 transition-all shadow-sm"
+              className="h-11 lg:h-12 inline-flex items-center gap-2 px-4 text-[17px] xl:text-[18px] font-bold text-rose-300 bg-rose-950/40 border border-rose-800/40 rounded-xl hover:bg-rose-900/50 hover:text-white transition-all shadow-sm whitespace-nowrap"
               title="Open Clinical AI Assistant"
             >
               <Sparkles className="w-4 h-4 text-rose-400" />
-              <span>AI Assistant</span>
+              <span>Clinical AI</span>
             </button>
 
             {isAuthenticated ? (
-              <div className="flex items-center gap-3 lg:gap-4 pl-3 border-l border-slate-800">
-                {/* Neatly Framed Points Display for Donors */}
+              <div className="flex items-center gap-3 xl:gap-3.5 pl-3 border-l border-slate-800">
+                {/* Neatly Framed Points Display for Donors (17–18px) */}
                 {isDonor && creditPoints !== null && (
                   <Link
                     to="/donor/dashboard"
                     title="Non-monetary volunteer participation points"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[15px] font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl hover:bg-amber-500/20 transition-all shadow-sm"
+                    className="h-11 lg:h-12 inline-flex items-center gap-2 px-4 text-[17px] xl:text-[18px] font-extrabold text-amber-300 bg-amber-500/15 border border-amber-500/35 rounded-xl hover:bg-amber-500/25 transition-all shadow-sm whitespace-nowrap"
                   >
-                    <Award className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <Award className="w-5 h-5 text-amber-400 flex-shrink-0" />
                     <span>{creditPoints} Pts</span>
                   </Link>
                 )}
 
-                {/* User Identity Avatar & Role */}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-extrabold text-white shadow-inner">
+                {/* User Identity Avatar & Role (17–18px Profile Name) */}
+                <div className="h-11 lg:h-12 px-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-3 shadow-sm">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-black text-rose-300 flex-shrink-0">
                     {getInitials(user?.name)}
                   </div>
-                  <div className="text-left hidden xl:block">
-                    <div className="text-[15px] font-bold text-white max-w-[130px] truncate leading-tight">
+                  <div className="text-left hidden xl:block leading-none">
+                    <div className="text-[17px] xl:text-[18px] font-bold text-white max-w-[130px] truncate">
                       {user?.name || 'User'}
                     </div>
-                    <div className="text-[11px] uppercase font-bold text-rose-400 tracking-wider">
+                    <div className="text-[11px] xl:text-[12px] uppercase font-bold text-rose-400 tracking-wider mt-1">
                       {user?.role || 'Member'}
                     </div>
                   </div>
                 </div>
 
-                {/* Clearly Visible & Accessible Logout Button */}
+                {/* Clearly Visible & Accessible Logout Button (18–19px) */}
                 <button
                   type="button"
                   onClick={handleLogout}
                   title="Sign out of your account"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-[16px] font-bold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-rose-900/60 border border-slate-700 hover:border-rose-700/60 rounded-xl transition-all shadow-sm group"
+                  className="h-11 lg:h-12 inline-flex items-center gap-2.5 px-4.5 xl:px-5 text-[18px] xl:text-[19px] font-bold text-slate-200 hover:text-white bg-slate-900 hover:bg-rose-950/70 border border-slate-800 hover:border-rose-800/60 rounded-xl transition-all shadow-sm group whitespace-nowrap"
                 >
-                  <LogOut className="w-4 h-4 text-rose-400 transition-transform group-hover:-translate-x-0.5" />
+                  <LogOut className="w-5 h-5 text-rose-400 transition-transform group-hover:-translate-x-0.5" />
                   <span>Logout</span>
                 </button>
               </div>
@@ -240,13 +243,13 @@ export default function Navbar({ onOpenAI }) {
               <div className="flex items-center gap-3">
                 <Link
                   to="/login"
-                  className="px-5 py-2.5 text-[16px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md transition-all shadow-rose-950 flex items-center gap-1.5"
+                  className="h-11 lg:h-12 px-6 text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md transition-all inline-flex items-center justify-center whitespace-nowrap"
                 >
                   Log In
                 </Link>
                 <Link
                   to="/signup"
-                  className="px-4 py-2.5 text-[16px] font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all"
+                  className="h-11 lg:h-12 px-5 text-[18px] font-bold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all inline-flex items-center justify-center whitespace-nowrap"
                 >
                   Register
                 </Link>
@@ -254,61 +257,74 @@ export default function Navbar({ onOpenAI }) {
             )}
           </div>
 
-          {/* Mobile Menu & AI Toggle */}
-          <div className="flex lg:hidden items-center gap-2">
+          {/* 4. Mobile Menu & AI Assistant (< lg) */}
+          <div className="flex lg:hidden items-center gap-2.5">
+            {isAuthenticated && isDonor && creditPoints !== null && (
+              <Link
+                to="/donor/dashboard"
+                className="h-10 inline-flex items-center gap-1.5 px-3 text-[15px] font-black text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl"
+                title="Volunteer Points"
+              >
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>{creditPoints}</span>
+              </Link>
+            )}
+
             <button
               type="button"
               onClick={onOpenAI}
-              className="p-2 text-rose-400 hover:bg-slate-900 rounded-xl border border-slate-800"
-              title="BloodBridge Assistant"
+              className="h-10 w-10 flex items-center justify-center text-rose-400 hover:bg-slate-900 rounded-xl border border-slate-800"
+              title="Clinical AI Assistant"
             >
               <Sparkles className="w-5 h-5" />
             </button>
+
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-200 hover:text-white hover:bg-slate-900 rounded-xl border border-slate-800"
-              aria-label="Toggle Dashboard Menu"
+              className="h-10 w-10 flex items-center justify-center text-slate-200 hover:text-white hover:bg-slate-900 rounded-xl border border-slate-800"
+              aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
+
         </div>
       </div>
 
       {/* Mobile Drawer (Clean, Spacious & Responsive) */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-800 bg-slate-950 px-4 pt-4 pb-6 space-y-3 shadow-2xl animate-in slide-in-from-top-2">
+        <div className="lg:hidden border-t border-slate-800 bg-slate-950 px-4 pt-4 pb-6 space-y-4 shadow-2xl animate-in slide-in-from-top-2">
           {isAuthenticated ? (
             <>
-              {/* User Identity Header */}
-              <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
+              {/* User Identity Header Card */}
+              <div className="p-4 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-bold text-white">
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-black text-rose-300 shadow-inner">
                     {getInitials(user?.name)}
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">{user?.name}</div>
-                    <div className="text-[11px] uppercase font-bold text-rose-400 tracking-wider">
-                      {user?.role}
+                    <div className="text-[15px] font-bold text-white leading-tight">{user?.name || 'User'}</div>
+                    <div className="text-[11px] uppercase font-bold text-rose-400 tracking-wider mt-0.5">
+                      {user?.role || 'Member'}
                     </div>
                   </div>
                 </div>
 
                 {isDonor && creditPoints !== null && (
-                  <div className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                     <Award className="w-3.5 h-3.5 text-amber-400" />
                     <span>{creditPoints} Pts</span>
                   </div>
                 )}
               </div>
 
-              {/* Navigation Links */}
-              <div className="space-y-1.5 pt-1">
+              {/* Navigation Links with uniform spacing & icons */}
+              <div className="space-y-2 pt-1">
                 <Link
                   to="/requests/create"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 text-[17px] font-bold text-rose-300 hover:bg-slate-900 rounded-xl border border-rose-500/20 bg-rose-500/10 flex items-center gap-2"
+                  className="w-full px-4 py-3.5 text-[17px] font-bold text-rose-200 hover:text-white bg-rose-500/15 hover:bg-gradient-to-r hover:from-rose-600 hover:to-[#D71935] rounded-xl border border-rose-500/30 flex items-center gap-2.5 transition-all shadow-sm"
                 >
                   <PlusCircle className="w-5 h-5 text-rose-400" />
                   <span>Create Emergency Request</span>
@@ -318,7 +334,11 @@ export default function Navbar({ onOpenAI }) {
                   <Link
                     to="/requester/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-4 py-2.5 text-[17px] font-semibold text-slate-200 hover:bg-slate-900 rounded-xl"
+                    className={`block px-4 py-3 text-[18px] font-semibold rounded-xl transition-all ${
+                      isActive('/requester/dashboard')
+                        ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                        : 'text-slate-200 hover:bg-slate-900 hover:text-white'
+                    }`}
                   >
                     My Requests
                   </Link>
@@ -328,7 +348,11 @@ export default function Navbar({ onOpenAI }) {
                   <Link
                     to="/donor/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-4 py-2.5 text-[17px] font-semibold text-slate-200 hover:bg-slate-900 rounded-xl"
+                    className={`block px-4 py-3 text-[18px] font-semibold rounded-xl transition-all ${
+                      isActive('/donor/dashboard')
+                        ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                        : 'text-slate-200 hover:bg-slate-900 hover:text-white'
+                    }`}
                   >
                     Donor Portal
                   </Link>
@@ -337,16 +361,24 @@ export default function Navbar({ onOpenAI }) {
                 <Link
                   to="/blood-banks"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 text-[17px] font-semibold text-slate-200 hover:bg-slate-900 rounded-xl flex items-center gap-2"
+                  className={`px-4 py-3 text-[18px] font-semibold rounded-xl transition-all flex items-center gap-2.5 ${
+                    isActive('/blood-banks')
+                      ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                      : 'text-slate-200 hover:bg-slate-900 hover:text-white'
+                  }`}
                 >
-                  <Building2 className="w-4 h-4 text-slate-400" />
+                  <Building2 className="w-5 h-5 text-slate-400" />
                   <span>Regional Blood Banks</span>
                 </Link>
 
                 <Link
                   to="/how-it-works"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 text-[17px] font-semibold text-slate-200 hover:bg-slate-900 rounded-xl"
+                  className={`block px-4 py-3 text-[18px] font-semibold rounded-xl transition-all ${
+                    isActive('/how-it-works')
+                      ? 'bg-slate-800 text-rose-400 border border-slate-700'
+                      : 'text-slate-200 hover:bg-slate-900 hover:text-white'
+                  }`}
                 >
                   How It Works
                 </Link>
@@ -356,24 +388,28 @@ export default function Navbar({ onOpenAI }) {
                     <Link
                       to="/admin/dashboard"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-2.5 text-[17px] font-bold text-amber-400 hover:bg-slate-900 rounded-xl flex items-center gap-2"
+                      className={`px-4 py-3 text-[18px] font-bold text-amber-400 hover:bg-slate-900 rounded-xl flex items-center gap-2 ${
+                        isActive('/admin/dashboard') ? 'bg-slate-800' : ''
+                      }`}
                     >
-                      <Shield className="w-4 h-4" />
+                      <Shield className="w-5 h-5" />
                       <span>Admin Console</span>
                     </Link>
                     <Link
                       to="/admin/rag"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-2.5 text-[17px] font-bold text-indigo-400 hover:bg-slate-900 rounded-xl flex items-center gap-2"
+                      className={`px-4 py-3 text-[18px] font-bold text-indigo-400 hover:bg-slate-900 rounded-xl flex items-center gap-2 ${
+                        isActive('/admin/rag') ? 'bg-slate-800' : ''
+                      }`}
                     >
-                      <BookOpen className="w-4 h-4" />
+                      <BookOpen className="w-5 h-5" />
                       <span>Knowledge Base (RAG)</span>
                     </Link>
                   </>
                 )}
               </div>
 
-              {/* Prominent Full-Width Logout for Mobile */}
+              {/* Prominent Full-Width Logout for Mobile (18–19px) */}
               <div className="pt-3 border-t border-slate-800">
                 <button
                   type="button"
@@ -381,33 +417,33 @@ export default function Navbar({ onOpenAI }) {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full py-3 px-4 text-[17px] font-bold text-white bg-rose-600/90 hover:bg-rose-600 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-950"
+                  className="w-full py-4 px-4 text-[18px] font-bold text-white bg-gradient-to-r from-rose-600 to-[#D71935] hover:from-rose-500 hover:to-red-600 rounded-xl flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-rose-950/60"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-5 h-5" />
                   <span>Logout</span>
                 </button>
               </div>
             </>
           ) : (
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-2.5 pt-1">
               <Link
                 to="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-3 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md"
+                className="block w-full text-center py-3.5 text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md"
               >
                 Log In
               </Link>
               <Link
                 to="/signup"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2.5 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
+                className="block w-full text-center py-3 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
               >
                 Register
               </Link>
               <Link
                 to="/blood-banks"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2.5 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
+                className="block w-full text-center py-3 text-[17px] font-semibold text-slate-200 bg-slate-900 border border-slate-800 rounded-xl"
               >
                 Blood Banks
               </Link>

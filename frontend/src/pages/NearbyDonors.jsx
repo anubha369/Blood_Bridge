@@ -74,12 +74,12 @@ export default function NearbyDonors() {
       {/* Page Heading */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <Search className="w-7 h-7 text-rose-600" />
-            Location-Based Donor Search
+          <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Search className="w-8 h-8 text-rose-600" />
+            <span>Location-Based Donor Search</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Spatial indexing via PostGIS <code className="text-rose-600 bg-rose-50 px-1 py-0.5 rounded text-xs font-mono">ST_DWithin</code> • SRID 4326 Geography Point
+          <p className="text-[17px] text-slate-600 mt-1.5">
+            Spatial indexing via PostGIS <code className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded text-sm font-mono">ST_DWithin</code> • SRID 4326 Geography Point
           </p>
         </div>
 

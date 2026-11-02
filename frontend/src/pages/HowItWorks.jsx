@@ -7,13 +7,13 @@ export default function HowItWorks() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
       {/* Header */}
       <div className="text-center space-y-4 max-w-3xl mx-auto">
-        <span className="text-xs font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
-          Architecture & Verification Guide
+        <span className="text-xs font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-3.5 py-1.5 rounded-full border border-rose-200">
+          Architecture &amp; Verification Guide
         </span>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-black text-slate-900 tracking-tight">
           How BloodBridge Coordinates Emergencies
         </h1>
-        <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+        <p className="text-[17px] sm:text-[18px] text-slate-600 leading-relaxed">
           BloodBridge replaces chaotic social media requests and manual phone calling with a deterministic, privacy-first coordination platform.
         </p>
       </div>

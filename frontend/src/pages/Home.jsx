@@ -112,35 +112,35 @@ export default function Home({ onOpenAI }) {
           <nav className="hidden md:flex items-center gap-6 lg:gap-8" aria-label="Primary Navigation">
             <Link
               to="/"
-              className="text-[17px] font-bold text-[#0F172A] relative py-1 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#D71935]"
+              className="text-[18px] xl:text-[19px] font-bold text-[#0F172A] relative py-1 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#D71935]"
               aria-current="page"
             >
               Home
             </Link>
             <Link
               to="/blood-banks"
-              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-1.5"
+              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-2"
             >
-              <Building2 className="w-4 h-4 text-slate-400" />
+              <Building2 className="w-5 h-5 text-slate-400" />
               <span>Blood Banks</span>
             </Link>
             <Link
               to="/how-it-works"
-              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               How It Works
             </Link>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-about', e)}
-              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               About
             </button>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-faq', e)}
-              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               FAQ
             </button>
@@ -154,7 +154,7 @@ export default function Home({ onOpenAI }) {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-700 hover:text-[#0F172A] rounded-xl hover:bg-slate-100"
+              className="p-2.5 text-slate-700 hover:text-[#0F172A] rounded-xl hover:bg-slate-100"
               aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -168,28 +168,28 @@ export default function Home({ onOpenAI }) {
             <Link
               to="/"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-[17px] font-bold text-[#D71935]"
+              className="block py-2.5 text-[18px] font-bold text-[#D71935]"
             >
               Home
             </Link>
             <Link
               to="/blood-banks"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-[17px] font-semibold text-slate-700"
+              className="block py-2.5 text-[18px] font-semibold text-slate-700"
             >
               Blood Banks
             </Link>
             <Link
               to="/how-it-works"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-[17px] font-semibold text-slate-700"
+              className="block py-2.5 text-[18px] font-semibold text-slate-700"
             >
               How It Works
             </Link>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-about', e)}
-              className="block w-full text-left py-2 text-[17px] font-semibold text-slate-700"
+              className="block w-full text-left py-2.5 text-[18px] font-semibold text-slate-700"
             >
               About BloodBridge
             </button>

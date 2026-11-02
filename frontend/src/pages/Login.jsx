@@ -139,13 +139,13 @@ export default function Login() {
         <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-9 border border-slate-200/90 shadow-xl shadow-slate-200/40 space-y-6">
           {/* Card Header */}
           <div className="text-center space-y-2">
-            <div className="text-[11px] font-black uppercase tracking-widest text-[#D71935]">
+            <div className="text-[12px] font-black uppercase tracking-widest text-[#D71935]">
               SECURE HEALTHCARE PORTAL
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-black text-[#0F172A] tracking-tight">
               Welcome Back
             </h1>
-            <p className="text-xs text-slate-500">
+            <p className="text-[16px] text-slate-600">
               Select your access role and enter your credentials.
             </p>
           </div>
@@ -155,7 +155,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleRoleSelect('donor')}
-              className={`py-2.5 text-[15px] font-bold rounded-xl transition-all ${
+              className={`py-3 text-[16px] sm:text-[17px] font-bold rounded-xl transition-all ${
                 activeRole === 'donor'
                   ? 'bg-white text-[#D71935] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -168,7 +168,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleRoleSelect('patient')}
-              className={`py-2.5 text-[15px] font-bold rounded-xl transition-all ${
+              className={`py-3 text-[16px] sm:text-[17px] font-bold rounded-xl transition-all ${
                 activeRole === 'patient'
                   ? 'bg-white text-[#0F172A] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -181,7 +181,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleRoleSelect('admin')}
-              className={`py-2.5 text-[15px] font-bold rounded-xl transition-all ${
+              className={`py-3 text-[16px] sm:text-[17px] font-bold rounded-xl transition-all ${
                 activeRole === 'admin'
                   ? 'bg-white text-[#0F172A] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -275,29 +275,29 @@ export default function Login() {
 
             {/* Button Action Stack */}
             <div className="space-y-3 pt-2">
-              {/* Sign In Button (Primary) */}
+              {/* Sign In Button (Primary: 18–19px) */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 px-6 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="w-full py-4 px-6 text-[18px] sm:text-[19px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
                 <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </button>
 
-              {/* Sign Up Button (Secondary) */}
+              {/* Sign Up Button (Secondary: 18–19px) */}
               <Link
                 to={`/signup${activeRole ? `?role=${activeRole}` : ''}`}
-                className="w-full py-3.5 px-6 text-[17px] font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl transition-all flex items-center justify-center gap-2 group"
+                className="w-full py-4 px-6 text-[18px] sm:text-[19px] font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl transition-all flex items-center justify-center gap-2 group"
               >
                 <span>Create New Account</span>
-                <ArrowRight className="w-4 h-4 text-[#0F172A] transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="w-5 h-5 text-[#0F172A] transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
 
             {/* Auth Switch Link */}
             <div className="text-center pt-2">
-              <p className="text-xs text-slate-500">
+              <p className="text-[14px] sm:text-[15px] text-slate-500">
                 Haven't registered yet?{' '}
                 <Link
                   to={`/signup${activeRole ? `?role=${activeRole}` : ''}`}

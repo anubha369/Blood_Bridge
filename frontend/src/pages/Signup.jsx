@@ -168,13 +168,13 @@ export default function Signup() {
         <div className="max-w-lg w-full bg-white rounded-3xl p-6 sm:p-9 border border-slate-200/90 shadow-xl shadow-slate-200/40 space-y-6">
           {/* Card Header */}
           <div className="text-center space-y-2">
-            <div className="text-[11px] font-black uppercase tracking-widest text-[#D71935]">
+            <div className="text-[12px] font-black uppercase tracking-widest text-[#D71935]">
               HEALTHCARE REGISTRY ENROLLMENT
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-black text-[#0F172A] tracking-tight">
               Create an Account
             </h1>
-            <p className="text-xs text-slate-500">
+            <p className="text-[16px] text-slate-600">
               Join our emergency response network to donate or coordinate blood supplies.
             </p>
           </div>
@@ -186,7 +186,7 @@ export default function Signup() {
               <button
                 type="button"
                 onClick={() => setRole('donor')}
-                className={`py-3.5 px-3 text-[16px] font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
+                className={`py-3.5 px-3 text-[17px] font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
                   role === 'donor'
                     ? 'bg-rose-50 border-[#D71935] text-[#D71935] shadow-sm'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -198,7 +198,7 @@ export default function Signup() {
               <button
                 type="button"
                 onClick={() => setRole('requester')}
-                className={`py-3.5 px-3 text-[16px] font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
+                className={`py-3.5 px-3 text-[17px] font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
                   role === 'requester'
                     ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -365,12 +365,12 @@ export default function Signup() {
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Button (18–19px) */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 px-6 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="w-full py-4 px-6 text-[18px] sm:text-[19px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 <span>{loading ? 'Sending Verification Code...' : 'Create Account & Send Verification Code'}</span>
                 <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
@@ -379,7 +379,7 @@ export default function Signup() {
 
             {/* Auth Switch Link */}
             <div className="text-center pt-2">
-              <p className="text-xs text-slate-500">
+              <p className="text-[14px] sm:text-[15px] text-slate-500">
                 Already registered?{' '}
                 <Link
                   to={`/login${role ? `?role=${role}` : ''}`}

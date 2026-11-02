@@ -109,20 +109,20 @@ export default function RequesterDashboard() {
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight">
             Requester Portal
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-[17px] text-slate-600 mt-1.5">
             Welcome back, <span className="font-bold text-slate-800">{user?.name}</span>. Track active emergency blood requests.
           </p>
         </div>
 
         <Link
           to="/requests/create"
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all whitespace-nowrap self-start sm:self-auto"
+          className="inline-flex items-center gap-2.5 px-6 py-3.5 text-[17px] font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all whitespace-nowrap self-start sm:self-auto"
         >
-          <PlusCircle className="w-4 h-4" />
-          Create New Request
+          <PlusCircle className="w-5 h-5" />
+          <span>Create New Request</span>
         </Link>
       </div>
 
