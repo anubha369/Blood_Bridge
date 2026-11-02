@@ -458,7 +458,7 @@ router.post('/register-initiate', authLimiter, async (req, res, next) => {
     localStore.email_otp_verifications = (localStore.email_otp_verifications || []).filter(
       (c) => c.email !== normalizedEmail
     );
-    localStore.email_otp_verifications.push({
+    const memChallenge = {
       id: challengeId,
       email: normalizedEmail,
       otp_hash: otpHashed,
@@ -469,7 +469,11 @@ router.post('/register-initiate', authLimiter, async (req, res, next) => {
       last_sent_at: Date.now(),
       verified: false,
       consumed: false
-    });
+    };
+    if (process.env.NODE_ENV === 'test') {
+      memChallenge._test_otp = otp;
+    }
+    localStore.email_otp_verifications.push(memChallenge);
 
     // Send Email via Brevo
     await sendOtpEmail({
@@ -571,10 +575,7 @@ router.post('/verify-email-otp', authLimiter, async (req, res, next) => {
     }
 
     // Verify cryptographic SHA-256 OTP Hash
-    let isMatch = verifyOtpHash(cleanOtp, challenge.otp_hash);
-    if (!isMatch && cleanOtp === '123456' && (process.env.NODE_ENV === 'test' || config.nodeEnv !== 'production')) {
-      isMatch = true;
-    }
+    const isMatch = verifyOtpHash(cleanOtp, challenge.otp_hash);
 
     if (!isMatch) {
       if (isPostgresConnected() && getPool()) {
@@ -776,8 +777,8 @@ router.post('/send-otp', authLimiter, async (req, res, next) => {
     }
 
     const challengeId = uuidv4();
-    const demoOtp = '123456';
-    let otpSent = demoOtp;
+    const generatedOtp = generateCryptographicOtp();
+    let otpSent = generatedOtp;
 
     // Check if MSG91 is configured
     if (config.msg91AuthKey && config.msg91TemplateId) {
@@ -798,7 +799,7 @@ router.post('/send-otp', authLimiter, async (req, res, next) => {
         console.warn('MSG91 Dispatch notice:', mErr.message);
       }
     } else {
-      console.log(`[SMS OTP Simulation] Evaluation code ${demoOtp} generated for ${parsedPhone.masked}`);
+      console.log(`[SMS OTP Simulation] OTP challenge generated for ${parsedPhone.masked}`);
     }
 
     // Save in challenges store
@@ -808,7 +809,7 @@ router.post('/send-otp', authLimiter, async (req, res, next) => {
       phone_digits: parsedPhone.digits,
       phone_normalized: parsedPhone.normalized,
       phone_masked: parsedPhone.masked,
-      otp: otpSent,
+      otp: generatedOtp,
       attempts: 0,
       expires_at: Date.now() + (config.msg91OtpExpiry || 5) * 60 * 1000,
       created_at: Date.now(),
@@ -872,15 +873,6 @@ router.post('/verify-otp', authLimiter, async (req, res, next) => {
       }
     }
 
-    // Evaluation mode OTP verification
-    if (!challenge && cleanOtp === '123456') {
-      return res.json({
-        success: true,
-        message: 'Evaluation OTP verified successfully.',
-        verified: true
-      });
-    }
-
     if (!challenge) {
       return res.status(400).json({ success: false, error: 'OTP session expired or not found. Please request a new code.' });
     }
@@ -894,7 +886,7 @@ router.post('/verify-otp', authLimiter, async (req, res, next) => {
       return res.status(429).json({ success: false, error: 'Too many incorrect attempts. Please request a new code.' });
     }
 
-    if (cleanOtp !== challenge.otp && cleanOtp !== '123456') {
+    if (cleanOtp !== challenge.otp) {
       return res.status(400).json({
         success: false,
         error: `Incorrect OTP code. (${5 - challenge.attempts} attempts remaining)`
@@ -948,8 +940,7 @@ router.post('/resend-otp', authLimiter, async (req, res, next) => {
     return res.json({
       success: true,
       message: 'New OTP code dispatched.',
-      cooldown_seconds: 60,
-      demo_otp: '123456'
+      cooldown_seconds: 60
     });
   } catch (err) {
     next(err);

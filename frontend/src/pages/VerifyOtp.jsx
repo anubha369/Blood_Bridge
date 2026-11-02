@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Smartphone,
   Mail,
   ArrowRight,
   ArrowLeft,
@@ -10,11 +9,11 @@ import {
   Shield,
   AlertCircle,
   RotateCw,
-  Sparkles
+  Clock
 } from 'lucide-react';
 
 export default function VerifyOtp() {
-  const { verifyOtp, resendOtp, verifyEmailOtp, resendEmailOtp, user } = useAuth();
+  const { verifyEmailOtp, resendEmailOtp, verifyOtp, resendOtp, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,19 +24,23 @@ export default function VerifyOtp() {
   const initialChallengeId = searchParams.get('challenge_id') || location.state?.challenge_id || '';
 
   const [challengeId, setChallengeId] = useState(initialChallengeId);
-  const [otp, setOtp] = useState('');
+  const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [verifiedSuccess, setVerifiedSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // 5-minute code expiration timer (300 seconds)
+  const [expirySeconds, setExpirySeconds] = useState(300);
+
   // 60-second resend cooldown timer
-  const [countdown, setCountdown] = useState(60);
+  const [cooldown, setCooldown] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
-  const inputRef = useRef(null);
+  // Array of 6 input refs
+  const inputsRef = useRef([]);
 
-  // Masked email format helper: p***a@example.com
+  // Masked email format helper: e.g. a***a@gmail.com
   const getMaskedEmail = (em) => {
     if (location.state?.email_masked) return location.state.email_masked;
     if (!em || !em.includes('@')) return 'your email';
@@ -46,49 +49,130 @@ export default function VerifyOtp() {
     return `${masked}@${domain}`;
   };
 
-  // Masked phone format helper: +91 ******3210
-  const getMaskedPhone = (p) => {
-    const digits = String(p).replace(/\D/g, '');
-    const last4 = digits.slice(-4) || '0000';
-    return `+91 ******${last4}`;
+  // Format seconds to MM:SS
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Auto-focus first input on mount
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
+    if (inputsRef.current[0]) {
+      inputsRef.current[0].focus();
     }
   }, []);
 
+  // 5-minute expiration countdown
   useEffect(() => {
-    let timer;
-    if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    } else {
+    if (expirySeconds <= 0) return;
+    const interval = setInterval(() => {
+      setExpirySeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [expirySeconds]);
+
+  // 60-second resend cooldown countdown
+  useEffect(() => {
+    if (cooldown <= 0) {
       setCanResend(true);
+      return;
     }
-    return () => clearTimeout(timer);
-  }, [countdown]);
+    const interval = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [cooldown]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleOtpChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(val);
+  // Handle single digit changes
+  const handleDigitChange = (index, value) => {
+    // Clean numeric only
+    const cleanVal = value.replace(/\D/g, '');
+
+    // Case 1: user pasted multi-digits into a box directly
+    if (cleanVal.length > 1) {
+      handlePastedCode(cleanVal);
+      return;
+    }
+
+    const newDigits = [...digits];
+    newDigits[index] = cleanVal;
+    setDigits(newDigits);
     setError(null);
 
-    // Auto-submit when 6 digits are typed
-    if (val.length === 6) {
-      performVerification(val);
+    // Auto-advance to next box if character entered
+    if (cleanVal && index < 5) {
+      inputsRef.current[index + 1]?.focus();
     }
   };
 
-  const performVerification = async (codeToVerify) => {
-    const code = codeToVerify || otp;
+  // Handle backspace and arrow navigation
+  const handleKeyDown = (index, e) => {
+    if (e.key === 'Backspace') {
+      if (!digits[index] && index > 0) {
+        // Current box is empty, move back and clear previous
+        const newDigits = [...digits];
+        newDigits[index - 1] = '';
+        setDigits(newDigits);
+        inputsRef.current[index - 1]?.focus();
+      } else {
+        // Clear current box
+        const newDigits = [...digits];
+        newDigits[index] = '';
+        setDigits(newDigits);
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      inputsRef.current[index - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      inputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  // Handle clipboard paste of 6 digits
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text');
+    handlePastedCode(pasteData);
+  };
+
+  const handlePastedCode = (pasteString) => {
+    const numericOnly = pasteString.replace(/\D/g, '').slice(0, 6);
+    if (!numericOnly) return;
+
+    const newDigits = ['', '', '', '', '', ''];
+    for (let i = 0; i < numericOnly.length; i++) {
+      newDigits[i] = numericOnly[i];
+    }
+    setDigits(newDigits);
+    setError(null);
+
+    // Focus appropriate box
+    const focusIndex = Math.min(numericOnly.length, 5);
+    inputsRef.current[focusIndex]?.focus();
+  };
+
+  const handleVerify = async (e) => {
+    if (e) e.preventDefault();
+    const code = digits.join('').trim();
+
     if (code.length !== 6) {
-      setError('Please enter the complete 6-digit OTP code.');
+      setError('Please enter all 6 digits of the verification code.');
+      return;
+    }
+
+    if (expirySeconds <= 0) {
+      setError('Verification code has expired. Please click "Resend Code".');
       return;
     }
 
@@ -105,24 +189,20 @@ export default function VerifyOtp() {
 
       if (res && (res.success || res.verified)) {
         setVerifiedSuccess(true);
-        showToast(emailParam ? 'Email verified successfully! Welcome to BloodBridge.' : 'Identity verified successfully!');
+        showToast('Email verified successfully! Welcome to BloodBridge.');
       } else {
         setError(res?.error || 'Verification failed. Please check the code.');
       }
     } catch (err) {
-      setError(err.message || 'Incorrect verification code. Please try again.');
+      const msg = err.response?.data?.error || err.message || 'Incorrect verification code. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    performVerification(otp);
-  };
-
   const handleResend = async () => {
-    if (!canResend) return;
+    if (!canResend || loading) return;
 
     setLoading(true);
     setError(null);
@@ -136,14 +216,18 @@ export default function VerifyOtp() {
       }
 
       if (res && res.success) {
-        setCountdown(60);
+        if (res.challenge_id) setChallengeId(res.challenge_id);
+        setDigits(['', '', '', '', '', '']);
+        setExpirySeconds(300);
+        setCooldown(60);
         setCanResend(false);
-        showToast(emailParam ? 'New 6-digit verification code sent to your email.' : 'New verification code dispatched via SMS.');
+        showToast('A new 6-digit verification code has been sent to your email.');
+        inputsRef.current[0]?.focus();
       } else {
         setError(res?.error || 'Could not resend verification code. Please wait a moment.');
       }
     } catch (err) {
-      setError(err.message || 'Resend failed. Please try again.');
+      setError(err.message || 'Failed to resend code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -185,11 +269,11 @@ export default function VerifyOtp() {
           </Link>
 
           <Link
-            to="/"
+            to="/signup"
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-[#D71935] px-4 py-2 rounded-full border border-slate-200 hover:border-slate-300 bg-white transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Return to Home</span>
+            <span>Back to Signup</span>
           </Link>
         </div>
       </header>
@@ -199,31 +283,35 @@ export default function VerifyOtp() {
         <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-9 border border-slate-200/90 shadow-xl shadow-slate-200/40 space-y-6">
           {/* Card Header */}
           <div className="text-center space-y-2">
-            <div className="text-[11px] font-black uppercase tracking-widest text-[#D71935]">
-              {emailParam ? 'EMAIL VERIFICATION (BREVO)' : 'SMS TWO-FACTOR VERIFICATION'}
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 text-[#D71935] mb-2 shadow-sm">
+              <Mail className="w-6 h-6" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
-              Enter Verification Code
+              Verify Your Email
             </h1>
-            <p className="text-xs text-slate-500">
-              {emailParam
-                ? 'Securing your BloodBridge registry account with real-time email verification.'
-                : 'Protecting the healthcare donor registry with real-time SMS authentication.'}
+            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              We've sent a 6-digit verification code to your registered email address.
             </p>
           </div>
 
           {/* Masked Recipient Display Card */}
-          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex items-center gap-3 text-xs text-slate-700">
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-[#D71935] flex items-center justify-center flex-shrink-0">
-              {emailParam ? <Mail className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
-            </div>
-            <div>
-              <span className="text-slate-500">
-                {emailParam ? 'Code sent via Brevo to:' : 'Code sent via SMS to:'}
-              </span>{' '}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between text-xs text-slate-700">
+            <div className="flex items-center gap-2.5">
+              <span className="text-slate-500">Sent to:</span>
               <strong className="text-slate-900 font-mono text-sm tracking-wide">
-                {emailParam ? getMaskedEmail(emailParam) : getMaskedPhone(phoneParam)}
+                {emailParam ? getMaskedEmail(emailParam) : 'your email'}
               </strong>
+            </div>
+            {/* 5-minute Expiration Countdown */}
+            <div className={`flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-lg ${
+              expirySeconds > 60
+                ? 'bg-slate-100 text-slate-600'
+                : expirySeconds > 0
+                ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                : 'bg-rose-50 text-rose-600 border border-rose-200'
+            }`}>
+              <Clock className="w-3.5 h-3.5" />
+              <span>{expirySeconds > 0 ? formatTime(expirySeconds) : 'Expired'}</span>
             </div>
           </div>
 
@@ -231,7 +319,15 @@ export default function VerifyOtp() {
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span className="leading-snug">{error}</span>
+              <span className="leading-snug flex-1">{error}</span>
+            </div>
+          )}
+
+          {/* Expiry Warning */}
+          {expirySeconds === 0 && !error && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-700 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span className="leading-snug">Verification code has expired. Please click "Resend Code" below to receive a new one.</span>
             </div>
           )}
 
@@ -243,10 +339,10 @@ export default function VerifyOtp() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-900">
-                  {emailParam ? 'Email Verified Successfully!' : 'Phone Verified Successfully'}
+                  Email Verified Successfully!
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Your BloodBridge account is activated and your healthcare credentials have been registered.
+                  Your BloodBridge account is activated and your registration is complete.
                 </p>
               </div>
 
@@ -260,38 +356,44 @@ export default function VerifyOtp() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Six-digit OTP input */}
+            <form onSubmit={handleVerify} className="space-y-5">
+              {/* Six Separate Numeric Input Boxes */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-700 text-center">
-                  Six-digit Verification Code
+                  Enter 6-Digit Verification Code
                 </label>
-                <div className="flex justify-center">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    required
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    value={otp}
-                    onChange={handleOtpChange}
-                    placeholder="••••••"
-                    className="w-48 py-3 text-center font-mono font-black text-2xl tracking-[0.45em] bg-slate-50 border border-slate-300 rounded-2xl focus:ring-4 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all shadow-inner"
-                  />
+                <div
+                  className="flex justify-center items-center gap-2 sm:gap-3"
+                  onPaste={handlePaste}
+                >
+                  {digits.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => (inputsRef.current[index] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleDigitChange(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(index, e)}
+                      autoComplete="off"
+                      className="w-11 h-13 sm:w-12 sm:h-14 text-center font-mono font-black text-xl sm:text-2xl bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl focus:ring-4 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all shadow-inner select-none"
+                    />
+                  ))}
                 </div>
-                <p className="text-[11px] text-center text-slate-400">
-                  Check your inbox and spam folder. Code expires in 5 minutes.
+                <p className="text-[11px] text-center text-slate-400 pt-1">
+                  Check your inbox and spam folder.
                 </p>
               </div>
 
-              {/* Verify Button */}
+              {/* Verify Email Button */}
               <button
                 type="submit"
-                disabled={loading || otp.length !== 6}
-                className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                disabled={loading || digits.join('').length !== 6 || expirySeconds === 0}
+                className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                <span>{loading ? 'Verifying Code...' : 'Verify & Complete Registration'}</span>
+                <span>{loading ? 'Verifying...' : 'Verify Email'}</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
 
@@ -302,7 +404,7 @@ export default function VerifyOtp() {
                   type="button"
                   onClick={handleResend}
                   disabled={!canResend || loading}
-                  className={`font-bold transition-colors flex items-center gap-1 ${
+                  className={`font-bold transition-colors flex items-center gap-1.5 ${
                     canResend
                       ? 'text-[#D71935] hover:underline cursor-pointer'
                       : 'text-slate-400 cursor-not-allowed'
@@ -310,9 +412,19 @@ export default function VerifyOtp() {
                 >
                   <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                   <span>
-                    {canResend ? 'Resend Code' : `Resend in ${countdown}s`}
+                    {canResend ? 'Resend Code' : `Resend in ${cooldown}s`}
                   </span>
                 </button>
+              </div>
+
+              {/* Back to Signup Link */}
+              <div className="text-center pt-1">
+                <Link
+                  to="/signup"
+                  className="text-xs text-slate-500 hover:text-[#D71935] font-semibold transition-colors"
+                >
+                  ← Back to Signup
+                </Link>
               </div>
             </form>
           )}

@@ -47,7 +47,12 @@ export default function Signup() {
   const sanitizeError = (err, fallback = 'Registration failed. Please check your details.') => {
     if (!err) return fallback;
     if (typeof err === 'string' && err !== '[object Object]') return err;
-    if (err.message && typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
+    if (err.message && typeof err.message === 'string' && err.message !== '[object Object]') {
+      if (err.message.includes('An error occurred with this application') || err.message.includes('502') || err.message.includes('504')) {
+        return 'Unable to reach backend service. Please check your network connection and retry.';
+      }
+      return err.message;
+    }
     if (typeof err.error === 'string' && err.error !== '[object Object]') return err.error;
     if (err.data?.error) {
       if (typeof err.data.error === 'string' && err.data.error !== '[object Object]') return err.data.error;
@@ -265,7 +270,7 @@ export default function Signup() {
             {/* Mobile Number with +91 Country Badge */}
             <div className="space-y-1">
               <label className="block text-xs font-bold text-slate-700">
-                Indian Mobile Number (for 2FA SMS Verification)
+                Mobile Number
               </label>
               <div className="relative flex items-center">
                 <div className="h-10 pl-3 pr-2.5 bg-slate-100 border border-r-0 border-slate-300 rounded-l-xl flex items-center gap-1.5 text-xs font-bold text-slate-700 select-none">
@@ -283,13 +288,15 @@ export default function Signup() {
                 />
               </div>
               <p className="text-[10px] text-slate-400">
-                A 6-digit verification code will be sent to this Indian mobile number.
+                10-digit mobile number for emergency notifications and coordination.
               </p>
             </div>
 
             {/* Email Address */}
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Email Address</label>
+              <label className="block text-xs font-bold text-slate-700">
+                Email Address <span className="text-[10px] font-normal text-slate-400">(Verification code will be sent here)</span>
+              </label>
               <div className="relative">
                 <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400">
                   <Mail className="w-4 h-4" />
@@ -365,7 +372,7 @@ export default function Signup() {
                 disabled={loading}
                 className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
-                <span>{loading ? 'Sending Verification Code...' : 'Complete Registration & Send Email OTP'}</span>
+                <span>{loading ? 'Sending Verification Code...' : 'Create Account & Send Verification Code'}</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
             </div>

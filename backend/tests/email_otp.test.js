@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const http = require('http');
 const app = require('../src/app');
 const { localStore, getPool, isPostgresConnected } = require('../src/db/db');
-const { generateOtpEmailHtml, maskEmail } = require('../src/services/emailService');
+const { generateOtpEmailHtml, maskEmail, getLastDispatchedOtp } = require('../src/services/emailService');
 
 function testRequest(method, path, body = null, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -102,11 +102,16 @@ test('Email OTP: Complete Registration Workflow (Initiate -> Verify -> Login)', 
   assert.strictEqual(badOtpRes.body.success, false);
   assert.ok(badOtpRes.body.error.includes('Incorrect verification code'));
 
-  // 3. Verify evaluation / test code '123456' succeeds in test environment
+  // 3. Verify with the actual cryptographically generated OTP (strict verification, zero bypass)
+  const dispatched = getLastDispatchedOtp();
+  assert.ok(dispatched && dispatched.otp, 'Dispatched OTP must be captured for test verification');
+  assert.strictEqual(dispatched.toEmail, uniqueEmail);
+  const validOtp = dispatched.otp;
+
   const verifyRes = await testRequest('POST', '/api/auth/verify-email-otp', {
     challenge_id: challengeId,
     email: uniqueEmail,
-    otp: '123456'
+    otp: validOtp
   });
 
   assert.strictEqual(verifyRes.status, 201);
@@ -119,7 +124,7 @@ test('Email OTP: Complete Registration Workflow (Initiate -> Verify -> Login)', 
   const reuseRes = await testRequest('POST', '/api/auth/verify-email-otp', {
     challenge_id: challengeId,
     email: uniqueEmail,
-    otp: '123456'
+    otp: validOtp
   });
   assert.strictEqual(reuseRes.status, 400);
   assert.ok(reuseRes.body.error.includes('expired') || reuseRes.body.error.includes('Invalid'));

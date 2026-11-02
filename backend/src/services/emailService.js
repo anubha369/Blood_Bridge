@@ -181,12 +181,15 @@ function maskEmail(email) {
   return `${maskedName}@${domain}`;
 }
 
+let _lastDispatchedOtpForTest = null;
+
 /**
  * Sends a transactional OTP email using Brevo (REST API or SMTP).
  * Falls back to simulation logging in development if Brevo credentials are not yet live.
  */
 async function sendOtpEmail({ toEmail, toName, otp, expiresInMinutes = 5 }) {
   const cleanEmail = String(toEmail).trim().toLowerCase();
+  _lastDispatchedOtpForTest = { toEmail: cleanEmail, otp: String(otp).trim() };
   const masked = maskEmail(cleanEmail);
   const subject = 'Verify Your BloodBridge Account';
   const htmlContent = generateOtpEmailHtml({ toName, otp, expiresInMinutes });
@@ -238,9 +241,10 @@ async function sendOtpEmail({ toEmail, toName, otp, expiresInMinutes = 5 }) {
           user: smtpUser,
           pass: config.brevoApiKey
         },
-        connectionTimeout: 8000,
-        greetingTimeout: 5000,
-        socketTimeout: 8000
+        family: 4,
+        connectionTimeout: 15000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000
       });
 
       const info = await transporter.sendMail({
@@ -271,5 +275,6 @@ async function sendOtpEmail({ toEmail, toName, otp, expiresInMinutes = 5 }) {
 module.exports = {
   sendOtpEmail,
   generateOtpEmailHtml,
-  maskEmail
+  maskEmail,
+  getLastDispatchedOtp: () => _lastDispatchedOtpForTest
 };
