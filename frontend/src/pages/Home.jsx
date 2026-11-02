@@ -154,17 +154,8 @@ export default function Home({ onOpenAI }) {
             </button>
           </nav>
 
-          {/* Right Action: Clean Header Action without duplicate Login button */}
-          <div className="hidden sm:flex items-center gap-3.5">
-            <button
-              type="button"
-              onClick={onOpenAI}
-              className="inline-flex items-center gap-2 px-4 py-2 text-[15px] font-bold text-[#881337] bg-rose-50 hover:bg-rose-100/80 border border-rose-200/80 rounded-xl transition-all shadow-sm"
-            >
-              <Sparkles className="w-4 h-4 text-rose-500" />
-              <span>Clinical AI</span>
-            </button>
-          </div>
+          {/* Right Area: Clean Header without duplicate action buttons */}
+          <div className="hidden sm:flex items-center gap-3.5" />
 
           {/* Mobile hamburger menu toggle */}
           <div className="flex sm:hidden items-center gap-2">
@@ -238,17 +229,17 @@ export default function Home({ onOpenAI }) {
       </header>
 
       {/* ======================================================================
-          SECTION A: HERO (Editorial Photograph + Emergency Actions + Quick Search)
+          SECTION A: HERO (Balanced Two-Column: 46% Expanded Text, 54% Dominant Right Artwork)
           ====================================================================== */}
-      <section className="relative pt-8 sm:pt-12 lg:pt-16 pb-16 sm:pb-20 overflow-hidden" aria-labelledby="heroHeadline">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-center">
+      <section className="relative pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 overflow-hidden" aria-labelledby="heroHeadline">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-10 lg:gap-8 xl:gap-14">
             
-            {/* Left Column: Exact Content Hierarchy & Single Clearly Visible Login */}
-            <div className="lg:col-span-5 space-y-6 sm:space-y-7 text-left">
+            {/* Left Column: Expanded Text Area (approx 46-48% width) */}
+            <div className="w-full lg:w-[48%] xl:w-[46%] flex flex-col justify-center space-y-6 sm:space-y-7 xl:space-y-8 text-left">
               
               {/* Trust-oriented Eyebrow Badge */}
-              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#881337]">
+              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#881337] self-start">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#D71935] animate-pulse" aria-hidden="true"></span>
                 <span className="text-[13px] sm:text-[14px] font-extrabold tracking-wider uppercase">
                   Emergency Blood Coordination
@@ -259,18 +250,18 @@ export default function Home({ onOpenAI }) {
               <div>
                 <h1
                   id="heroHeadline"
-                  className="text-5xl sm:text-6xl lg:text-[68px] xl:text-[72px] font-black tracking-tight leading-[1.02] text-[#0F172A]"
+                  className="text-5xl sm:text-6xl lg:text-[70px] xl:text-[76px] font-black tracking-tight leading-[1.0] text-[#0F172A]"
                 >
                   Blood<span className="text-[#D71935]">Bridge</span>
                 </h1>
               </div>
 
               {/* 2. Main Hero Heading */}
-              <div className="space-y-1">
-                <h2 className="text-2xl sm:text-3xl lg:text-[34px] xl:text-[38px] font-extrabold text-slate-800 tracking-tight leading-snug">
+              <div className="space-y-1.5">
+                <h2 className="text-3xl sm:text-4xl lg:text-[38px] xl:text-[42px] font-extrabold text-slate-800 tracking-tight leading-[1.18]">
                   Bridging the Gap Between
                 </h2>
-                <div className="text-2xl sm:text-3xl lg:text-[34px] xl:text-[38px] font-extrabold tracking-tight">
+                <div className="text-3xl sm:text-4xl lg:text-[38px] xl:text-[42px] font-extrabold tracking-tight leading-[1.18]">
                   <span className="text-[#0F172A]">Need</span>{' '}
                   <span className="text-slate-400 font-normal">and</span>{' '}
                   <span className="text-[#D71935]">Hope</span>
@@ -278,7 +269,7 @@ export default function Home({ onOpenAI }) {
               </div>
 
               {/* 3. Supporting Description */}
-              <p className="text-[18px] sm:text-[19px] text-slate-600 leading-relaxed font-normal max-w-xl">
+              <p className="text-[19px] sm:text-[20px] lg:text-[20.5px] text-slate-600 leading-relaxed font-normal">
                 A platform that connects blood donors with those in need, helping save lives, one drop at a time.
               </p>
 
@@ -287,7 +278,7 @@ export default function Home({ onOpenAI }) {
                 <Link
                   to="/login"
                   id="heroLoginBtn"
-                  className="inline-flex items-center justify-center gap-3 px-9 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/30 transition-all group"
+                  className="inline-flex items-center justify-center gap-3 px-10 py-4 text-[18px] sm:text-[19px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/35 transition-all group"
                 >
                   <Lock className="w-5 h-5 text-white" />
                   <span>Log In</span>
@@ -295,49 +286,29 @@ export default function Home({ onOpenAI }) {
                 </Link>
               </div>
 
-              {/* Quick Actions Bar: Search Nearby Donors & Smart AI Assistant */}
-              <div className="flex flex-wrap items-center gap-5 pt-1 text-[16px]">
-                <Link
-                  to="/donors/nearby"
-                  className="inline-flex items-center gap-1.5 font-bold text-[#D71935] hover:underline"
-                >
-                  <Search className="w-4 h-4" />
-                  <span>Search Nearby Donors Directly</span>
-                </Link>
-                <span className="text-slate-300">•</span>
-                <button
-                  type="button"
-                  onClick={onOpenAI}
-                  className="inline-flex items-center gap-1.5 font-bold text-slate-700 hover:text-[#D71935] transition-colors"
-                >
-                  <Sparkles className="w-4 h-4 text-rose-500" />
-                  <span>Ask Clinical AI Assistant</span>
-                </button>
-              </div>
-
-              {/* Trust Indicators (14–15px) */}
-              <div className="pt-4 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[14px] sm:text-[15px] text-slate-600 font-semibold">
-                <div className="flex items-center gap-1.5">
+              {/* Trust Indicators */}
+              <div className="pt-6 border-t border-slate-200/90 grid grid-cols-2 sm:grid-cols-4 gap-4 text-[14px] sm:text-[15px] text-slate-600 font-semibold">
+                <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>Verified Donors</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>Privacy-First</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>NBTC Guidelines</span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>100% Unpaid</span>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Dominant Naturally Blended Hero Emblem (50–55% desktop width) */}
-            <div className="lg:col-span-7 relative w-full flex flex-col items-center justify-center lg:pl-2">
+            {/* Right Column: Dominant Naturally Blended Hero Emblem (approx 52-54% width, shifted to right) */}
+            <div className="w-full lg:w-[52%] xl:w-[54%] relative flex flex-col items-center lg:items-end justify-center">
               {/* Soft ambient lighting glow matching #FAF9F6 background */}
               <div
                 className="absolute inset-0 bg-gradient-to-tr from-rose-200/40 via-red-100/25 to-transparent rounded-full blur-3xl pointer-events-none -z-10"
@@ -345,7 +316,7 @@ export default function Home({ onOpenAI }) {
               />
 
               {/* Soft-Edge Blended Emblem Container — Dominant Visual Element */}
-              <div className="relative w-full max-w-[680px] xl:max-w-[740px] flex flex-col items-center justify-center p-2 sm:p-4">
+              <div className="relative w-full max-w-[660px] xl:max-w-[720px] flex flex-col items-center lg:items-end justify-center p-2 sm:p-4">
                 <div
                   className="relative w-full aspect-[16/9] flex items-center justify-center transition-transform duration-700 hover:scale-[1.015]"
                   style={{
@@ -367,7 +338,7 @@ export default function Home({ onOpenAI }) {
                 </div>
 
                 {/* Floating Tasteful Trust Pill */}
-                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/70 shadow-sm text-slate-700 mt-3">
+                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/70 shadow-sm text-slate-700 mt-3 self-center lg:self-end">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
                   <span className="text-[14px] sm:text-[15px] font-bold text-[#0F172A]">
                     Clinical Coordination Active
