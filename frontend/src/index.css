@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 html {
-  font-size: 17px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -31,9 +30,6 @@ input, select, textarea {
 }
 
 @media (min-width: 768px) {
-  html {
-    font-size: 18px;
-  }
   label {
     font-size: 18px;
   }

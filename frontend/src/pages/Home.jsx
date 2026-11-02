@@ -94,53 +94,53 @@ export default function Home({ onOpenAI }) {
           1. MINIMAL, ELEGANT NAVIGATION BAR
           ====================================================================== */}
       <header className="w-full bg-[#FAF9F6]/95 backdrop-blur-md border-b border-slate-200/90 z-30 sticky top-0" role="banner">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 lg:h-[72px] flex items-center justify-between">
           
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-3 group" aria-label="BloodBridge Platform Home">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/20 group-hover:scale-105 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/20 group-hover:scale-105 transition-transform duration-300">
               <Heart className="w-5 h-5 fill-white" />
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-[26px] font-black tracking-tight text-[#0F172A]">
+              <span className="text-[23px] sm:text-[25px] font-black tracking-tight text-[#0F172A]">
                 Blood<span className="text-[#D71935]">Bridge</span>
               </span>
             </div>
           </Link>
 
           {/* Center Navigation Links: Home, Blood Banks, How It Works, About, FAQ */}
-          <nav className="hidden md:flex items-center gap-6 lg:gap-8" aria-label="Primary Navigation">
+          <nav className="hidden md:flex items-center gap-5 lg:gap-7" aria-label="Primary Navigation">
             <Link
               to="/"
-              className="text-[18px] xl:text-[19px] font-bold text-[#0F172A] relative py-1 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#D71935]"
+              className="text-[16px] xl:text-[17px] font-bold text-[#0F172A] relative py-1 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#D71935]"
               aria-current="page"
             >
               Home
             </Link>
             <Link
               to="/blood-banks"
-              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-2"
+              className="text-[16px] xl:text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-1.5"
             >
-              <Building2 className="w-5 h-5 text-slate-400" />
+              <Building2 className="w-4.5 h-4.5 text-slate-400" />
               <span>Blood Banks</span>
             </Link>
             <Link
               to="/how-it-works"
-              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+              className="text-[16px] xl:text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               How It Works
             </Link>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-about', e)}
-              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+              className="text-[16px] xl:text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               About
             </button>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-faq', e)}
-              className="text-[18px] xl:text-[19px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+              className="text-[16px] xl:text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               FAQ
             </button>

@@ -65,50 +65,50 @@ export default function Navbar({ onOpenAI }) {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white shadow-lg transition-all">
+    <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white shadow-md transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 lg:h-24 gap-4 xl:gap-6">
+        <div className="flex items-center justify-between h-16 lg:h-[72px] gap-3 xl:gap-5">
           
-          {/* 1. Left: Brand Identity (24–28px Brand Name) */}
-          <Link to="/" className="flex items-center gap-3.5 group flex-shrink-0" aria-label="BloodBridge Home">
-            <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-2xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-lg shadow-rose-950/60 group-hover:scale-105 transition-transform duration-300">
-              <Heart className="w-6 h-6 fill-white" />
+          {/* 1. Left: Brand Identity */}
+          <Link to="/" className="flex items-center gap-3 group flex-shrink-0" aria-label="BloodBridge Home">
+            <div className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/50 group-hover:scale-105 transition-transform duration-300">
+              <Heart className="w-5 h-5 fill-white" />
             </div>
             <div className="flex flex-col justify-center">
-              <span className="text-[24px] sm:text-[26px] lg:text-[28px] font-black tracking-tight text-white leading-none">
+              <span className="text-[22px] sm:text-[23px] lg:text-[24px] font-black tracking-tight text-white leading-none">
                 Blood<span className="text-[#D71935]">Bridge</span>
               </span>
-              <p className="text-[12px] sm:text-[13px] text-slate-400 font-semibold tracking-wide mt-1 hidden sm:block leading-none">
+              <p className="text-[11px] text-slate-400 font-semibold tracking-wide mt-1 hidden sm:block leading-none">
                 Emergency Blood Coordination
               </p>
             </div>
           </Link>
 
-          {/* 2. Center: Evenly Spaced & Visually Balanced Navigation Links (18–20px) */}
+          {/* 2. Center: Clean & Evenly Aligned Navigation Links */}
           <nav
-            className="hidden lg:flex items-center justify-center gap-2 xl:gap-3 flex-1 mx-2 xl:mx-4"
+            className="hidden lg:flex items-center gap-1 xl:gap-2"
             aria-label="Main Navigation"
           >
             {/* Regional Blood Banks Directory */}
             <Link
               to="/blood-banks"
-              className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap ${
+              className={`h-10 px-3 xl:px-3.5 text-[15px] xl:text-[16px] font-semibold rounded-lg transition-all inline-flex items-center gap-1.5 whitespace-nowrap ${
                 isActive('/blood-banks')
                   ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
                   : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              <Building2 className="w-5 h-5 text-slate-400" />
+              <Building2 className="w-4 h-4 text-slate-400" />
               <span>Blood Banks</span>
             </Link>
 
             {/* How It Works */}
             <Link
               to="/how-it-works"
-              className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center justify-center whitespace-nowrap ${
+              className={`h-10 px-3 xl:px-3.5 text-[15px] xl:text-[16px] font-semibold rounded-lg transition-all inline-flex items-center justify-center whitespace-nowrap ${
                 isActive('/how-it-works')
                   ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
-                  : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
+                : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
               <span>How It Works</span>
@@ -118,13 +118,13 @@ export default function Navbar({ onOpenAI }) {
             {isAuthenticated && (
               <Link
                 to="/requests/create"
-                className={`h-11 lg:h-12 px-5 text-[18px] xl:text-[19px] font-extrabold rounded-xl transition-all inline-flex items-center gap-2.5 whitespace-nowrap ${
+                className={`h-10 px-3.5 xl:px-4 text-[15px] xl:text-[16px] font-bold rounded-lg transition-all inline-flex items-center gap-2 whitespace-nowrap ${
                   isActive('/requests/create')
                     ? 'bg-gradient-to-r from-rose-600 to-[#D71935] text-white shadow-md shadow-rose-950/60 border border-rose-500'
                     : 'bg-rose-500/20 text-rose-300 hover:bg-gradient-to-r hover:from-rose-600 hover:to-[#D71935] hover:text-white border border-rose-500/40 shadow-sm'
                 }`}
               >
-                <PlusCircle className="w-5 h-5 flex-shrink-0" />
+                <PlusCircle className="w-4 h-4 flex-shrink-0" />
                 <span>Create Request</span>
               </Link>
             )}
@@ -133,7 +133,7 @@ export default function Navbar({ onOpenAI }) {
             {isAuthenticated && (isRequester || isAdmin) && (
               <Link
                 to="/requester/dashboard"
-                className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center justify-center whitespace-nowrap ${
+                className={`h-10 px-3 xl:px-3.5 text-[15px] xl:text-[16px] font-semibold rounded-lg transition-all inline-flex items-center justify-center whitespace-nowrap ${
                   isActive('/requester/dashboard')
                     ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
                     : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
@@ -147,7 +147,7 @@ export default function Navbar({ onOpenAI }) {
             {isAuthenticated && (isDonor || isAdmin) && (
               <Link
                 to="/donor/dashboard"
-                className={`h-11 lg:h-12 px-4 xl:px-5 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center justify-center whitespace-nowrap ${
+                className={`h-10 px-3 xl:px-3.5 text-[15px] xl:text-[16px] font-semibold rounded-lg transition-all inline-flex items-center justify-center whitespace-nowrap ${
                   isActive('/donor/dashboard')
                     ? 'bg-slate-800 text-rose-400 border border-slate-700 shadow-sm'
                     : 'text-slate-200 hover:text-white hover:bg-slate-900 border border-transparent'
@@ -162,37 +162,37 @@ export default function Navbar({ onOpenAI }) {
               <>
                 <Link
                   to="/admin/dashboard"
-                  className={`h-11 lg:h-12 px-4 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap ${
+                  className={`h-10 px-3 text-[15px] xl:text-[16px] font-semibold rounded-lg transition-all inline-flex items-center gap-1.5 whitespace-nowrap ${
                     isActive('/admin/dashboard')
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
                       : 'text-amber-400 hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <Shield className="w-5 h-5" />
+                  <Shield className="w-4 h-4" />
                   <span>Admin</span>
                 </Link>
                 <Link
                   to="/admin/rag"
-                  className={`h-11 lg:h-12 px-4 text-[18px] xl:text-[19px] font-bold rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap ${
+                  className={`h-10 px-3 text-[15px] xl:text-[16px] font-semibold rounded-lg transition-all inline-flex items-center gap-1.5 whitespace-nowrap ${
                     isActive('/admin/rag')
                       ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
                       : 'text-indigo-400 hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <BookOpen className="w-5 h-5" />
+                  <BookOpen className="w-4 h-4" />
                   <span>Knowledge</span>
                 </Link>
               </>
             )}
           </nav>
 
-          {/* 3. Right: User Elements (Points: 17–18px, Profile: 17–18px, Logout: 18–19px) */}
-          <div className="hidden lg:flex items-center gap-3 xl:gap-3.5 flex-shrink-0">
+          {/* 3. Right: User Controls & Identity */}
+          <div className="hidden lg:flex items-center gap-2 xl:gap-2.5 flex-shrink-0">
             {/* AI Assistant Pill */}
             <button
               type="button"
               onClick={onOpenAI}
-              className="h-11 lg:h-12 inline-flex items-center gap-2 px-4 text-[17px] xl:text-[18px] font-bold text-rose-300 bg-rose-950/40 border border-rose-800/40 rounded-xl hover:bg-rose-900/50 hover:text-white transition-all shadow-sm whitespace-nowrap"
+              className="h-10 inline-flex items-center gap-1.5 px-3 text-[14px] xl:text-[15px] font-semibold text-rose-300 bg-rose-950/40 border border-rose-800/40 rounded-lg hover:bg-rose-900/50 hover:text-white transition-all shadow-sm whitespace-nowrap"
               title="Open Clinical AI Assistant"
             >
               <Sparkles className="w-4 h-4 text-rose-400" />
@@ -200,56 +200,56 @@ export default function Navbar({ onOpenAI }) {
             </button>
 
             {isAuthenticated ? (
-              <div className="flex items-center gap-3 xl:gap-3.5 pl-3 border-l border-slate-800">
-                {/* Neatly Framed Points Display for Donors (17–18px) */}
+              <div className="flex items-center gap-2 xl:gap-2.5 pl-2.5 border-l border-slate-800">
+                {/* Neatly Framed Points Display for Donors */}
                 {isDonor && creditPoints !== null && (
                   <Link
                     to="/donor/dashboard"
                     title="Non-monetary volunteer participation points"
-                    className="h-11 lg:h-12 inline-flex items-center gap-2 px-4 text-[17px] xl:text-[18px] font-extrabold text-amber-300 bg-amber-500/15 border border-amber-500/35 rounded-xl hover:bg-amber-500/25 transition-all shadow-sm whitespace-nowrap"
+                    className="h-10 inline-flex items-center gap-1.5 px-3 text-[14px] xl:text-[15px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/35 rounded-lg hover:bg-amber-500/25 transition-all shadow-sm whitespace-nowrap"
                   >
-                    <Award className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                    <Award className="w-4 h-4 text-amber-400 flex-shrink-0" />
                     <span>{creditPoints} Pts</span>
                   </Link>
                 )}
 
-                {/* User Identity Avatar & Role (17–18px Profile Name) */}
-                <div className="h-11 lg:h-12 px-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-3 shadow-sm">
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-black text-rose-300 flex-shrink-0">
+                {/* User Identity Avatar & Role */}
+                <div className="h-10 px-2.5 xl:px-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 shadow-sm">
+                  <div className="w-7 h-7 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-black text-rose-300 flex-shrink-0">
                     {getInitials(user?.name)}
                   </div>
                   <div className="text-left hidden xl:block leading-none">
-                    <div className="text-[17px] xl:text-[18px] font-bold text-white max-w-[130px] truncate">
+                    <div className="text-[14px] xl:text-[15px] font-bold text-white max-w-[120px] truncate">
                       {user?.name || 'User'}
                     </div>
-                    <div className="text-[11px] xl:text-[12px] uppercase font-bold text-rose-400 tracking-wider mt-1">
+                    <div className="text-[10px] uppercase font-bold text-rose-400 tracking-wider mt-0.5">
                       {user?.role || 'Member'}
                     </div>
                   </div>
                 </div>
 
-                {/* Clearly Visible & Accessible Logout Button (18–19px) */}
+                {/* Clearly Visible & Accessible Logout Button */}
                 <button
                   type="button"
                   onClick={handleLogout}
                   title="Sign out of your account"
-                  className="h-11 lg:h-12 inline-flex items-center gap-2.5 px-4.5 xl:px-5 text-[18px] xl:text-[19px] font-bold text-slate-200 hover:text-white bg-slate-900 hover:bg-rose-950/70 border border-slate-800 hover:border-rose-800/60 rounded-xl transition-all shadow-sm group whitespace-nowrap"
+                  className="h-10 inline-flex items-center gap-2 px-3 xl:px-3.5 text-[14px] xl:text-[15px] font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-rose-950/70 border border-slate-800 hover:border-rose-800/60 rounded-lg transition-all shadow-sm group whitespace-nowrap"
                 >
-                  <LogOut className="w-5 h-5 text-rose-400 transition-transform group-hover:-translate-x-0.5" />
+                  <LogOut className="w-4 h-4 text-rose-400 transition-transform group-hover:-translate-x-0.5" />
                   <span>Logout</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="h-11 lg:h-12 px-6 text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md transition-all inline-flex items-center justify-center whitespace-nowrap"
+                  className="h-10 px-4 text-[15px] xl:text-[16px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-lg shadow-sm transition-all inline-flex items-center justify-center whitespace-nowrap"
                 >
                   Log In
                 </Link>
                 <Link
                   to="/signup"
-                  className="h-11 lg:h-12 px-5 text-[18px] font-bold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all inline-flex items-center justify-center whitespace-nowrap"
+                  className="h-10 px-4 text-[15px] xl:text-[16px] font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 transition-all inline-flex items-center justify-center whitespace-nowrap"
                 >
                   Register
                 </Link>
