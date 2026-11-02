@@ -206,6 +206,17 @@ export const BloodBankDirectoryScreen: React.FC<{ navigation: any }> = ({ naviga
             tintColor={THEME.colors.primary}
           />
         }
+        ListFooterComponent={
+          <View style={{ paddingTop: 10, paddingBottom: 20 }}>
+            <Button
+              title="+ Create a Blood Request"
+              variant="primary"
+              size="lg"
+              showArrow
+              onPress={() => navigation.navigate('CreateRequest')}
+            />
+          </View>
+        }
         ListHeaderComponent={
           <View style={styles.listHeader}>
             {/* Title Row */}

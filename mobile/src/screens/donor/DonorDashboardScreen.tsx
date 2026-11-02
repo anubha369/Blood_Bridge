@@ -282,6 +282,18 @@ export const DonorDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
           </TouchableOpacity>
         </View>
 
+        {/* Figma Screen 7 Hero Header */}
+        <View style={styles.figmaHeader}>
+          <View style={styles.figmaEyebrow}>
+            <Ionicons name="heart" size={11} color={THEME.colors.primary} />
+            <Text style={styles.figmaEyebrowText}>VOLUNTEER READINESS</Text>
+          </View>
+          <Text style={styles.figmaTitle}>Your readiness matters</Text>
+          <Text style={styles.figmaSubtitle}>
+            Stay available for urgent blood matching in your city to support emergency patients in need.
+          </Text>
+        </View>
+
         {/* Donor Profile Hero Card */}
         <Card variant="elevated" style={styles.heroCard}>
           <View style={styles.heroRow}>
@@ -682,6 +694,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#B45309'
+  },
+  figmaHeader: {
+    marginBottom: 12
+  },
+  figmaEyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 14,
+    alignSelf: 'flex-start',
+    marginBottom: 6
+  },
+  figmaEyebrowText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: THEME.colors.primary,
+    letterSpacing: 0.6
+  },
+  figmaTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: THEME.colors.navy,
+    letterSpacing: -0.4,
+    marginBottom: 4
+  },
+  figmaSubtitle: {
+    fontSize: 12,
+    color: THEME.colors.slate600,
+    lineHeight: 16
   },
   heroCard: {
     padding: 16,

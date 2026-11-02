@@ -63,6 +63,7 @@ export interface DonorCandidate {
   name: string;
   blood_group: BloodGroup;
   distance_km?: number;
+  distance_band?: string;
   compatibility_rank?: number;
   match_reasons?: string[];
   masked_phone?: string;

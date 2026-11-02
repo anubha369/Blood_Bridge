@@ -26,6 +26,8 @@ import { SelectDonorScreen } from '../screens/requester/SelectDonorScreen';
 import { ConfirmFulfillmentScreen } from '../screens/requester/ConfirmFulfillmentScreen';
 import { BloodBankDirectoryScreen } from '../screens/requester/BloodBankDirectoryScreen';
 import { CreateRequestScreen } from '../screens/requester/CreateRequestScreen';
+import { DonorMatchingReviewScreen } from '../screens/requester/DonorMatchingReviewScreen';
+import { DispatchConfirmationScreen } from '../screens/requester/DispatchConfirmationScreen';
 import { NotificationsScreen } from '../screens/requester/NotificationsScreen';
 
 // Donor Detail Screens
@@ -73,6 +75,8 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="ConfirmFulfillment" component={ConfirmFulfillmentScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="CreateRequest" component={CreateRequestScreen} />
+      <Stack.Screen name="DonorMatchingReview" component={DonorMatchingReviewScreen} />
+      <Stack.Screen name="DispatchConfirmation" component={DispatchConfirmationScreen} />
       <Stack.Screen name="BloodBankDirectory" component={BloodBankDirectoryScreen} />
 
       {/* Donor Detail / Modal Screens */}

@@ -154,6 +154,19 @@ export const CreditWalletScreen: React.FC<{ navigation: any }> = ({ navigation }
           />
         }
       >
+        {/* Figma Screen 8 Hero Header */}
+        <View style={styles.figmaHeaderSection}>
+          <View style={styles.eyebrowBadge}>
+            <Ionicons name="trophy" size={12} color="#D97706" />
+            <Text style={styles.eyebrowText}>LIFE SAVER REWARDS</Text>
+          </View>
+          <Text style={styles.figmaTitle}>Recognition, not payment</Text>
+          <Text style={styles.figmaSubtitle}>
+            Non-monetary appreciation honoring dedicated blood donors across India in accordance
+            with NBTC ethical guidelines.
+          </Text>
+        </View>
+
         {/* Wallet Balance Card */}
         <Card variant="elevated" style={styles.walletCard}>
           <View style={styles.walletTop}>
@@ -292,6 +305,40 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 12
+  },
+  figmaHeaderSection: {
+    marginBottom: 14
+  },
+  eyebrowBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    alignSelf: 'flex-start',
+    marginBottom: 8
+  },
+  eyebrowText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B45309',
+    letterSpacing: 0.6
+  },
+  figmaTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: THEME.colors.navy,
+    letterSpacing: -0.4,
+    marginBottom: 4
+  },
+  figmaSubtitle: {
+    fontSize: 13,
+    color: THEME.colors.slate600,
+    lineHeight: 18
   },
   walletCard: {
     padding: 18,

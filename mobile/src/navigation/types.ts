@@ -31,6 +31,21 @@ export type RootStackParamList = {
   Notifications: undefined;
   BloodBankDirectory: undefined;
   CreateRequest: undefined;
+  DonorMatchingReview: {
+    requestId: string;
+    bloodGroup?: string;
+    unitsNeeded?: number;
+    hospitalName?: string;
+    patientName?: string;
+  };
+  DispatchConfirmation: {
+    requestId: string;
+    patientName?: string;
+    hospitalName?: string;
+    bloodGroup?: string;
+    unitsNeeded?: number;
+    donorsAlertedCount?: number;
+  };
 
   // Donor Modals & Detail screens
   Availability: undefined;

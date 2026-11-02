@@ -206,16 +206,13 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
 
       const res = await api.requests.create(payload);
       if (res.success && res.request) {
-        Alert.alert(
-          'Emergency Blood Request Registered! 🩸',
-          'Your request is live. You can now track compatible donors and dispatch emergency notifications.',
-          [
-            {
-              text: 'View Request Tracking (5 Stages)',
-              onPress: () => navigation.replace('RequestTracking', { requestId: res.request.id })
-            }
-          ]
-        );
+        navigation.navigate('DonorMatchingReview', {
+          requestId: res.request.id,
+          bloodGroup,
+          unitsNeeded: parseInt(unitsNeeded, 10),
+          hospitalName: hospitalName.trim(),
+          patientName: patientName.trim()
+        });
       } else {
         setError(res.error || 'Failed to register blood request.');
       }
@@ -313,10 +310,17 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
         )}
 
         {/* ======================================================================
-            STEP 1: BLOOD & HOSPITAL REQUIREMENT
+            STEP 1: BLOOD & HOSPITAL REQUIREMENT (Figma Step 1)
             ====================================================================== */}
         {currentStep === 1 && (
           <View>
+            <View style={styles.figmaStepHeadingBox}>
+              <Text style={styles.figmaStepTitle}>What blood is needed?</Text>
+              <Text style={styles.figmaStepSubtitle}>
+                Every second counts in an emergency. Specify the required blood group and whole-blood units needed.
+              </Text>
+            </View>
+
             {/* Required Blood Group */}
             <BloodGroupSelector
               label="Select Required Blood Group *"
@@ -459,10 +463,17 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
         )}
 
         {/* ======================================================================
-            STEP 2: PATIENT & CLINICAL DETAILS
+            STEP 2: PATIENT & CLINICAL DETAILS (Figma Step 2)
             ====================================================================== */}
         {currentStep === 2 && (
           <View>
+            <View style={styles.figmaStepHeadingBox}>
+              <Text style={styles.figmaStepTitle}>Patient & clinical details</Text>
+              <Text style={styles.figmaStepSubtitle}>
+                Provide patient and hospital details to guide volunteer donors to the correct bedside and transfusion centre.
+              </Text>
+            </View>
+
             <Card variant="elevated" style={styles.reviewSummaryCard}>
               <View style={styles.reviewRow}>
                 <View style={styles.bloodCircleSmall}>
@@ -626,6 +637,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 14,
     ...THEME.shadows.sm
+  },
+  figmaStepHeadingBox: {
+    marginBottom: 14
+  },
+  figmaStepTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: THEME.colors.navy,
+    letterSpacing: -0.4,
+    marginBottom: 4
+  },
+  figmaStepSubtitle: {
+    fontSize: 12,
+    color: THEME.colors.slate600,
+    lineHeight: 16
   },
   stepItem: {
     flexDirection: 'row',
