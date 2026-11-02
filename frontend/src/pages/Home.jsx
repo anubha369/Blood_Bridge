@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowRight,
@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function Home({ onOpenAI }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('tab-about');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -39,6 +39,20 @@ export default function Home({ onOpenAI }) {
     : user?.role === 'donor'
       ? '/donor/dashboard'
       : '/requester/dashboard';
+
+  // If session is verifying, render a minimal clean container
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center">
+        <div className="w-9 h-9 border-3 border-[#D71935] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // If already authenticated, directly navigate to the appropriate portal dashboard
+  if (isAuthenticated && user) {
+    return <Navigate to={dashboardPath} replace />;
+  }
 
   const openModalWithTab = (tabId, e) => {
     if (e) e.preventDefault();
@@ -140,59 +154,20 @@ export default function Home({ onOpenAI }) {
             </button>
           </nav>
 
-          {/* Right Action: Auth-gated Actions (Login prominent before login, Request Blood only after login) */}
+          {/* Right Action: Clean Header Action without duplicate Login button */}
           <div className="hidden sm:flex items-center gap-3.5">
-            {isAuthenticated ? (
-              <>
-                <Link
-                  to="/requests/create"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-full shadow-md shadow-rose-950/20 hover:shadow-lg hover:shadow-rose-900/30 transition-all group"
-                >
-                  <Activity className="w-4 h-4 text-white" />
-                  <span>Request Blood</span>
-                </Link>
-                <Link
-                  to={dashboardPath}
-                  className="text-[17px] font-bold text-slate-700 hover:text-[#0F172A] px-4 py-2 rounded-xl transition-colors border border-transparent hover:border-slate-300"
-                >
-                  My Dashboard
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="inline-flex items-center justify-center px-6 py-2.5 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-full shadow-md shadow-rose-950/20 hover:shadow-lg hover:shadow-rose-900/30 transition-all"
-                >
-                  Log In
-                </Link>
-                <Link
-                  to="/signup"
-                  className="text-[17px] font-bold text-slate-700 hover:text-[#0F172A] px-4 py-2 rounded-xl transition-colors border border-slate-300 hover:border-slate-400 bg-white"
-                >
-                  Register
-                </Link>
-              </>
-            )}
+            <button
+              type="button"
+              onClick={onOpenAI}
+              className="inline-flex items-center gap-2 px-4 py-2 text-[15px] font-bold text-[#881337] bg-rose-50 hover:bg-rose-100/80 border border-rose-200/80 rounded-xl transition-all shadow-sm"
+            >
+              <Sparkles className="w-4 h-4 text-rose-500" />
+              <span>Clinical AI</span>
+            </button>
           </div>
 
           {/* Mobile hamburger menu toggle */}
           <div className="flex sm:hidden items-center gap-2">
-            {isAuthenticated ? (
-              <Link
-                to="/requests/create"
-                className="px-4 py-2 text-[15px] font-bold text-white bg-[#D71935] rounded-full"
-              >
-                Request
-              </Link>
-            ) : (
-              <Link
-                to="/login"
-                className="px-4 py-2 text-[15px] font-bold text-white bg-[#D71935] rounded-full"
-              >
-                Log In
-              </Link>
-            )}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -249,42 +224,14 @@ export default function Home({ onOpenAI }) {
             >
               FAQ
             </button>
-            <div className="pt-3 border-t border-slate-200 flex flex-col gap-2.5">
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to="/requests/create"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-3 text-[17px] font-bold text-white bg-[#D71935] rounded-xl shadow-md"
-                  >
-                    Request Blood
-                  </Link>
-                  <Link
-                    to={dashboardPath}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-3 text-[17px] font-bold text-slate-800 bg-white border border-slate-300 rounded-xl"
-                  >
-                    Go to Dashboard
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-3 text-[17px] font-bold text-white bg-[#D71935] rounded-xl shadow-md"
-                  >
-                    Log In
-                  </Link>
-                  <Link
-                    to="/signup"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-3 text-[17px] font-bold text-slate-800 bg-white border border-slate-300 rounded-xl"
-                  >
-                    Create Account
-                  </Link>
-                </>
-              )}
+            <div className="pt-3 border-t border-slate-200">
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full block text-center py-3 text-[17px] font-bold text-white bg-[#D71935] rounded-xl shadow-md"
+              >
+                Log In
+              </Link>
             </div>
           </div>
         )}
@@ -324,46 +271,17 @@ export default function Home({ onOpenAI }) {
                 Connecting urgent blood requirements with verified regional blood centres and consenting voluntary donors through a rapid, privacy-conscious workflow.
               </p>
 
-              {/* Emergency / Auth-Gated Action Buttons */}
-              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                {isAuthenticated ? (
-                  <>
-                    <Link
-                      to="/requests/create"
-                      className="inline-flex items-center justify-center gap-3 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/30 transition-all group"
-                    >
-                      <Activity className="w-5 h-5 text-white" />
-                      <span>Request Blood</span>
-                      <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                    </Link>
-
-                    <Link
-                      to="/donor/dashboard"
-                      className="inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl shadow-sm transition-all"
-                    >
-                      <Heart className="w-5 h-5 text-[#D71935]" />
-                      <span>Go to Donor Dashboard</span>
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      to="/login"
-                      className="inline-flex items-center justify-center gap-3 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/30 transition-all group"
-                    >
-                      <Lock className="w-5 h-5 text-white" />
-                      <span>Log In to Continue</span>
-                      <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                    </Link>
-
-                    <Link
-                      to="/signup"
-                      className="inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl shadow-sm transition-all"
-                    >
-                      <span>Create Account</span>
-                    </Link>
-                  </>
-                )}
+              {/* Single, Clearly Visible Login Option */}
+              <div className="pt-2 flex items-center">
+                <Link
+                  to="/login"
+                  id="heroLoginBtn"
+                  className="inline-flex items-center justify-center gap-3 px-9 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/30 transition-all group"
+                >
+                  <Lock className="w-5 h-5 text-white" />
+                  <span>Log In</span>
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
 
               {/* Quick Actions Bar: Search Nearby Donors & Smart AI Assistant */}
@@ -407,41 +325,48 @@ export default function Home({ onOpenAI }) {
               </div>
             </div>
 
-            {/* Right Column: Official BloodBridge Emblem Showcase */}
-            <div className="lg:col-span-5 relative w-full">
-              {/* Subtle ambient decorative background aura */}
+            {/* Right Column: Art-Directed Naturally Blended Hero Emblem */}
+            <div className="lg:col-span-5 relative w-full flex flex-col items-center justify-center">
+              {/* Soft ambient lighting glow matching #FAF9F6 background */}
               <div
-                className="absolute -inset-2 sm:-inset-4 bg-gradient-to-tr from-rose-200/50 via-red-100/40 to-slate-100/50 rounded-[36px] blur-2xl -z-10 opacity-70"
+                className="absolute inset-0 bg-gradient-to-tr from-rose-200/40 via-red-100/25 to-transparent rounded-full blur-3xl pointer-events-none -z-10"
                 aria-hidden="true"
               />
 
-              {/* Main Showcase Architectural Card */}
-              <div className="relative rounded-[32px] overflow-hidden bg-white p-4 sm:p-6 border border-slate-200 shadow-xl shadow-slate-900/5 hover:shadow-2xl hover:shadow-rose-950/10 transition-all duration-500">
-                
-                {/* Framed Image Container with 16:9 Aspect Ratio */}
-                <div className="relative rounded-2xl overflow-hidden aspect-[16/9] bg-white flex items-center justify-center p-2 sm:p-4">
+              {/* Soft-Edge Blended Emblem Container */}
+              <div className="relative w-full max-w-[540px] flex flex-col items-center justify-center p-2 sm:p-4">
+                <div
+                  className="relative w-full aspect-[16/9] flex items-center justify-center transition-transform duration-700 hover:scale-[1.02]"
+                  style={{
+                    maskImage: 'radial-gradient(ellipse 92% 88% at 50% 50%, black 72%, transparent 100%)',
+                    WebkitMaskImage: 'radial-gradient(ellipse 92% 88% at 50% 50%, black 72%, transparent 100%)'
+                  }}
+                >
                   <img
-                    src="/images/bloodbridge-hero-emblem.jpg"
+                    src="/images/bloodbridge-hero-emblem-transparent.png"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/images/bloodbridge-hero-emblem.jpg';
+                    }}
                     alt="BloodBridge official emblem: Donate • Connect • Save Lives"
-                    className="w-full h-full object-contain transform transition-transform duration-700 hover:scale-[1.02]"
+                    className="w-full h-full object-contain filter drop-shadow-sm select-none"
+                    style={{ mixBlendMode: 'multiply' }}
                     loading="eager"
                   />
                 </div>
 
-                {/* Subtle, Tasteful Trust Indicator Footer */}
-                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3 text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
-                    <span className="text-[14px] sm:text-[15px] font-bold text-[#0F172A]">
-                      Clinical Coordination Active
-                    </span>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#881337] bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                {/* Floating Tasteful Trust Pill */}
+                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/70 shadow-sm text-slate-700 mt-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
+                  <span className="text-[14px] sm:text-[15px] font-bold text-[#0F172A]">
+                    Clinical Coordination Active
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#881337]">
                     <Shield className="w-3.5 h-3.5 text-[#D71935]" />
                     <span>NBTC Standards</span>
                   </span>
                 </div>
-
               </div>
             </div>
 
@@ -485,10 +410,10 @@ export default function Home({ onOpenAI }) {
                 </p>
               </div>
               <Link
-                to={isAuthenticated ? "/requests/create" : "/login"}
+                to="/how-it-works"
                 className="pt-2 text-[15px] font-bold text-[#881337] flex items-center gap-1 hover:underline"
               >
-                <span>{isAuthenticated ? 'Start blood request' : 'Log in to coordinate'}</span>
+                <span>Emergency coordination protocol</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
@@ -762,45 +687,15 @@ export default function Home({ onOpenAI }) {
             Whether you are registering as an emergency donor or coordinating blood for a loved one, BloodBridge makes every second count.
           </p>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-            {isAuthenticated ? (
-              <>
-                <Link
-                  to="/requests/create"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-xl shadow-rose-950/40 transition-all group"
-                >
-                  <Activity className="w-5 h-5" />
-                  <span>Request Blood</span>
-                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                </Link>
-
-                <Link
-                  to="/donor/dashboard"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-[#0F172A] bg-white hover:bg-slate-100 rounded-2xl shadow-xl transition-all"
-                >
-                  <Heart className="w-5 h-5 text-[#D71935]" />
-                  <span>Go to Donor Dashboard</span>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-xl shadow-rose-950/40 transition-all group"
-                >
-                  <Lock className="w-5 h-5" />
-                  <span>Log In to Get Started</span>
-                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                </Link>
-
-                <Link
-                  to="/signup"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-[#0F172A] bg-white hover:bg-slate-100 rounded-2xl shadow-xl transition-all"
-                >
-                  <span>Create Free Account</span>
-                </Link>
-              </>
-            )}
+          <div className="pt-4 flex items-center justify-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center gap-2.5 px-9 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-xl shadow-rose-950/40 transition-all group"
+            >
+              <Lock className="w-5 h-5" />
+              <span>Log In to Get Started</span>
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+            </Link>
           </div>
 
         </div>
@@ -842,10 +737,10 @@ export default function Home({ onOpenAI }) {
               <ul className="space-y-2 text-[16px] sm:text-[17px]">
                 <li>
                   <Link
-                    to={isAuthenticated ? "/requests/create" : "/login"}
+                    to="/login"
                     className="hover:text-[#D71935] transition-colors"
                   >
-                    {isAuthenticated ? 'Create Emergency Request' : 'Log In to Request Blood'}
+                    Log In to Coordinate Blood
                   </Link>
                 </li>
                 <li>
@@ -860,20 +755,15 @@ export default function Home({ onOpenAI }) {
                 </li>
                 <li>
                   <Link
-                    to={isAuthenticated ? "/donor/dashboard" : "/signup"}
+                    to="/how-it-works"
                     className="hover:text-[#D71935] transition-colors"
                   >
-                    {isAuthenticated ? 'Donor Dashboard' : 'Register as Blood Donor'}
+                    Clinical Coordination Protocol
                   </Link>
                 </li>
                 <li>
                   <Link to="/blood-donation-info" className="hover:text-[#D71935] transition-colors">
                     Donor Eligibility &amp; NBTC Guidelines
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/how-it-works" className="hover:text-[#D71935] transition-colors">
-                    Clinical Coordination Workflow
                   </Link>
                 </li>
               </ul>

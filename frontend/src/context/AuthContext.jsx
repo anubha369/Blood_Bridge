@@ -4,10 +4,38 @@ import { api } from '../api/client';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Synchronously initialize session from localStorage to eliminate any render flash
+  const [user, setUser] = useState(() => {
+    try {
+      const token = localStorage.getItem('bloodbridge_token');
+      const savedUser = localStorage.getItem('bloodbridge_user');
+      if (token && savedUser) {
+        return JSON.parse(savedUser);
+      }
+    } catch (e) {
+      // Non-blocking fallback
+    }
+    return null;
+  });
 
-  // Load user session on mount
+  // Loading is only true if a token exists and needs verification
+  const [loading, setLoading] = useState(() => {
+    return !!localStorage.getItem('bloodbridge_token') && !localStorage.getItem('bloodbridge_user');
+  });
+
+  // Save/clear user in localStorage helper
+  const updateStoredUser = (userData) => {
+    setUser(userData);
+    if (userData) {
+      try {
+        localStorage.setItem('bloodbridge_user', JSON.stringify(userData));
+      } catch (e) {}
+    } else {
+      localStorage.removeItem('bloodbridge_user');
+    }
+  };
+
+  // Load / verify user session on mount
   useEffect(() => {
     async function loadSession() {
       const token = localStorage.getItem('bloodbridge_token');
@@ -15,14 +43,18 @@ export function AuthProvider({ children }) {
         try {
           const res = await api.auth.getMe();
           if (res.success && res.user) {
-            setUser(res.user);
+            updateStoredUser(res.user);
           } else {
             localStorage.removeItem('bloodbridge_token');
+            updateStoredUser(null);
           }
         } catch (err) {
           console.warn('Session verification notice:', err.message);
           localStorage.removeItem('bloodbridge_token');
+          updateStoredUser(null);
         }
+      } else {
+        updateStoredUser(null);
       }
       setLoading(false);
     }
@@ -48,7 +80,7 @@ export function AuthProvider({ children }) {
     const res = await api.auth.login(payload);
     if (res.success && res.token) {
       localStorage.setItem('bloodbridge_token', res.token);
-      setUser(res.user);
+      updateStoredUser(res.user);
       return res.user;
     }
     throw new Error(extractErrorMessage(res, 'Login failed. Please check credentials.'));
@@ -58,7 +90,7 @@ export function AuthProvider({ children }) {
     const res = await api.auth.signup(payload);
     if (res.success && res.token) {
       localStorage.setItem('bloodbridge_token', res.token);
-      setUser(res.user);
+      updateStoredUser(res.user);
       return res.user;
     }
     throw new Error(extractErrorMessage(res, 'Registration failed. Please check your details.'));
@@ -84,7 +116,7 @@ export function AuthProvider({ children }) {
     const res = await api.auth.verifyEmailOtp({ email, otp, challenge_id: challengeId });
     if (res.success && res.token) {
       localStorage.setItem('bloodbridge_token', res.token);
-      setUser(res.user);
+      updateStoredUser(res.user);
       return res;
     }
     return res;
@@ -96,19 +128,19 @@ export function AuthProvider({ children }) {
 
   const setSessionUser = (userData, token) => {
     if (token) localStorage.setItem('bloodbridge_token', token);
-    setUser(userData);
+    updateStoredUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem('bloodbridge_token');
-    setUser(null);
+    updateStoredUser(null);
   };
 
   const refreshUser = async () => {
     try {
       const res = await api.auth.getMe();
       if (res.success && res.user) {
-        setUser(res.user);
+        updateStoredUser(res.user);
       }
     } catch (err) {
       console.warn('Could not refresh user:', err.message);
