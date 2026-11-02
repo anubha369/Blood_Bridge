@@ -22,7 +22,9 @@ import {
   AlertTriangle,
   Sparkles,
   Lock,
-  ArrowUpRight
+  ArrowUpRight,
+  Search,
+  Filter
 } from 'lucide-react';
 
 export default function Home({ onOpenAI }) {
@@ -32,6 +34,11 @@ export default function Home({ onOpenAI }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [faqOpenIndex, setFaqOpenIndex] = useState(null);
   const navigate = useNavigate();
+
+  // Quick Search Widget State
+  const [quickBloodGroup, setQuickBloodGroup] = useState('B+');
+  const [quickCity, setQuickCity] = useState('Lucknow');
+  const [quickRadius, setQuickRadius] = useState(25);
 
   const dashboardPath = user?.role === 'admin'
     ? '/admin/dashboard'
@@ -48,6 +55,15 @@ export default function Home({ onOpenAI }) {
 
   const toggleFaq = (idx) => {
     setFaqOpenIndex(faqOpenIndex === idx ? null : idx);
+  };
+
+  const handleQuickSearchSubmit = (e) => {
+    e.preventDefault();
+    navigate(`/donors/nearby?city=${encodeURIComponent(quickCity)}&blood_group=${encodeURIComponent(quickBloodGroup)}&radius_km=${quickRadius}`);
+  };
+
+  const handleQuickRequestRedirect = () => {
+    navigate(`/requests/create?city=${encodeURIComponent(quickCity)}&blood_group=${encodeURIComponent(quickBloodGroup)}`);
   };
 
   const faqItems = [
@@ -79,68 +95,83 @@ export default function Home({ onOpenAI }) {
       {/* ======================================================================
           1. MINIMAL, ELEGANT NAVIGATION BAR
           ====================================================================== */}
-      <header className="w-full bg-[#FAF9F6]/90 backdrop-blur-md border-b border-slate-200/80 z-30 sticky top-0" role="banner">
+      <header className="w-full bg-[#FAF9F6]/95 backdrop-blur-md border-b border-slate-200/90 z-30 sticky top-0" role="banner">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-3 group" aria-label="BloodBridge Platform Home">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/20 group-hover:scale-105 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/20 group-hover:scale-105 transition-transform duration-300">
               <Heart className="w-5 h-5 fill-white" />
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black tracking-tight text-[#0F172A]">
+              <span className="text-[26px] font-black tracking-tight text-[#0F172A]">
                 Blood<span className="text-[#D71935]">Bridge</span>
               </span>
             </div>
           </Link>
 
-          {/* Center Navigation Links (Clean & Uncluttered: Home, About, Blood Banks, FAQ) */}
-          <nav className="hidden md:flex items-center gap-8 lg:gap-10" aria-label="Primary Navigation">
+          {/* Center Navigation Links: Home, Find Donors, Blood Banks, How It Works, About, FAQ */}
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8" aria-label="Primary Navigation">
             <Link
               to="/"
-              className="text-sm font-bold text-[#0F172A] relative py-1 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#D71935]"
+              className="text-[17px] font-bold text-[#0F172A] relative py-1 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#D71935]"
               aria-current="page"
             >
               Home
             </Link>
-            <button
-              type="button"
-              onClick={(e) => openModalWithTab('tab-about', e)}
-              className="text-sm font-semibold text-slate-600 hover:text-[#0F172A] transition-colors py-1"
+            <Link
+              to="/donors/nearby"
+              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-1.5"
             >
-              About
-            </button>
+              <Search className="w-4 h-4 text-slate-400 group-hover:text-[#D71935]" />
+              <span>Find Donors</span>
+            </Link>
             <Link
               to="/blood-banks"
-              className="text-sm font-semibold text-slate-600 hover:text-[#0F172A] transition-colors py-1 flex items-center gap-1.5"
+              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1 flex items-center gap-1.5"
             >
+              <Building2 className="w-4 h-4 text-slate-400" />
               <span>Blood Banks</span>
+            </Link>
+            <Link
+              to="/how-it-works"
+              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+            >
+              How It Works
             </Link>
             <button
               type="button"
+              onClick={(e) => openModalWithTab('tab-about', e)}
+              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
+            >
+              About
+            </button>
+            <button
+              type="button"
               onClick={(e) => openModalWithTab('tab-faq', e)}
-              className="text-sm font-semibold text-slate-600 hover:text-[#0F172A] transition-colors py-1"
+              className="text-[17px] font-semibold text-slate-700 hover:text-[#D71935] transition-colors py-1"
             >
               FAQ
             </button>
           </nav>
 
-          {/* Right Action: Single Login & Prominent Request Blood CTA */}
-          <div className="hidden sm:flex items-center gap-4">
-            <Link
-              to={isAuthenticated ? dashboardPath : '/login'}
-              className="text-sm font-bold text-slate-700 hover:text-[#0F172A] px-3 py-2 rounded-xl transition-colors"
-            >
-              {isAuthenticated ? 'My Dashboard' : 'Log In'}
-            </Link>
-
-            {/* Primary Navigation CTA */}
+          {/* Right Action: Prominent Request Blood CTA & Login Option */}
+          <div className="hidden sm:flex items-center gap-3.5">
+            {/* Primary Action Button: Request Blood */}
             <Link
               to="/requests/create"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-[#D71935] hover:bg-[#BE123C] rounded-full shadow-md shadow-rose-950/15 hover:shadow-lg hover:shadow-rose-900/25 transition-all group"
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-full shadow-md shadow-rose-950/20 hover:shadow-lg hover:shadow-rose-900/30 transition-all group"
             >
-              <Activity className="w-3.5 h-3.5 text-white" />
+              <Activity className="w-4 h-4 text-white" />
               <span>Request Blood</span>
+            </Link>
+
+            {/* Auth Action */}
+            <Link
+              to={isAuthenticated ? dashboardPath : '/login'}
+              className="text-[17px] font-bold text-slate-700 hover:text-[#0F172A] px-4 py-2 rounded-xl transition-colors border border-transparent hover:border-slate-300"
+            >
+              {isAuthenticated ? 'My Dashboard' : 'Log In'}
             </Link>
           </div>
 
@@ -148,7 +179,7 @@ export default function Home({ onOpenAI }) {
           <div className="flex sm:hidden items-center gap-2">
             <Link
               to="/requests/create"
-              className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#D71935] rounded-full"
+              className="px-4 py-2 text-[15px] font-bold text-white bg-[#D71935] rounded-full"
             >
               Request
             </Link>
@@ -169,45 +200,59 @@ export default function Home({ onOpenAI }) {
             <Link
               to="/"
               onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-bold text-[#D71935]"
+              className="block py-2 text-[17px] font-bold text-[#D71935]"
             >
               Home
+            </Link>
+            <Link
+              to="/donors/nearby"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-[17px] font-semibold text-slate-700"
+            >
+              Find Donors
+            </Link>
+            <Link
+              to="/blood-banks"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-[17px] font-semibold text-slate-700"
+            >
+              Blood Banks
+            </Link>
+            <Link
+              to="/how-it-works"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-[17px] font-semibold text-slate-700"
+            >
+              How It Works
             </Link>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-about', e)}
-              className="block w-full text-left py-2 text-sm font-semibold text-slate-700"
+              className="block w-full text-left py-2 text-[17px] font-semibold text-slate-700"
             >
-              About
+              About BloodBridge
             </button>
-            <Link
-              to="/blood-banks"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-sm font-semibold text-slate-700"
-            >
-              Blood Banks
-            </Link>
             <button
               type="button"
               onClick={(e) => openModalWithTab('tab-faq', e)}
-              className="block w-full text-left py-2 text-sm font-semibold text-slate-700"
+              className="block w-full text-left py-2 text-[17px] font-semibold text-slate-700"
             >
               FAQ
             </button>
             <div className="pt-3 border-t border-slate-200 flex flex-col gap-2.5">
               <Link
-                to={isAuthenticated ? dashboardPath : '/login'}
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center py-2.5 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl"
-              >
-                {isAuthenticated ? 'Go to Dashboard' : 'Log In'}
-              </Link>
-              <Link
                 to="/requests/create"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center py-2.5 text-xs font-bold text-white bg-[#D71935] rounded-xl shadow-md"
+                className="w-full text-center py-3 text-[17px] font-bold text-white bg-[#D71935] rounded-xl shadow-md"
               >
                 Request Blood
+              </Link>
+              <Link
+                to={isAuthenticated ? dashboardPath : '/login'}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-center py-3 text-[17px] font-bold text-slate-800 bg-white border border-slate-300 rounded-xl"
+              >
+                {isAuthenticated ? 'Go to Dashboard' : 'Log In'}
               </Link>
             </div>
           </div>
@@ -215,89 +260,109 @@ export default function Home({ onOpenAI }) {
       </header>
 
       {/* ======================================================================
-          SECTION A: HERO (Editorial Photograph + Emergency-First UX)
+          SECTION A: HERO (Editorial Photograph + Emergency Actions + Quick Search)
           ====================================================================== */}
-      <section className="relative pt-8 sm:pt-14 lg:pt-20 pb-16 sm:pb-24 overflow-hidden" aria-labelledby="heroHeadline">
+      <section className="relative pt-8 sm:pt-12 lg:pt-16 pb-16 sm:pb-20 overflow-hidden" aria-labelledby="heroHeadline">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             
-            {/* Left Column: Memorable Headline & Clear CTAs */}
-            <div className="lg:col-span-6 space-y-6 sm:space-y-8 text-left">
+            {/* Left Column: Memorable Headline, Prominent Emergency CTAs & Trust Badges */}
+            <div className="lg:col-span-7 space-y-6 sm:space-y-7 text-left">
               
               {/* Trust-oriented Eyebrow Badge */}
-              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-rose-50 border border-rose-200/80 text-[#881337]">
-                <span className="w-2 h-2 rounded-full bg-[#D71935] animate-pulse" aria-hidden="true"></span>
-                <span className="text-[11px] sm:text-xs font-extrabold tracking-wider uppercase">
+              <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-rose-50 border border-rose-200 text-[#881337]">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#D71935] animate-pulse" aria-hidden="true"></span>
+                <span className="text-[14px] sm:text-[15px] font-extrabold tracking-wider uppercase">
                   Emergency Blood Coordination Network
                 </span>
               </div>
 
-              {/* Memorable Headline */}
-              <div className="space-y-2">
+              {/* Memorable Headline (56–68px Desktop, 38–44px Mobile) */}
+              <div className="space-y-1">
                 <h1
                   id="heroHeadline"
-                  className="text-4xl sm:text-5xl lg:text-[62px] font-black text-[#0F172A] tracking-tight leading-[1.08]"
+                  className="text-4xl sm:text-5xl lg:text-[62px] xl:text-[66px] font-black text-[#0F172A] tracking-tight leading-[1.08]"
                 >
                   Every Drop Matters.<br />
                   <span className="text-[#881337]">Every Connection Counts.</span>
                 </h1>
               </div>
 
-              {/* Supporting Copy */}
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed font-normal max-w-xl">
-                Connecting people, donors, and healthcare facilities through a smarter emergency blood coordination network.
+              {/* Supporting Copy (18–19px) */}
+              <p className="text-[18px] sm:text-[19px] text-slate-700 leading-relaxed font-normal max-w-xl">
+                Connecting urgent blood requirements with verified regional blood centres and consenting voluntary donors through a rapid, privacy-conscious workflow.
               </p>
 
-              {/* Emergency-First CTAs (Clearly Differentiated) */}
+              {/* Emergency-First Action Buttons (17–19px font) */}
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 {/* Primary CTA: Request Blood (Rich Crimson) */}
                 <Link
                   to="/requests/create"
-                  className="inline-flex items-center justify-center gap-3 px-8 py-4 text-sm sm:text-base font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/30 transition-all group"
+                  className="inline-flex items-center justify-center gap-3 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-lg shadow-rose-950/20 hover:shadow-xl hover:shadow-rose-900/30 transition-all group"
                 >
                   <Activity className="w-5 h-5 text-white" />
                   <span>Request Blood</span>
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Link>
 
-                {/* Secondary CTA: Become a Donor (Midnight Navy) */}
+                {/* Secondary CTA: Register as a Donor */}
                 <Link
-                  to={isAuthenticated ? '/donor/dashboard' : '/signup?role=donor'}
-                  className="inline-flex items-center justify-center gap-2.5 px-8 py-4 text-sm sm:text-base font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl shadow-sm transition-all"
+                  to={isAuthenticated ? '/donor/dashboard' : '/donor/registration'}
+                  className="inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl shadow-sm transition-all"
                 >
-                  <Heart className="w-4 h-4 text-[#D71935]" />
+                  <Heart className="w-5 h-5 text-[#D71935]" />
                   <span>Become a Donor</span>
                 </Link>
               </div>
 
-              {/* Small Trust Indicators */}
-              <div className="pt-4 border-t border-slate-200/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] text-slate-500 font-semibold">
+              {/* Quick Actions Bar: Search Nearby Donors & Smart AI Assistant */}
+              <div className="flex flex-wrap items-center gap-5 pt-1 text-[16px]">
+                <Link
+                  to="/donors/nearby"
+                  className="inline-flex items-center gap-1.5 font-bold text-[#D71935] hover:underline"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Search Nearby Donors Directly</span>
+                </Link>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={onOpenAI}
+                  className="inline-flex items-center gap-1.5 font-bold text-slate-700 hover:text-[#D71935] transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 text-rose-500" />
+                  <span>Ask Clinical AI Assistant</span>
+                </button>
+              </div>
+
+              {/* Trust Indicators (14–15px) */}
+              <div className="pt-4 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[14px] sm:text-[15px] text-slate-600 font-semibold">
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>Verified Donors</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>Privacy-First</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span>NBTC Guidelines</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                  <span>Zero Fees</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>100% Unpaid</span>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: High-End Editorial Photograph */}
-            <div className="lg:col-span-6 flex justify-center">
-              <div className="w-full max-w-[560px] relative">
-                
-                {/* Architectural Framing Container */}
-                <div className="relative rounded-[32px] overflow-hidden bg-white p-2.5 sm:p-3 border border-slate-200/90 shadow-2xl shadow-slate-900/10">
-                  <div className="relative rounded-[24px] overflow-hidden aspect-[4/3] bg-slate-100">
+            {/* Right Column: Architectural Photography Card & Integrated Immediate Search Widget */}
+            <div className="lg:col-span-5 flex flex-col items-center gap-6">
+              
+              {/* Editorial Clinical Photography */}
+              <div className="w-full relative">
+                <div className="relative rounded-[28px] overflow-hidden bg-white p-2.5 border border-slate-200 shadow-xl">
+                  <div className="relative rounded-[20px] overflow-hidden aspect-[16/10] bg-slate-100">
                     <img
                       src="/images/blood-donation-hero.jpg"
                       onError={(e) => {
@@ -308,34 +373,127 @@ export default function Home({ onOpenAI }) {
                       className="w-full h-full object-cover object-center transform transition-transform duration-700 hover:scale-[1.02]"
                       loading="eager"
                     />
-
-                    {/* Subtle Gradient Scrim at Bottom of Photo */}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
-
-                    {/* Integrated On-Image Status Pill */}
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white text-xs font-semibold px-4 py-2.5 rounded-xl bg-slate-900/70 backdrop-blur-md border border-white/10">
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-[13px] font-semibold px-3.5 py-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-white/10">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                         <span>Clinical Matching Protocol Active</span>
                       </div>
-                      <span className="text-[10px] text-slate-300 font-normal hidden sm:inline">
+                      <span className="text-[12px] text-slate-300 font-normal hidden sm:inline">
                         NBTC Standards
                       </span>
                     </div>
                   </div>
                 </div>
-
-                {/* Subtle Floating Feature Badge (Top-Right) */}
-                <div className="absolute -top-4 -right-4 sm:-top-5 sm:-right-5 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xl hidden sm:flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#D71935] flex items-center justify-center font-bold">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-extrabold text-[#0F172A]">Safe &amp; Altruistic</div>
-                    <div className="text-[10px] text-slate-400 font-medium">100% Unpaid Donation</div>
-                  </div>
-                </div>
               </div>
+
+              {/* Direct Interactive Quick Search / Request Card */}
+              <div className="w-full bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xl space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 text-[#D71935] flex items-center justify-center font-bold">
+                      <Search className="w-4 h-4" />
+                    </div>
+                    <span className="text-[18px] font-extrabold text-[#0F172A]">
+                      Immediate Search &amp; Match
+                    </span>
+                  </div>
+                  <span className="text-[12px] uppercase font-bold tracking-wider text-[#D71935] bg-rose-50 px-2.5 py-0.5 rounded-full">
+                    PostGIS Spatial
+                  </span>
+                </div>
+
+                <form onSubmit={handleQuickSearchSubmit} className="space-y-4">
+                  {/* Blood Group Select */}
+                  <div>
+                    <label className="block text-[15px] font-bold text-slate-700 mb-1.5">
+                      Select Blood Group
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((grp) => (
+                        <button
+                          key={grp}
+                          type="button"
+                          onClick={() => setQuickBloodGroup(grp)}
+                          className={`py-2 text-[15px] font-extrabold rounded-xl border transition-all ${
+                            quickBloodGroup === grp
+                              ? 'bg-[#D71935] border-[#D71935] text-white shadow-sm'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {grp}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* City Selector */}
+                  <div>
+                    <label className="block text-[15px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#D71935]" />
+                      City / District
+                    </label>
+                    <select
+                      value={quickCity}
+                      onChange={(e) => setQuickCity(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-[16px] bg-slate-50 border border-slate-300 rounded-xl font-medium focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935]"
+                    >
+                      <option value="Lucknow">Lucknow (Uttar Pradesh)</option>
+                      <option value="Kanpur">Kanpur (Uttar Pradesh)</option>
+                      <option value="Varanasi">Varanasi (Uttar Pradesh)</option>
+                      <option value="Prayagraj">Prayagraj (Uttar Pradesh)</option>
+                      <option value="Agra">Agra (Uttar Pradesh)</option>
+                      <option value="Ghaziabad">Ghaziabad (Uttar Pradesh)</option>
+                      <option value="Noida">Noida (Uttar Pradesh)</option>
+                      <option value="Bareilly">Bareilly (Uttar Pradesh)</option>
+                      <option value="Gorakhpur">Gorakhpur (Uttar Pradesh)</option>
+                      <option value="Jaipur">Jaipur (Rajasthan)</option>
+                      <option value="Delhi">Delhi (NCR)</option>
+                    </select>
+                  </div>
+
+                  {/* Radius Slider */}
+                  <div>
+                    <div className="flex justify-between text-[14px] font-bold text-slate-700 mb-1">
+                      <span>Search Radius</span>
+                      <span className="text-[#D71935] font-mono">{quickRadius} km</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="60"
+                      step="5"
+                      value={quickRadius}
+                      onChange={(e) => setQuickRadius(parseInt(e.target.value, 10))}
+                      className="w-full accent-[#D71935] cursor-pointer h-2 bg-slate-200 rounded-lg"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 text-[16px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Search className="w-4 h-4" />
+                      <span>Search Donors</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickRequestRedirect}
+                      className="w-full py-3 px-4 text-[16px] font-bold text-[#0F172A] bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Activity className="w-4 h-4 text-[#D71935]" />
+                      <span>Request Blood</span>
+                    </button>
+                  </div>
+                </form>
+
+                <p className="text-[13px] text-slate-500 text-center pt-1">
+                  Geo-privacy active: exact residential GPS coordinates are never revealed.
+                </p>
+              </div>
+
             </div>
 
           </div>
@@ -343,20 +501,20 @@ export default function Home({ onOpenAI }) {
       </section>
 
       {/* ======================================================================
-          SECTION B: HOW BLOODBRIDGE WORKS (Horizontal Process Layout)
+          SECTION B: HOW BLOODBRIDGE WORKS (Horizontal 4-Step Emergency Workflow)
           ====================================================================== */}
-      <section className="py-16 sm:py-24 bg-white border-y border-slate-200/80" aria-labelledby="howItWorksHeading">
+      <section className="py-16 sm:py-24 bg-white border-y border-slate-200/90" aria-labelledby="howItWorksHeading">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          {/* Section Header */}
-          <div className="max-w-2xl mx-auto text-center space-y-3 mb-14 sm:mb-16">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-[#881337]">
-              Simple 4-Step Process
+          {/* Section Header (36–44px Desktop, 29–34px Mobile) */}
+          <div className="max-w-3xl mx-auto text-center space-y-3 mb-14 sm:mb-16">
+            <span className="text-[15px] font-extrabold uppercase tracking-widest text-[#881337]">
+              Simple 4-Step Emergency Journey
             </span>
-            <h2 id="howItWorksHeading" className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight">
+            <h2 id="howItWorksHeading" className="text-3xl sm:text-[38px] lg:text-[42px] font-extrabold text-[#0F172A] tracking-tight leading-tight">
               How BloodBridge Works
             </h2>
-            <p className="text-sm sm:text-base text-slate-500 leading-relaxed font-normal">
+            <p className="text-[18px] sm:text-[19px] text-slate-600 leading-relaxed font-normal">
               Designed for critical golden hours: clear, deterministic, and friction-free when minutes matter most.
             </p>
           </div>
@@ -365,78 +523,78 @@ export default function Home({ onOpenAI }) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             {/* Step 1 */}
-            <div className="p-6 rounded-3xl bg-[#FAF9F6] border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4">
+            <div className="p-7 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4 shadow-sm">
               <div className="space-y-3">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-sm text-[#881337] shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[18px] text-[#881337] shadow-sm">
                   01
                 </div>
-                <h3 className="text-lg font-bold text-[#0F172A]">
+                <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                   Post Emergency Request
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Enter required blood group, units, hospital name, and city. No bureaucratic delays or unnecessary signups during emergencies.
+                <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
+                  Specify blood group, units, hospital name, and city. No bureaucratic delays or unnecessary signups during emergencies.
                 </p>
               </div>
-              <div className="pt-2 text-[11px] font-bold text-[#881337] flex items-center gap-1">
-                <span>Immediate broadcast</span>
-                <ChevronRight className="w-3 h-3" />
-              </div>
+              <Link to="/requests/create" className="pt-2 text-[15px] font-bold text-[#881337] flex items-center gap-1 hover:underline">
+                <span>Start blood request</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
             </div>
 
             {/* Step 2 */}
-            <div className="p-6 rounded-3xl bg-[#FAF9F6] border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4">
+            <div className="p-7 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4 shadow-sm">
               <div className="space-y-3">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-sm text-[#881337] shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[18px] text-[#881337] shadow-sm">
                   02
                 </div>
-                <h3 className="text-lg font-bold text-[#0F172A]">
+                <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                   Spatial Candidate Matching
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                   Deterministic PostGIS algorithms cross-match compatible ABO/Rh donors and nearby certified blood banks within geographic radius.
                 </p>
               </div>
-              <div className="pt-2 text-[11px] font-bold text-[#881337] flex items-center gap-1">
+              <div className="pt-2 text-[15px] font-bold text-[#881337] flex items-center gap-1">
                 <span>RBC compatibility logic</span>
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="w-4 h-4" />
               </div>
             </div>
 
             {/* Step 3 */}
-            <div className="p-6 rounded-3xl bg-[#FAF9F6] border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4">
+            <div className="p-7 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4 shadow-sm">
               <div className="space-y-3">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-sm text-[#881337] shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[18px] text-[#881337] shadow-sm">
                   03
                 </div>
-                <h3 className="text-lg font-bold text-[#0F172A]">
+                <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                   Consent-Based Alert
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                   Eligible donors receive structured Telegram notifications with 1-click Accept / Decline buttons. Donor privacy is strictly protected.
                 </p>
               </div>
-              <div className="pt-2 text-[11px] font-bold text-[#881337] flex items-center gap-1">
+              <div className="pt-2 text-[15px] font-bold text-[#881337] flex items-center gap-1">
                 <span>Zero phone spam</span>
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="w-4 h-4" />
               </div>
             </div>
 
             {/* Step 4 */}
-            <div className="p-6 rounded-3xl bg-[#FAF9F6] border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4">
+            <div className="p-7 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 hover:border-slate-300 transition-all flex flex-col justify-between space-y-4 shadow-sm">
               <div className="space-y-3">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-sm text-[#881337] shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-extrabold text-[18px] text-[#881337] shadow-sm">
                   04
                 </div>
-                <h3 className="text-lg font-bold text-[#0F172A]">
+                <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                   Clinical Verification
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Donor arrives at the designated hospital blood bank. Certified medical personnel conduct final antibody screening and cross-matching.
+                <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
+                  Donor arrives at designated hospital blood bank. Certified medical personnel conduct final antibody screening and cross-matching.
                 </p>
               </div>
-              <div className="pt-2 text-[11px] font-bold text-[#881337] flex items-center gap-1">
+              <div className="pt-2 text-[15px] font-bold text-[#881337] flex items-center gap-1">
                 <span>Medical safety confirmed</span>
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="w-4 h-4" />
               </div>
             </div>
 
@@ -445,19 +603,48 @@ export default function Home({ onOpenAI }) {
       </section>
 
       {/* ======================================================================
-          SECTION C: WHY BLOODBRIDGE? (Real Platform Capabilities)
+          SECTION C: VERIFIED BLOOD BANKS CALLOUT (Premier UP Institutions)
           ====================================================================== */}
-      <section className="py-16 sm:py-24 bg-[#FAF9F6]" aria-labelledby="whyBloodBridgeHeading">
+      <section className="py-14 sm:py-18 bg-[#FAF9F6]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-gradient-to-r from-[#0F172A] to-[#1E293B] text-white rounded-3xl p-8 sm:p-12 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="space-y-3 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-rose-500/20 text-rose-300 rounded-full text-[14px] font-bold">
+                <Building2 className="w-4 h-4 text-rose-400" />
+                <span>Verified Regional Blood Bank Directory</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-[34px] font-extrabold tracking-tight text-white leading-tight">
+                Looking for Government &amp; Certified Blood Centres?
+              </h2>
+              <p className="text-[17px] sm:text-[18px] text-slate-300 leading-relaxed font-normal">
+                Access verified contact numbers, operating hours, and location details for premier medical institutions across Uttar Pradesh (KGMU, SGPGI, IMS-BHU, GSVM, SNMC).
+              </p>
+            </div>
+            <Link
+              to="/blood-banks"
+              className="px-8 py-4 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl transition-all shadow-lg shadow-rose-950/40 flex items-center gap-2.5 flex-shrink-0 self-start lg:self-center"
+            >
+              <span>Browse UP Blood Banks</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================================
+          SECTION D: WHY BLOODBRIDGE? (Real Platform Capabilities)
+          ====================================================================== */}
+      <section className="py-16 sm:py-24 bg-white border-t border-slate-200/90" aria-labelledby="whyBloodBridgeHeading">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="max-w-2xl mx-auto text-center space-y-3 mb-14 sm:mb-16">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-[#881337]">
+          <div className="max-w-3xl mx-auto text-center space-y-3 mb-14 sm:mb-16">
+            <span className="text-[15px] font-extrabold uppercase tracking-widest text-[#881337]">
               Platform Capabilities
             </span>
-            <h2 id="whyBloodBridgeHeading" className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight">
+            <h2 id="whyBloodBridgeHeading" className="text-3xl sm:text-[38px] lg:text-[42px] font-extrabold text-[#0F172A] tracking-tight leading-tight">
               Why BloodBridge?
             </h2>
-            <p className="text-sm sm:text-base text-slate-500 leading-relaxed font-normal">
+            <p className="text-[18px] sm:text-[19px] text-slate-600 leading-relaxed font-normal">
               Engineered to replace social media chaos with deterministic, verified, and safe healthcare coordination.
             </p>
           </div>
@@ -465,79 +652,79 @@ export default function Home({ onOpenAI }) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             {/* Feature 1 */}
-            <div className="p-7 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-11 h-11 rounded-2xl bg-rose-50 text-[#D71935] flex items-center justify-center">
-                <Activity className="w-5 h-5" />
+            <div className="p-8 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 shadow-sm space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#D71935] flex items-center justify-center">
+                <Activity className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
+              <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                 Organized Emergency Coordination
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                 Structured workflow ensures hospital ICU and emergency teams coordinate directly with donors, eliminating viral miscommunication and false alarms.
               </p>
             </div>
 
             {/* Feature 2 */}
-            <div className="p-7 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center">
-                <Compass className="w-5 h-5" />
+            <div className="p-8 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 shadow-sm space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center">
+                <Compass className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
-                Approximate Location-Based Discovery
+              <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
+                Approximate Spatial Discovery
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                 PostGIS spatial indexing calculates real-time proximity to hospital emergency desks while keeping private residential addresses protected.
               </p>
             </div>
 
             {/* Feature 3 */}
-            <div className="p-7 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                <Lock className="w-5 h-5" />
+            <div className="p-8 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 shadow-sm space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
+              <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                 Consent-Based Donor Contact
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                 Donors are never harassed by cold calls. Interactive Telegram dispatches respect donor autonomy and require voluntary consent before details are unlocked.
               </p>
             </div>
 
             {/* Feature 4 */}
-            <div className="p-7 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
-                <Clock className="w-5 h-5" />
+            <div className="p-8 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 shadow-sm space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                <Clock className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
+              <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                 90-Day Cooldown Protection
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                 Protects donor health by automatically enforcing a 3-month physiological recovery window after each whole-blood donation in compliance with NBTC guidelines.
               </p>
             </div>
 
             {/* Feature 5 */}
-            <div className="p-7 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center">
-                <Building2 className="w-5 h-5" />
+            <div className="p-8 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 shadow-sm space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center">
+                <Building2 className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
+              <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                 Certified Blood Bank Referral
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                 Direct integration with regional licensed blood banks across Uttar Pradesh, providing emergency telephone helplines and certified storage locations.
               </p>
             </div>
 
             {/* Feature 6 */}
-            <div className="p-7 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-800 flex items-center justify-center">
-                <Shield className="w-5 h-5" />
+            <div className="p-8 rounded-3xl bg-[#FAF9F6] border border-slate-200/90 shadow-sm space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-800 flex items-center justify-center">
+                <Shield className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
+              <h3 className="text-[22px] sm:text-[24px] font-bold text-[#0F172A]">
                 Strict Zero-Commercial Policy
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
                 Under Section 27 of the Drugs and Cosmetics Act, commercial trading or paid blood sales are strictly prohibited. BloodBridge is 100% voluntary and altruistic.
               </p>
             </div>
@@ -547,37 +734,37 @@ export default function Home({ onOpenAI }) {
       </section>
 
       {/* ======================================================================
-          SECTION D: TRUST AND TRANSPARENCY (Clinical Boundaries & Ethics)
+          SECTION E: CLINICAL BOUNDARIES & ETHICS
           ====================================================================== */}
-      <section className="py-16 sm:py-20 bg-white border-t border-slate-200/80" aria-labelledby="transparencyHeading">
+      <section className="py-16 sm:py-20 bg-[#FAF9F6] border-t border-slate-200/90" aria-labelledby="transparencyHeading">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-[#FAF9F6] border border-slate-200 rounded-3xl p-8 sm:p-12 space-y-6">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 space-y-6 shadow-sm">
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-[#881337] flex items-center justify-center font-bold">
-                  <Shield className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#881337] flex items-center justify-center font-bold">
+                  <Shield className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 id="transparencyHeading" className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-tight">
+                  <h2 id="transparencyHeading" className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
                     Clinical Boundaries &amp; Donor Trust
                   </h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-[15px] text-slate-500">
                     Our strict operational framework for clinical and patient safety
                   </p>
                 </div>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[14px] font-bold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>NBTC Compliant Guidelines</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs sm:text-sm text-slate-600 leading-relaxed">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-[17px] sm:text-[18px] text-slate-700 leading-relaxed">
               <div className="space-y-3">
-                <h3 className="font-bold text-[#0F172A] text-sm flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#D71935]"></span>
+                <h3 className="font-bold text-[#0F172A] text-[20px] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#D71935]"></span>
                   Preliminary Discovery vs. Medical Confirmation
                 </h3>
                 <p>
@@ -586,8 +773,8 @@ export default function Home({ onOpenAI }) {
               </div>
 
               <div className="space-y-3">
-                <h3 className="font-bold text-[#0F172A] text-sm flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#D71935]"></span>
+                <h3 className="font-bold text-[#0F172A] text-[20px] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#D71935]"></span>
                   Donor Consent &amp; Privacy Safeguards
                 </h3>
                 <p>
@@ -601,7 +788,7 @@ export default function Home({ onOpenAI }) {
       </section>
 
       {/* ======================================================================
-          SECTION E: FINAL CTA ("Be Someone's Reason to Hope")
+          SECTION F: FINAL CTA ("Be Someone's Reason to Hope")
           ====================================================================== */}
       <section className="py-20 sm:py-28 bg-[#0F172A] text-white relative overflow-hidden" aria-labelledby="ctaHeading">
         
@@ -610,35 +797,35 @@ export default function Home({ onOpenAI }) {
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 space-y-6">
           
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-rose-300 text-xs font-bold tracking-wider uppercase">
-            <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/15 text-rose-300 text-[14px] font-bold tracking-wider uppercase">
+            <Heart className="w-4 h-4 fill-rose-400 text-rose-400" />
             <span>Join the Coordination Network</span>
           </div>
 
-          <h2 id="ctaHeading" className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
+          <h2 id="ctaHeading" className="text-4xl sm:text-5xl lg:text-[58px] font-black tracking-tight text-white leading-tight">
             Be Someone's Reason to Hope.
           </h2>
 
-          <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
+          <p className="text-[18px] sm:text-[20px] text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
             Whether you are registering as an emergency donor or coordinating blood for a loved one, BloodBridge makes every second count.
           </p>
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              to={isAuthenticated ? '/donor/dashboard' : '/signup?role=donor'}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-sm sm:text-base font-bold text-[#0F172A] bg-white hover:bg-slate-100 rounded-2xl shadow-xl transition-all"
+              to="/requests/create"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-xl shadow-rose-950/40 transition-all group"
             >
-              <Heart className="w-4 h-4 text-[#D71935]" />
-              <span>Become a Donor</span>
+              <Activity className="w-5 h-5" />
+              <span>Request Blood</span>
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Link>
 
             <Link
-              to="/requests/create"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-sm sm:text-base font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-2xl shadow-xl shadow-rose-950/40 transition-all group"
+              to={isAuthenticated ? '/donor/dashboard' : '/donor/registration'}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 text-[17px] sm:text-[18px] font-bold text-[#0F172A] bg-white hover:bg-slate-100 rounded-2xl shadow-xl transition-all"
             >
-              <Activity className="w-4 h-4" />
-              <span>Request Blood</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              <Heart className="w-5 h-5 text-[#D71935]" />
+              <span>Become a Donor</span>
             </Link>
           </div>
 
@@ -646,27 +833,27 @@ export default function Home({ onOpenAI }) {
       </section>
 
       {/* ======================================================================
-          SECTION F: SOPHISTICATED FOOTER
+          SECTION G: SOPHISTICATED FOOTER
           ====================================================================== */}
-      <footer className="bg-white border-t border-slate-200/80 text-slate-600" role="contentinfo">
+      <footer className="bg-white border-t border-slate-200/90 text-slate-700" role="contentinfo">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
             
             {/* Col 1: Brand & Emergency Helplines */}
             <div className="space-y-4 md:col-span-1">
               <Link to="/" className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#881337] to-[#D71935] flex items-center justify-center text-white">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#881337] to-[#D71935] flex items-center justify-center text-white">
                   <Heart className="w-4 h-4 fill-white" />
                 </div>
-                <span className="text-xl font-black text-[#0F172A]">
+                <span className="text-[22px] font-black text-[#0F172A]">
                   Blood<span className="text-[#D71935]">Bridge</span>
                 </span>
               </Link>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-[16px] sm:text-[17px] text-slate-600 leading-relaxed">
                 Emergency blood discovery and coordination network built for rapid golden-hour response across Uttar Pradesh.
               </p>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] space-y-1 text-slate-700">
-                <strong className="block text-[#0F172A]">UP Health Helplines:</strong>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-[15px] space-y-1.5 text-slate-800">
+                <strong className="block text-[#0F172A] text-[16px]">UP Health Helplines:</strong>
                 <div>Blood Availability: <strong className="text-[#881337]">1910</strong></div>
                 <div>State Health Helpline: <strong className="text-[#881337]">104</strong></div>
                 <div>Emergency Ambulance: <strong className="text-[#881337]">108 / 102</strong></div>
@@ -675,13 +862,18 @@ export default function Home({ onOpenAI }) {
 
             {/* Col 2: Coordination Services */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider">
+              <h4 className="text-[18px] font-bold text-[#0F172A] uppercase tracking-wider">
                 Coordination Services
               </h4>
-              <ul className="space-y-2 text-xs">
+              <ul className="space-y-2 text-[16px] sm:text-[17px]">
                 <li>
                   <Link to="/requests/create" className="hover:text-[#D71935] transition-colors">
                     Create Emergency Request
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/donors/nearby" className="hover:text-[#D71935] transition-colors">
+                    Find Compatible Donors
                   </Link>
                 </li>
                 <li>
@@ -690,28 +882,29 @@ export default function Home({ onOpenAI }) {
                   </Link>
                 </li>
                 <li>
+                  <Link to="/donor/registration" className="hover:text-[#D71935] transition-colors">
+                    Register as Blood Donor
+                  </Link>
+                </li>
+                <li>
                   <Link to="/blood-donation-info" className="hover:text-[#D71935] transition-colors">
                     Donor Eligibility &amp; NBTC Guidelines
                   </Link>
                 </li>
                 <li>
-                  <button
-                    type="button"
-                    onClick={(e) => openModalWithTab('tab-how', e)}
-                    className="text-left hover:text-[#D71935] transition-colors"
-                  >
+                  <Link to="/how-it-works" className="hover:text-[#D71935] transition-colors">
                     Clinical Coordination Workflow
-                  </button>
+                  </Link>
                 </li>
               </ul>
             </div>
 
             {/* Col 3: Company & Portals */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider">
+              <h4 className="text-[18px] font-bold text-[#0F172A] uppercase tracking-wider">
                 Portals &amp; FAQs
               </h4>
-              <ul className="space-y-2 text-xs">
+              <ul className="space-y-2 text-[16px] sm:text-[17px]">
                 <li>
                   <button
                     type="button"
@@ -750,13 +943,13 @@ export default function Home({ onOpenAI }) {
 
             {/* Col 4: Legal & Clinical Notice */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider">
+              <h4 className="text-[18px] font-bold text-[#0F172A] uppercase tracking-wider">
                 Clinical &amp; Privacy Ethics
               </h4>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[15px] sm:text-[16px] text-slate-600 leading-relaxed">
                 BloodBridge facilitates preliminary coordination. All transfusion compatibility testing and blood release decisions belong exclusively to certified medical professionals.
               </p>
-              <div className="pt-1 flex flex-col gap-1 text-xs">
+              <div className="pt-1 flex flex-col gap-1.5 text-[15px] sm:text-[16px]">
                 <Link to="/privacy-policy" className="hover:text-[#D71935] underline transition-colors">
                   Privacy Policy &amp; Geo-Masking
                 </Link>
@@ -768,9 +961,9 @@ export default function Home({ onOpenAI }) {
 
           </div>
 
-          <div className="mt-12 pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="mt-12 pt-6 border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-3 text-[15px] text-slate-500">
             <p>© 2026 BloodBridge. All rights reserved.</p>
-            <p className="text-[11px]">
+            <p className="text-[14px]">
               Strictly Voluntary &amp; Altruistic • Compliant with Section 27 Drugs &amp; Cosmetics Act
             </p>
           </div>
@@ -796,14 +989,14 @@ export default function Home({ onOpenAI }) {
               className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors"
               aria-label="Close Information Modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
 
             <div>
-              <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#881337]">
+              <div className="text-[14px] font-extrabold uppercase tracking-widest text-[#881337]">
                 HEALTHCARE INFORMATION
               </div>
-              <h2 id="modalDialogTitle" className="text-2xl font-black text-[#0F172A] tracking-tight">
+              <h2 id="modalDialogTitle" className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
                 BloodBridge Network
               </h2>
             </div>
@@ -813,7 +1006,7 @@ export default function Home({ onOpenAI }) {
               <button
                 type="button"
                 onClick={() => setActiveTab('tab-about')}
-                className={`pb-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
+                className={`pb-2.5 text-[16px] sm:text-[17px] font-bold border-b-2 whitespace-nowrap transition-all ${
                   activeTab === 'tab-about'
                     ? 'border-[#D71935] text-[#D71935]'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -826,7 +1019,7 @@ export default function Home({ onOpenAI }) {
               <button
                 type="button"
                 onClick={() => setActiveTab('tab-how')}
-                className={`pb-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
+                className={`pb-2.5 text-[16px] sm:text-[17px] font-bold border-b-2 whitespace-nowrap transition-all ${
                   activeTab === 'tab-how'
                     ? 'border-[#D71935] text-[#D71935]'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -839,7 +1032,7 @@ export default function Home({ onOpenAI }) {
               <button
                 type="button"
                 onClick={() => setActiveTab('tab-faq')}
-                className={`pb-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
+                className={`pb-2.5 text-[16px] sm:text-[17px] font-bold border-b-2 whitespace-nowrap transition-all ${
                   activeTab === 'tab-faq'
                     ? 'border-[#D71935] text-[#D71935]'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -852,7 +1045,7 @@ export default function Home({ onOpenAI }) {
               <button
                 type="button"
                 onClick={() => setActiveTab('tab-contact')}
-                className={`pb-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
+                className={`pb-2.5 text-[16px] sm:text-[17px] font-bold border-b-2 whitespace-nowrap transition-all ${
                   activeTab === 'tab-contact'
                     ? 'border-[#D71935] text-[#D71935]'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -860,77 +1053,72 @@ export default function Home({ onOpenAI }) {
                 role="tab"
                 aria-selected={activeTab === 'tab-contact'}
               >
-                Emergency Helplines
+                Helplines
               </button>
             </div>
 
             {/* Tab 1: About */}
             {activeTab === 'tab-about' && (
-              <div className="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <div className="space-y-4 text-[16px] sm:text-[17px] text-slate-700 leading-relaxed animate-in fade-in">
                 <p>
-                  BloodBridge is an emergency blood coordination infrastructure engineered to connect patients, voluntary donors, and certified blood centres rapidly, transparently, and safely across Uttar Pradesh.
+                  BloodBridge is an emergency blood coordination infrastructure engineered to bridge the critical gap between blood need and hope during golden medical hours.
                 </p>
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>
-                      <strong className="text-slate-900">Deterministic Compatibility:</strong> Strict red blood cell antigen compatibility rules based on clinical hematology standards.
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>
-                      <strong className="text-slate-900">Privacy Geo-Masking:</strong> Donors' private addresses are shielded; only regional distance bands are shared with hospital desks.
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>
-                      <strong className="text-slate-900">100% Voluntary &amp; Unpaid:</strong> Strictly altruistic under Indian healthcare regulations with zero commercial transaction fees.
-                    </span>
-                  </div>
+                <p>
+                  Unlike generic bulletin boards or unverified social media forwards, BloodBridge coordinates deterministic ABO/Rh red blood cell matching and contacts consenting donors via direct, consent-gated Telegram channels.
+                </p>
+                <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-rose-950 space-y-1">
+                  <strong className="block text-[#881337] font-extrabold text-[17px]">Our Mission</strong>
+                  <p>Zero lives lost due to delays in finding compatible blood in an emergency.</p>
                 </div>
               </div>
             )}
 
-            {/* Tab 2: Workflow */}
+            {/* Tab 2: How It Works */}
             {activeTab === 'tab-how' && (
-              <div className="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                <p>
-                  A streamlined emergency coordination process connecting patients with nearby compatible voluntary donors:
-                </p>
-                <div className="space-y-3 pt-1">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <strong className="block text-[#0F172A] text-xs font-bold mb-1">1. Hospital Request</strong>
-                    Enter patient's ABO/Rh group and hospital location to trigger immediate local matching.
+              <div className="space-y-4 text-[16px] sm:text-[17px] text-slate-700 leading-relaxed animate-in fade-in">
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <span className="w-8 h-8 rounded-full bg-rose-100 text-[#881337] font-extrabold flex items-center justify-center text-sm flex-shrink-0">1</span>
+                    <p><strong>Post Request:</strong> Enter patient blood group, units needed, and hospital location without red tape.</p>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <strong className="block text-[#0F172A] text-xs font-bold mb-1">2. Consent-Based Alert</strong>
-                    Eligible nearby donors receive instant alerts via Telegram with 1-click Accept / Decline.
+                  <div className="flex gap-3">
+                    <span className="w-8 h-8 rounded-full bg-rose-100 text-[#881337] font-extrabold flex items-center justify-center text-sm flex-shrink-0">2</span>
+                    <p><strong>Spatial Match:</strong> PostGIS spatial queries locate nearby compatible donors and verified regional blood banks.</p>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <strong className="block text-[#0F172A] text-xs font-bold mb-1">3. Clinical Transfusion</strong>
-                    Attending hospital clinicians verify, cross-match, and safely perform the transfusion.
+                  <div className="flex gap-3">
+                    <span className="w-8 h-8 rounded-full bg-rose-100 text-[#881337] font-extrabold flex items-center justify-center text-sm flex-shrink-0">3</span>
+                    <p><strong>Consent-Based Notification:</strong> Telegram alerts prompt donors to Accept or Decline with 1 click.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="w-8 h-8 rounded-full bg-rose-100 text-[#881337] font-extrabold flex items-center justify-center text-sm flex-shrink-0">4</span>
+                    <p><strong>Clinical Delivery:</strong> Hospital pathologists perform final antibody screening and transfusion.</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Tab 3: FAQ */}
+            {/* Tab 3: Interactive FAQ Accordion */}
             {activeTab === 'tab-faq' && (
-              <div className="space-y-3">
+              <div className="space-y-3 animate-in fade-in">
                 {faqItems.map((item, idx) => (
-                  <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <div
+                    key={idx}
+                    className="border border-slate-200 rounded-2xl overflow-hidden transition-colors"
+                  >
                     <button
                       type="button"
                       onClick={() => toggleFaq(idx)}
-                      className="w-full p-3.5 text-left text-xs sm:text-sm font-bold text-[#0F172A] bg-slate-50 hover:bg-slate-100 flex items-center justify-between gap-3 transition-colors"
+                      className="w-full p-4 text-left font-bold text-[#0F172A] text-[16px] sm:text-[17px] flex items-center justify-between hover:bg-slate-50 transition-colors"
                     >
                       <span>{item.q}</span>
-                      <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${faqOpenIndex === idx ? 'rotate-90 text-[#D71935]' : ''}`} />
+                      <ChevronRight
+                        className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${
+                          faqOpenIndex === idx ? 'rotate-90 text-[#D71935]' : ''
+                        }`}
+                      />
                     </button>
                     {faqOpenIndex === idx && (
-                      <div className="p-4 text-xs text-slate-600 bg-white leading-relaxed border-t border-slate-100">
+                      <div className="p-4 pt-0 text-[16px] text-slate-600 leading-relaxed border-t border-slate-100 bg-slate-50/50">
                         {item.a}
                       </div>
                     )}
@@ -939,55 +1127,39 @@ export default function Home({ onOpenAI }) {
               </div>
             )}
 
-            {/* Tab 4: Emergency Contacts */}
+            {/* Tab 4: Emergency Helplines */}
             {activeTab === 'tab-contact' && (
-              <div className="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                <p>
-                  Official emergency dispatch helplines and healthcare assistance:
-                </p>
-                <div className="space-y-2.5 pt-1">
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <strong className="block text-[#881337] text-xs font-bold">Uttar Pradesh Blood Availability Helpline</strong>
-                      <span className="text-[11px] text-slate-500">24/7 centralized helpline for blood units</span>
-                    </div>
-                    <span className="text-base font-black text-[#881337]">1910</span>
+              <div className="space-y-4 text-[16px] sm:text-[17px] text-slate-700 leading-relaxed animate-in fade-in">
+                <p>For immediate institutional assistance across Uttar Pradesh, dial authorized government numbers:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="text-[14px] text-slate-500 block">Blood Helpline</span>
+                    <span className="text-2xl font-black text-[#881337]">1910</span>
                   </div>
-
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <strong className="block text-[#0F172A] text-xs font-bold">State Health Helpline</strong>
-                      <span className="text-[11px] text-slate-500">Emergency medical guidance</span>
-                    </div>
-                    <span className="text-base font-black text-slate-800">104</span>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="text-[14px] text-slate-500 block">State Health Helpline</span>
+                    <span className="text-2xl font-black text-[#881337]">104</span>
                   </div>
-
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <strong className="block text-[#0F172A] text-xs font-bold">Ambulance Emergency</strong>
-                      <span className="text-[11px] text-slate-500">Government ambulance service</span>
-                    </div>
-                    <span className="text-base font-black text-slate-800">108 / 102</span>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="text-[14px] text-slate-500 block">Emergency Ambulance</span>
+                    <span className="text-2xl font-black text-[#881337]">108 / 102</span>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="text-[14px] text-slate-500 block">National Emergency</span>
+                    <span className="text-2xl font-black text-[#881337]">112</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Dialog Footer Actions */}
-            <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">
-                BloodBridge Emergency Coordination
-              </span>
-              <div className="flex gap-2">
-                <Link
-                  to="/requests/create"
-                  onClick={() => setModalOpen(false)}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#D71935] hover:bg-[#BE123C] rounded-full shadow-md transition-all"
-                >
-                  <span>Request Blood</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
+            <div className="pt-3 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="px-6 py-2.5 text-[16px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Close
+              </button>
             </div>
 
           </div>

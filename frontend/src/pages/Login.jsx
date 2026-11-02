@@ -155,7 +155,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleRoleSelect('donor')}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`py-2.5 text-[15px] font-bold rounded-xl transition-all ${
                 activeRole === 'donor'
                   ? 'bg-white text-[#D71935] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -163,12 +163,12 @@ export default function Login() {
               role="tab"
               aria-selected={activeRole === 'donor'}
             >
-              Donor Portal
+              Donor
             </button>
             <button
               type="button"
               onClick={() => handleRoleSelect('patient')}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`py-2.5 text-[15px] font-bold rounded-xl transition-all ${
                 activeRole === 'patient'
                   ? 'bg-white text-[#0F172A] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -181,7 +181,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleRoleSelect('admin')}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`py-2.5 text-[15px] font-bold rounded-xl transition-all ${
                 activeRole === 'admin'
                   ? 'bg-white text-[#0F172A] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -189,28 +189,28 @@ export default function Login() {
               role="tab"
               aria-selected={activeRole === 'admin'}
             >
-              Administrator
+              Admin
             </button>
           </div>
 
           {/* Error Banner */}
           {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start gap-2.5 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-[15px] text-rose-700 flex items-start gap-2.5 animate-in fade-in">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <span className="leading-snug">{error}</span>
             </div>
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Identifier Input */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-[17px] font-semibold text-slate-800">
                 Email Address, Mobile (+91), or Username
               </label>
               <div className="relative">
-                <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400">
-                  <User className="w-4 h-4" />
+                <div className="w-11 h-11 absolute left-0 top-0 flex items-center justify-center text-slate-400">
+                  <User className="w-5 h-5" />
                 </div>
                 <input
                   type="text"
@@ -218,7 +218,7 @@ export default function Login() {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="e.g. donor.sarah@bloodbridge.org or +91 98765 43210"
-                  className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
+                  className="w-full pl-11 pr-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
                   autoComplete="username"
                 />
               </div>
@@ -227,17 +227,17 @@ export default function Login() {
             {/* Password Input */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-700">Password</label>
+                <label className="block text-[17px] font-semibold text-slate-800">Password</label>
                 <Link
                   to="/forgot-password"
-                  className="text-[11px] font-bold text-[#D71935] hover:underline"
+                  className="text-[14px] font-bold text-[#D71935] hover:underline"
                 >
-                  Forgot?
+                  Forgot Password?
                 </Link>
               </div>
               <div className="relative">
-                <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400">
-                  <Lock className="w-4 h-4" />
+                <div className="w-11 h-11 absolute left-0 top-0 flex items-center justify-center text-slate-400">
+                  <Lock className="w-5 h-5" />
                 </div>
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -245,22 +245,22 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
+                  className="w-full pl-11 pr-11 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="w-10 h-10 absolute right-0 top-0 flex items-center justify-center text-slate-400 hover:text-slate-700"
+                  className="w-11 h-11 absolute right-0 top-0 flex items-center justify-center text-slate-400 hover:text-slate-700"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
             {/* Remember Me Checkbox */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2.5 pt-1">
               <input
                 type="checkbox"
                 id="rememberMe"
@@ -268,29 +268,29 @@ export default function Login() {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 text-[#D71935] rounded border-slate-300 focus:ring-[#D71935]"
               />
-              <label htmlFor="rememberMe" className="text-xs text-slate-600 cursor-pointer">
+              <label htmlFor="rememberMe" className="text-[15px] text-slate-700 cursor-pointer">
                 Keep me securely authenticated on this workstation
               </label>
             </div>
 
             {/* Button Action Stack */}
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-3 pt-2">
               {/* Sign In Button (Primary) */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="w-full py-4 px-6 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </button>
 
               {/* Sign Up Button (Secondary) */}
               <Link
                 to={`/signup${activeRole ? `?role=${activeRole}` : ''}`}
-                className="w-full py-3 px-4 text-xs font-bold text-[#0F172A] bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-2xl transition-all flex items-center justify-center gap-2 group"
+                className="w-full py-3.5 px-6 text-[17px] font-bold text-[#0F172A] bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-[#0F172A] rounded-2xl transition-all flex items-center justify-center gap-2 group"
               >
-                <span>Sign Up</span>
+                <span>Create New Account</span>
                 <ArrowRight className="w-4 h-4 text-[#0F172A] transition-transform group-hover:translate-x-1" />
               </Link>
             </div>

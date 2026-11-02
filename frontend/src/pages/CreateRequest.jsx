@@ -343,20 +343,20 @@ export default function CreateRequest() {
             )}
           </div>
 
-          <form onSubmit={handleStep1Next} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2">
+          <form onSubmit={handleStep1Next} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <h2 className="text-[20px] font-extrabold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2">
               Step 1: Blood Requirement Details
             </h2>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">Required Blood Group *</label>
+              <label className="block text-[17px] font-semibold text-slate-800 mb-2">Required Blood Group *</label>
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                 {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((grp) => (
                   <button
                     key={grp}
                     type="button"
                     onClick={() => setBloodGroup(grp)}
-                    className={`py-2.5 text-xs font-black rounded-xl border transition-all ${
+                    className={`py-3 text-[17px] font-black rounded-xl border transition-all ${
                       bloodGroup === grp
                         ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -370,7 +370,7 @@ export default function CreateRequest() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Units Needed (Bags / Pints) *</label>
+                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Units Needed (Bags / Pints) *</label>
                 <input
                   type="number"
                   min="1"
@@ -378,16 +378,16 @@ export default function CreateRequest() {
                   required
                   value={unitsNeeded}
                   onChange={(e) => setUnitsNeeded(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Urgency Level *</label>
+                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Urgency Level *</label>
                 <select
                   value={urgency}
                   onChange={(e) => setUrgency(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-semibold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl font-semibold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 >
                   <option value="emergency">Critical Emergency (Immediate)</option>
                   <option value="urgent">Urgent (Within 24 Hours)</option>
@@ -398,14 +398,14 @@ export default function CreateRequest() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                  City / District *
+                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-rose-500" />
+                  <span>City / District *</span>
                 </label>
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 >
                   {locations.length > 0 ? (
                     locations.map((loc) => (
@@ -432,9 +432,9 @@ export default function CreateRequest() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                  Hospital or Blood Bank Name *
+                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  <span>Hospital or Blood Bank Name *</span>
                 </label>
                 <input
                   type="text"
@@ -442,15 +442,15 @@ export default function CreateRequest() {
                   value={hospitalName}
                   onChange={(e) => setHospitalName(e.target.value)}
                   placeholder="e.g. KGMU Centenary Hospital"
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-slate-500" />
-                Requester Contact Phone *
+              <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                <Phone className="w-4 h-4 text-slate-500" />
+                <span>Requester Contact Phone *</span>
               </label>
               <input
                 type="tel"
@@ -458,17 +458,17 @@ export default function CreateRequest() {
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder="+91 98765 43210"
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-mono"
+                className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-mono"
               />
             </div>
 
             <div className="pt-2 flex justify-end">
               <button
                 type="submit"
-                className="py-3 px-6 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all flex items-center gap-2"
+                className="py-3.5 px-8 text-[17px] font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all flex items-center gap-2"
               >
                 <span>Continue to Patient Details</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-5 h-5" />
               </button>
             </div>
           </form>
@@ -479,29 +479,29 @@ export default function CreateRequest() {
       {currentStep === 2 && (
         <form onSubmit={handleStep2Submit} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
-              Step 2: Patient & Clinical Context
+            <h2 className="text-[20px] font-extrabold uppercase tracking-wider text-slate-900">
+              Step 2: Patient &amp; Clinical Context
             </h2>
-            <span className="text-xs text-rose-600 font-bold">
+            <span className="text-[16px] text-rose-600 font-bold">
               {bloodGroup} • {unitsNeeded} {unitsNeeded > 1 ? 'Units' : 'Unit'}
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Patient Full Name *</label>
+              <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Patient Full Name *</label>
               <input
                 type="text"
                 required
                 value={patientName}
                 onChange={(e) => setPatientName(e.target.value)}
                 placeholder="e.g. Ramesh Chandra"
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Patient Age (Optional)</label>
+              <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Patient Age (Optional)</label>
               <input
                 type="number"
                 min="0"
@@ -509,40 +509,40 @@ export default function CreateRequest() {
                 value={patientAge}
                 onChange={(e) => setPatientAge(e.target.value)}
                 placeholder="e.g. 45"
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Hospital Ward / Bed / Department</label>
+            <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Hospital Ward / Bed / Department</label>
             <input
               type="text"
               value={hospitalAddress}
               onChange={(e) => setHospitalAddress(e.target.value)}
               placeholder="e.g. Emergency Casualty Block, 3rd Floor, ICU Bed 12"
-              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Needed By Date / Time (Optional)</label>
+            <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Needed By Date / Time (Optional)</label>
             <input
               type="datetime-local"
               value={neededBy}
               onChange={(e) => setNeededBy(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Additional Medical Coordination Notes</label>
+            <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Additional Medical Coordination Notes</label>
             <textarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Replacement donor required for elective CABG surgery; attending physician Dr. V. Verma"
-              className="w-full p-3.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              className="w-full p-4 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
             />
           </div>
 
@@ -550,19 +550,19 @@ export default function CreateRequest() {
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className="py-2.5 px-4 text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5"
+              className="py-3 px-6 text-[16px] font-bold text-slate-700 hover:text-slate-900 flex items-center gap-2 border border-slate-300 rounded-xl hover:bg-slate-50"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
             </button>
 
             <button
               type="submit"
               disabled={submitting}
-              className="py-3 px-6 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all flex items-center gap-2"
+              className="py-3.5 px-8 text-[17px] font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all flex items-center gap-2 disabled:opacity-50"
             >
-              {submitting ? 'Registering & Finding Results...' : 'Confirm & View Verified Results'}
-              <ArrowRight className="w-4 h-4" />
+              <span>{submitting ? 'Registering & Finding Results...' : 'Confirm & View Verified Results'}</span>
+              <ArrowRight className="w-5 h-5" />
             </button>
           </div>
         </form>

@@ -181,12 +181,12 @@ export default function Signup() {
 
           {/* Role Selection Tabs */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">I want to register as:</label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <label className="block text-[17px] font-semibold text-slate-800 mb-2">I want to register as:</label>
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setRole('donor')}
-                className={`py-3 px-3 text-xs font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
+                className={`py-3.5 px-3 text-[16px] font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
                   role === 'donor'
                     ? 'bg-rose-50 border-[#D71935] text-[#D71935] shadow-sm'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -198,7 +198,7 @@ export default function Signup() {
               <button
                 type="button"
                 onClick={() => setRole('requester')}
-                className={`py-3 px-3 text-xs font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
+                className={`py-3.5 px-3 text-[16px] font-bold rounded-2xl border transition-all flex items-center justify-center gap-2 ${
                   role === 'requester'
                     ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
                     : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -212,8 +212,8 @@ export default function Signup() {
 
           {/* Error Banner */}
           {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start gap-2.5 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-[15px] text-rose-700 flex items-start gap-2.5 animate-in fade-in">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div className="leading-snug flex-1">
                 <div>{error}</div>
                 {(error.toLowerCase().includes('already exists') || error.toLowerCase().includes('conflict') || error.toLowerCase().includes('registered')) && (
@@ -233,10 +233,10 @@ export default function Signup() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* Full Name */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Full Name</label>
+                <label className="block text-[17px] font-semibold text-slate-800">Full Name</label>
                 <div className="relative">
-                  <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400">
-                    <User className="w-4 h-4" />
+                  <div className="w-11 h-11 absolute left-0 top-0 flex items-center justify-center text-slate-400">
+                    <User className="w-5 h-5" />
                   </div>
                   <input
                     type="text"
@@ -244,16 +244,16 @@ export default function Signup() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Priya Sharma"
-                    className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
+                    className="w-full pl-11 pr-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
                   />
                 </div>
               </div>
 
               {/* Username */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Username</label>
+                <label className="block text-[17px] font-semibold text-slate-800">Username</label>
                 <div className="relative">
-                  <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400 text-xs font-bold">
+                  <div className="w-11 h-11 absolute left-0 top-0 flex items-center justify-center text-slate-400 text-sm font-bold">
                     @
                   </div>
                   <input
@@ -315,10 +315,10 @@ export default function Signup() {
             {/* Passwords */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Password</label>
+                <label className="block text-[17px] font-semibold text-slate-800">Password</label>
                 <div className="relative">
-                  <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400">
-                    <Lock className="w-4 h-4" />
+                  <div className="w-11 h-11 absolute left-0 top-0 flex items-center justify-center text-slate-400">
+                    <Lock className="w-5 h-5" />
                   </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -327,23 +327,23 @@ export default function Signup() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Min 6 chars"
-                    className="w-full pl-10 pr-9 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
+                    className="w-full pl-11 pr-10 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="w-9 h-10 absolute right-0 top-0 flex items-center justify-center text-slate-400 hover:text-slate-700"
+                    className="w-10 h-11 absolute right-0 top-0 flex items-center justify-center text-slate-400 hover:text-slate-700"
                   >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Confirm Password</label>
+                <label className="block text-[17px] font-semibold text-slate-800">Confirm Password</label>
                 <div className="relative">
-                  <div className="w-10 h-10 absolute left-0 top-0 flex items-center justify-center text-slate-400">
-                    <Lock className="w-4 h-4" />
+                  <div className="w-11 h-11 absolute left-0 top-0 flex items-center justify-center text-slate-400">
+                    <Lock className="w-5 h-5" />
                   </div>
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -352,14 +352,14 @@ export default function Signup() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Repeat password"
-                    className="w-full pl-10 pr-9 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
+                    className="w-full pl-11 pr-10 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="w-9 h-10 absolute right-0 top-0 flex items-center justify-center text-slate-400 hover:text-slate-700"
+                    className="w-10 h-11 absolute right-0 top-0 flex items-center justify-center text-slate-400 hover:text-slate-700"
                   >
-                    {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -370,10 +370,10 @@ export default function Signup() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="w-full py-4 px-6 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 <span>{loading ? 'Sending Verification Code...' : 'Create Account & Send Verification Code'}</span>
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </button>
             </div>
 

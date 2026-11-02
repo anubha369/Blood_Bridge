@@ -130,8 +130,8 @@ export default function RequesterDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-rose-600">Active Requests</div>
-            <div className="text-3xl font-extrabold text-slate-900 mt-1">{activeCount}</div>
+            <div className="text-[14px] font-bold uppercase tracking-wider text-rose-600">Active Requests</div>
+            <div className="text-[36px] sm:text-[38px] font-extrabold text-slate-900 mt-1 leading-none">{activeCount}</div>
           </div>
           <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
             <Activity className="w-6 h-6" />
@@ -140,8 +140,8 @@ export default function RequesterDashboard() {
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-emerald-600">Fulfilled Requests</div>
-            <div className="text-3xl font-extrabold text-slate-900 mt-1">{fulfilledCount}</div>
+            <div className="text-[14px] font-bold uppercase tracking-wider text-emerald-600">Fulfilled Requests</div>
+            <div className="text-[36px] sm:text-[38px] font-extrabold text-slate-900 mt-1 leading-none">{fulfilledCount}</div>
           </div>
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
             <CheckCircle2 className="w-6 h-6" />
@@ -150,8 +150,8 @@ export default function RequesterDashboard() {
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-indigo-600">Total Tracked</div>
-            <div className="text-3xl font-extrabold text-slate-900 mt-1">{requests.length}</div>
+            <div className="text-[14px] font-bold uppercase tracking-wider text-indigo-600">Total Tracked</div>
+            <div className="text-[36px] sm:text-[38px] font-extrabold text-slate-900 mt-1 leading-none">{requests.length}</div>
           </div>
           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
             <Clock className="w-6 h-6" />
@@ -161,9 +161,9 @@ export default function RequesterDashboard() {
 
       {/* Requests List */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-rose-600" />
-          My Registered Blood Requests
+        <h2 className="text-[22px] sm:text-[24px] font-bold text-slate-900 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-rose-600" />
+          <span>My Registered Blood Requests</span>
         </h2>
 
         {loading ? (

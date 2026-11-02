@@ -236,31 +236,31 @@ export default function AdminDashboard() {
 
       {/* High-Level Metric Tiles */}
       {metrics && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Registered Donors</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">{metrics.donors?.total || donors.length}</div>
-            <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Registered Donors</div>
+            <div className="text-[34px] font-black text-slate-900 mt-1 leading-none">{metrics.donors?.total || donors.length}</div>
+            <div className="text-[13px] text-emerald-600 font-semibold mt-1">
               {metrics.donors?.verified || 0} Verified
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Review</div>
-            <div className="text-2xl font-black text-amber-600 mt-1">{metrics.donors?.pending || 0}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Awaiting check</div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Pending Review</div>
+            <div className="text-[34px] font-black text-amber-600 mt-1 leading-none">{metrics.donors?.pending || 0}</div>
+            <div className="text-[13px] text-slate-400 mt-1">Awaiting check</div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Requests</div>
-            <div className="text-2xl font-black text-rose-600 mt-1">{requests.length}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">{requests.filter(r => r.status === 'fulfilled').length} Fulfilled</div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Active Requests</div>
+            <div className="text-[34px] font-black text-rose-600 mt-1 leading-none">{requests.length}</div>
+            <div className="text-[13px] text-slate-400 mt-1">{requests.filter(r => r.status === 'fulfilled').length} Fulfilled</div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">WhatsApp Dispatches</div>
-            <div className="text-2xl font-black text-indigo-600 mt-1">{whatsappJobs.length}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Broadcast alerts</div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Alert Dispatches</div>
+            <div className="text-[34px] font-black text-indigo-600 mt-1 leading-none">{whatsappJobs.length}</div>
+            <div className="text-[13px] text-slate-400 mt-1">Broadcast alerts</div>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">

@@ -828,9 +828,9 @@ export default function DonorDashboard() {
             </div>
           </div>
 
-          <div className="bg-amber-50 px-4 py-2 rounded-2xl border border-amber-200 text-center sm:text-right">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Verified Balance</span>
-            <span className="text-2xl font-black text-amber-600">{credits.balance} Pts</span>
+          <div className="bg-amber-50 px-5 py-2.5 rounded-2xl border border-amber-200 text-center sm:text-right">
+            <span className="text-[12px] font-bold uppercase tracking-wider text-amber-800 block">Verified Balance</span>
+            <span className="text-[36px] font-black text-amber-600 leading-none">{credits.balance} Pts</span>
           </div>
         </div>
 

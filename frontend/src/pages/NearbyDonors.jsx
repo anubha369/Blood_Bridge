@@ -94,12 +94,12 @@ export default function NearbyDonors() {
 
       {/* Search Filter Box */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-end">
           {/* City Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-rose-500" />
-              City / Region
+            <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-rose-500" />
+              <span>City / Region</span>
             </label>
             <select
               value={city}
@@ -108,7 +108,7 @@ export default function NearbyDonors() {
                 setLatitude('');
                 setLongitude('');
               }}
-              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
+              className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
             >
               {locations.length > 0 ? (
                 locations.map((loc) => (
@@ -136,14 +136,14 @@ export default function NearbyDonors() {
 
           {/* Blood Group Filter */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-              <Heart className="w-3.5 h-3.5 text-rose-500" />
-              Blood Group
+            <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+              <Heart className="w-4 h-4 text-rose-500" />
+              <span>Blood Group</span>
             </label>
             <select
               value={bloodGroup}
               onChange={(e) => setBloodGroup(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
+              className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
             >
               <option value="">All Blood Groups</option>
               {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => (
@@ -154,9 +154,9 @@ export default function NearbyDonors() {
 
           {/* Radius Slider */}
           <div>
-            <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+            <div className="flex justify-between text-[16px] font-semibold text-slate-800 mb-1.5">
               <span>Radius Filter</span>
-              <span className="text-rose-600 font-mono">{radiusKm} km</span>
+              <span className="text-rose-600 font-mono font-bold">{radiusKm} km</span>
             </div>
             <input
               type="range"
@@ -165,7 +165,7 @@ export default function NearbyDonors() {
               step="5"
               value={radiusKm}
               onChange={(e) => setRadiusKm(parseInt(e.target.value, 10))}
-              className="w-full accent-rose-600 cursor-pointer h-2 bg-slate-200 rounded-lg mt-2"
+              className="w-full accent-rose-600 cursor-pointer h-2 bg-slate-200 rounded-lg mt-3"
             />
           </div>
 
@@ -174,17 +174,17 @@ export default function NearbyDonors() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-5 text-[17px] font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Querying PostGIS...
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Searching...</span>
                 </>
               ) : (
                 <>
-                  <Search className="w-3.5 h-3.5" />
-                  Execute Spatial Search
+                  <Search className="w-4 h-4" />
+                  <span>Execute Spatial Search</span>
                 </>
               )}
             </button>
@@ -266,14 +266,14 @@ export default function NearbyDonors() {
                   </div>
                 </div>
 
-                <h3 className="font-bold text-slate-900 text-sm">{donor.name}</h3>
-                <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  {donor.area ? `${donor.area}, ` : ''}{donor.city}
+                <h3 className="font-bold text-slate-900 text-[20px]">{donor.name}</h3>
+                <div className="text-[16px] text-slate-600 flex items-center gap-1.5 mt-1">
+                  <MapPin className="w-4 h-4 text-slate-400" />
+                  <span>{donor.area ? `${donor.area}, ` : ''}{donor.city}</span>
                 </div>
 
                 {donor.last_donation_date && (
-                  <div className="text-[11px] text-slate-400 mt-2">
+                  <div className="text-[14px] text-slate-500 mt-2">
                     Last donation: {donor.last_donation_date}
                   </div>
                 )}
@@ -282,10 +282,10 @@ export default function NearbyDonors() {
               <div className="pt-3 border-t border-slate-100">
                 <button
                   onClick={() => setSelectedDonorForContact(donor)}
-                  className="w-full py-2 px-3 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                  className="w-full py-3 px-4 text-[16px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
-                  <Phone className="w-3.5 h-3.5 text-rose-600" />
-                  Contact Potential Donor
+                  <Phone className="w-4 h-4 text-rose-600" />
+                  <span>Contact Potential Donor</span>
                 </button>
               </div>
             </div>
