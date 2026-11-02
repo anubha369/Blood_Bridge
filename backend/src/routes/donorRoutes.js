@@ -612,7 +612,12 @@ router.get('/contact-requests', authenticateUser, async (req, res, next) => {
             br.hospital_name,
             br.city,
             br.urgency,
-            br.status AS request_status
+            br.status AS request_status,
+            br.selected_donor_id,
+            br.confirmation_status,
+            br.reconfirmed_at,
+            (br.selected_donor_id = donor.id) AS is_selected,
+            (br.selected_donor_id = donor.id AND COALESCE(br.confirmation_status, 'pending') = 'pending') AS needs_reconfirmation
           FROM public.telegram_notifications tn
           JOIN public.blood_requests br ON tn.request_id = br.id
           WHERE tn.donor_id = $1
@@ -644,7 +649,12 @@ router.get('/contact-requests', authenticateUser, async (req, res, next) => {
           hospital_name: br.hospital_name || 'Hospital',
           city: br.city || donor.city,
           urgency: br.urgency || 'urgent',
-          request_status: br.status || 'active'
+          request_status: br.status || 'active',
+          selected_donor_id: br.selected_donor_id || null,
+          confirmation_status: br.confirmation_status || 'pending',
+          reconfirmed_at: br.reconfirmed_at || null,
+          is_selected: br.selected_donor_id === donor.id,
+          needs_reconfirmation: br.selected_donor_id === donor.id && (br.confirmation_status || 'pending') === 'pending'
         };
       });
     }

@@ -408,6 +408,68 @@ async function sendEmergencyBloodRequestNotification(donor, bloodRequest) {
 }
 
 /**
+ * Stage 4: Dispatch donor selection reconfirmation request to chosen donor via Telegram
+ */
+async function sendDonorSelectionReconfirmation(donor, bloodRequest) {
+  if (!donor) throw new Error('Donor profile required.');
+  if (!bloodRequest) throw new Error('Blood request required.');
+
+  if (!donor.telegram_chat_id) {
+    return {
+      success: false,
+      skipped: true,
+      reason: 'Donor has not linked a Telegram account'
+    };
+  }
+
+  const messageText =
+    `🚨 *CONFIRMATION REQUEST: You have been chosen by the requester!* 🚨\n\n` +
+    `Hello *${donor.name}*,\n` +
+    `The requester has selected you to provide blood for requirement *#${bloodRequest.id.substring(0, 8)}*.\n\n` +
+    `📋 *Request Details:*\n` +
+    `• *Patient:* ${bloodRequest.patient_name}\n` +
+    `• *Blood Group:* ${bloodRequest.blood_group}\n` +
+    `• *Units Needed:* ${bloodRequest.units_needed}\n` +
+    `• *Hospital:* ${bloodRequest.hospital_name}, ${bloodRequest.city}\n\n` +
+    `Please tap below to reconfirm your willingness and availability to donate:`;
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        {
+          text: '✅ Confirm Availability',
+          callback_data: `reconfirm_accept_${bloodRequest.id}_${donor.id}`
+        },
+        {
+          text: '❌ Decline / Unavailable',
+          callback_data: `reconfirm_decline_${bloodRequest.id}_${donor.id}`
+        }
+      ]
+    ]
+  };
+
+  let apiRes = null;
+  let status = 'sent';
+  try {
+    apiRes = await sendTelegramMessage(
+      donor.telegram_chat_id,
+      messageText,
+      inlineKeyboard
+    );
+  } catch (err) {
+    console.warn(`[Telegram Reconfirmation Error] ${donor.telegram_chat_id}:`, err.message);
+    status = 'failed';
+  }
+
+  return {
+    success: status === 'sent',
+    telegram_message_id: apiRes?.result?.message_id || null,
+    recipient_chat_id: donor.telegram_chat_id,
+    status
+  };
+}
+
+/**
  * Dispatch emergency alerts to a list of eligible matching donors
  */
 async function dispatchEmergencyRequestNotifications({ request, eligibleDonors, maxRecipients = 10 }) {
@@ -630,6 +692,99 @@ async function handleTelegramCallbackQuery(callbackQuery) {
   const originalText = callbackQuery.message?.text || '';
 
   console.log(`[Telegram Callback] Received query id=${callbackId} data="${rawData}" from=${fromId} chat=${maskChatId(effectiveChatId)}`);
+
+  // 0. Stage 4: Donor Selection Reconfirmation callback (reconfirm_accept / reconfirm_decline)
+  if (rawData.startsWith('reconfirm_')) {
+    const rMatch = rawData.match(/^reconfirm_(accept|decline)[:_]([a-f0-9\-]+)(?:[:_]([a-f0-9\-]+))?$/i);
+    if (!rMatch) {
+      await answerCallbackQuery(callbackId, '⚠️ Unrecognized reconfirmation action.', true);
+      return;
+    }
+    const rAction = rMatch[1].toLowerCase();
+    const reqId = rMatch[2].trim();
+    const donorId = rMatch[3] ? rMatch[3].trim() : null;
+
+    let donor = null;
+    if (effectiveChatId) donor = await getDonorByTelegramChatId(effectiveChatId);
+    if (!donor && fromId) donor = await getDonorByTelegramChatId(fromId);
+    if (!donor && donorId) donor = await getDonorById(donorId);
+
+    if (!donor) {
+      await answerCallbackQuery(callbackId, '⚠️ Donor account not found.', true);
+      return;
+    }
+
+    let bloodReq = (localStore.blood_requests || []).find((r) => r.id === reqId);
+    if (!bloodReq && isPostgresConnected()) {
+      const pool = getPool();
+      if (pool) {
+        try {
+          const res = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [reqId]);
+          if (res.rows.length > 0) bloodReq = res.rows[0];
+        } catch (_) {}
+      }
+    }
+
+    if (!bloodReq) {
+      await answerCallbackQuery(callbackId, '⚠️ Blood request record not found.', true);
+      return;
+    }
+
+    const isConfirmed = rAction === 'accept';
+    const confStatus = isConfirmed ? 'confirmed' : 'declined';
+    const nowIso = new Date().toISOString();
+
+    bloodReq.confirmation_status = confStatus;
+    bloodReq.reconfirmed_at = nowIso;
+    if (isConfirmed) {
+      bloodReq.status = 'donor_selected';
+    } else {
+      bloodReq.status = 'donors_responded';
+      bloodReq.selected_donor_id = null;
+    }
+    bloodReq.updated_at = nowIso;
+
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE public.blood_requests 
+           SET confirmation_status = $1, 
+               reconfirmed_at = NOW(), 
+               status = $2, 
+               selected_donor_id = $3, 
+               updated_at = NOW() 
+           WHERE id = $4`,
+          [confStatus, bloodReq.status, bloodReq.selected_donor_id, reqId]
+        );
+      } catch (e) {
+        console.warn('DB reconfirmation update error:', e.message);
+      }
+    }
+
+    if (isConfirmed) {
+      await answerCallbackQuery(callbackId, '✅ Availability reconfirmed! Requester notified.', false);
+      if (effectiveChatId && messageId) {
+        await editMessageText(
+          effectiveChatId,
+          messageId,
+          `${originalText}\n\n✅ *RECONFIRMATION: CONFIRMED*\nThank you! You have reconfirmed your availability to donate blood. The requester has been notified to coordinate hospital logistics.`,
+          { inline_keyboard: [] }
+        );
+      }
+    } else {
+      await answerCallbackQuery(callbackId, '❌ Decline recorded. Requester notified to choose another donor.', false);
+      if (effectiveChatId && messageId) {
+        await editMessageText(
+          effectiveChatId,
+          messageId,
+          `${originalText}\n\n❌ *RECONFIRMATION: DECLINED*\nYou indicated you are unavailable for this donation. The requester has been notified to select an alternate donor.`,
+          { inline_keyboard: [] }
+        );
+      }
+    }
+    return;
+  }
 
   // 1. Flexible regex to support donor_accept:<id>, donor_decline:<id>, accept_req_<id>, decline_req_<id>, accept:<id>, decline:<id>
   const match = rawData.match(/^(?:donor_)?(accept|decline)[:_](?:req_)?(.+)$/i);
@@ -1146,6 +1301,7 @@ module.exports = {
   sendTelegramMessage,
   sendEmergencyBloodRequestNotification,
   dispatchEmergencyRequestNotifications,
+  sendDonorSelectionReconfirmation,
   handleTelegramMessage,
   handleTelegramCallbackQuery,
   handleCallbackQuery: handleTelegramCallbackQuery,

@@ -9,7 +9,7 @@
  * - Consent-gated verification check
  */
 
-const { localStore } = require('../db/db');
+const { localStore, isPostgresConnected, getPool } = require('../db/db');
 
 const DEFAULT_COOLDOWN_MONTHS = 3;
 
@@ -50,7 +50,7 @@ function isDonorEligibleForNotification(donor, referenceTime = new Date()) {
   }
 
   // 2. Explicit availability check
-  if (donor.availability_status !== 'available') {
+  if (donor.availability_status && donor.availability_status !== 'available') {
     return false;
   }
 
@@ -80,24 +80,75 @@ function isDonorEligibleForNotification(donor, referenceTime = new Date()) {
 
 /**
  * Confirm a completed donation and activate the 3-month cooldown
+ * Stores cooldown start, end timestamp, updates availability_status, and persists to DB.
  */
-function recordCompletedDonation(donorId, donationDate = new Date().toISOString().split('T')[0], confirmedBy = 'donor') {
-  const donor = (localStore.donors || []).find((d) => d.id === donorId);
-  if (!donor) {
-    throw new Error('Donor record not found.');
+async function recordCompletedDonation(donorId, donationDate = new Date().toISOString().split('T')[0], confirmedBy = 'donor', requestId = null) {
+  let donor = (localStore.donors || []).find((d) => d.id === donorId);
+  const now = new Date();
+  const cooldownEndDate = calculateCooldownDate(donationDate, DEFAULT_COOLDOWN_MONTHS);
+  const cooldownUntilIso = cooldownEndDate ? cooldownEndDate.toISOString() : null;
+  const cooldownStartIso = now.toISOString();
+
+  if (isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const res = await pool.query('SELECT * FROM public.donors WHERE id = $1 LIMIT 1', [donorId]);
+      if (res.rows.length > 0) {
+        donor = res.rows[0];
+      }
+      await pool.query(
+        `UPDATE public.donors 
+         SET last_donation_date = $1,
+             donated_last_3_months = TRUE,
+             cooldown_start = $2,
+             cooldown_until = $3,
+             availability_status = 'recently_donated',
+             donation_history_status = 'verified_recent',
+             last_availability_confirmed_at = $2,
+             updated_at = $2
+         WHERE id = $4`,
+        [donationDate, cooldownStartIso, cooldownUntilIso, donorId]
+      );
+
+      // Record in donor_cooldowns table
+      await pool.query(
+        `INSERT INTO public.donor_cooldowns (
+          donor_id, request_id, start_date, end_date, reason, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [donorId, requestId, cooldownStartIso, cooldownUntilIso, confirmedBy || 'request_fulfilled', cooldownStartIso]
+      );
+
+      // Record audit event in DB
+      await pool.query(
+        `INSERT INTO public.audit_events (
+          action, actor_id, actor_role, entity_type, entity_id, metadata, timestamp
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          'donation_confirmed',
+          donorId,
+          confirmedBy,
+          'donor',
+          donorId,
+          JSON.stringify({ donation_date: donationDate, cooldown_until: cooldownUntilIso, cooldown_start: cooldownStartIso, request_id: requestId }),
+          cooldownStartIso
+        ]
+      );
+    } catch (dbErr) {
+      console.warn('DB recordCompletedDonation update error:', dbErr.message);
+    }
   }
 
-  const cooldownEndDate = calculateCooldownDate(donationDate, DEFAULT_COOLDOWN_MONTHS);
+  if (donor) {
+    donor.last_donation_date = donationDate;
+    donor.donated_last_3_months = true;
+    donor.cooldown_start = cooldownStartIso;
+    donor.cooldown_until = cooldownUntilIso;
+    donor.availability_status = 'recently_donated';
+    donor.donation_history_status = 'verified_recent';
+    donor.last_availability_confirmed_at = cooldownStartIso;
+    donor.updated_at = cooldownStartIso;
+  }
 
-  donor.last_donation_date = donationDate;
-  donor.donated_last_3_months = true;
-  donor.cooldown_until = cooldownEndDate ? cooldownEndDate.toISOString() : null;
-  donor.availability_status = 'recently_donated';
-  donor.donation_history_status = 'verified_recent';
-  donor.last_availability_confirmed_at = new Date().toISOString();
-  donor.updated_at = new Date().toISOString();
-
-  // Audit event
   if (localStore.audit_events) {
     localStore.audit_events.push({
       action: 'donation_confirmed',
@@ -107,9 +158,11 @@ function recordCompletedDonation(donorId, donationDate = new Date().toISOString(
       entity_id: donorId,
       metadata: {
         donation_date: donationDate,
-        cooldown_until: donor.cooldown_until
+        cooldown_until: cooldownUntilIso,
+        cooldown_start: cooldownStartIso,
+        request_id: requestId
       },
-      timestamp: new Date().toISOString()
+      timestamp: cooldownStartIso
     });
   }
 
@@ -119,7 +172,7 @@ function recordCompletedDonation(donorId, donationDate = new Date().toISOString(
 /**
  * Process cooldown expiry and re-confirmation
  */
-function checkAndUpdateCooldownExpiry(donor, referenceTime = new Date()) {
+async function checkAndUpdateCooldownExpiry(donor, referenceTime = new Date()) {
   if (!donor || !donor.cooldown_until) return donor;
 
   const now = new Date(referenceTime).getTime();
@@ -131,6 +184,23 @@ function checkAndUpdateCooldownExpiry(donor, referenceTime = new Date()) {
     donor.donation_history_status = 'eligible';
     donor.availability_status = 'available';
     donor.updated_at = new Date().toISOString();
+
+    if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        await pool.query(
+          `UPDATE public.donors 
+           SET donated_last_3_months = FALSE,
+               donation_history_status = 'eligible',
+               availability_status = 'available',
+               updated_at = NOW()
+           WHERE id = $1`,
+          [donor.id]
+        );
+      } catch (err) {
+        console.warn('DB checkAndUpdateCooldownExpiry error:', err.message);
+      }
+    }
   }
 
   return donor;

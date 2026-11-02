@@ -71,8 +71,16 @@ export default function Navbar({ onOpenAI }) {
           
           {/* 1. Left: Brand Identity */}
           <Link to="/" className="flex items-center gap-3 group flex-shrink-0" aria-label="BloodBridge Home">
-            <div className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/50 group-hover:scale-105 transition-transform duration-300">
-              <Heart className="w-5 h-5 fill-white" />
+            <div className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shadow-rose-950/50 group-hover:scale-105 transition-transform duration-300 overflow-hidden">
+              <img
+                src="/images/bloodbridge-hero-emblem-transparent.png"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = '/images/bloodbridge-hero-emblem.jpg';
+                }}
+                alt="BloodBridge Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex flex-col justify-center">
               <span className="text-[22px] sm:text-[23px] lg:text-[24px] font-black tracking-tight text-white leading-none">

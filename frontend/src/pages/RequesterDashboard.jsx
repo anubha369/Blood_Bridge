@@ -213,21 +213,31 @@ export default function RequesterDashboard() {
                       {r.urgency}
                     </span>
 
-                    {/* Status Badge */}
+                    {/* 5-Stage Workflow Status Badge */}
                     <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                       r.status === 'donor_selected'
-                        ? 'bg-emerald-600 text-white font-black animate-pulse'
-                        : r.status === 'responses_received'
+                        ? 'bg-rose-600 text-white font-black'
+                        : ['donors_responded', 'responses_received'].includes(r.status)
                         ? 'bg-emerald-100 text-emerald-800 font-extrabold'
-                        : r.status === 'notifications_queued'
+                        : ['alerting_donors', 'notifications_queued'].includes(r.status)
                         ? 'bg-blue-100 text-blue-800'
                         : r.status === 'fulfilled'
-                        ? 'bg-indigo-100 text-indigo-800'
+                        ? 'bg-emerald-600 text-white font-extrabold'
                         : r.status === 'cancelled'
                         ? 'bg-red-100 text-red-800'
                         : 'bg-slate-100 text-slate-700'
                     }`}>
-                      {r.status === 'donor_selected' ? 'Donor Selected' : r.status === 'responses_received' ? 'Donors Responded' : r.status}
+                      {r.status === 'registered' || r.status === 'submitted' || r.status === 'searching'
+                        ? '1. Registered'
+                        : r.status === 'alerting_donors' || r.status === 'notifications_queued'
+                        ? '2. Alerting Donors'
+                        : r.status === 'donors_responded' || r.status === 'responses_received'
+                        ? '3. Donors Responded'
+                        : r.status === 'donor_selected'
+                        ? '4. Donor Selected'
+                        : r.status === 'fulfilled'
+                        ? '5. Fulfilled'
+                        : r.status}
                     </span>
                   </div>
 

@@ -177,9 +177,13 @@ export const api = {
     getCandidates: (id, radiusKm = 30) => request(`/requests/${id}/candidates?radius_km=${radiusKm}`),
     getContactRequests: (id) => request(`/requests/${id}/contact-requests`),
     sendDonorRequest: (id, donorId) => request(`/requests/${id}/send-donor-request`, { method: 'POST', body: JSON.stringify({ donor_id: donorId }) }),
+    alertDonors: (id, payload = {}) => request(`/requests/${id}/alert-donors`, { method: 'POST', body: JSON.stringify(payload) }),
     getAcceptedDonors: (id) => request(`/requests/${id}/accepted-donors`),
-    selectDonor: (id, donorId) => request(`/requests/${id}/select-donor`, { method: 'POST', body: JSON.stringify({ donor_id: donorId }) }),
+    selectDonor: (id, donorId, manualConfirm = false) => request(`/requests/${id}/select-donor`, { method: 'POST', body: JSON.stringify({ donor_id: donorId, manual_confirm: manualConfirm }) }),
+    reconfirmDonor: (id, action, method = 'portal') => request(`/requests/${id}/reconfirm-donor`, { method: 'POST', body: JSON.stringify({ action, method }) }),
     reselectDonor: (id) => request(`/requests/${id}/reselect-donor`, { method: 'POST' }),
+    fulfill: (id, payload = {}) => request(`/requests/${id}/fulfill`, { method: 'POST', body: JSON.stringify(payload) }),
+    cancel: (id) => request(`/requests/${id}/cancel`, { method: 'POST' }),
     updateStatus: (id, status) => request(`/requests/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
   },
 

@@ -22,26 +22,30 @@ const { findNearbyDonors, resolveCityCoordinates } = require('../services/spatia
 const { recordCompletedDonation } = require('../services/cooldownService');
 const {
   dispatchEmergencyRequestNotifications,
-  sendEmergencyBloodRequestNotification
+  sendEmergencyBloodRequestNotification,
+  sendDonorSelectionReconfirmation
 } = require('../services/telegramService');
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const VALID_STATUSES = [
+  'registered',
+  'alerting_donors',
+  'donors_responded',
+  'donor_selected',
+  'fulfilled',
+  'cancelled',
+  'expired',
+  'closed',
   'draft',
   'submitted',
   'validating',
   'searching',
   'notifications_queued',
   'responses_received',
-  'donor_selected',
   'coordination_in_progress',
   'active',
   'pending',
-  'partially_fulfilled',
-  'fulfilled',
-  'cancelled',
-  'expired',
-  'closed'
+  'partially_fulfilled'
 ];
 
 // POST /api/requests
@@ -106,7 +110,10 @@ router.post('/', authenticateUser, async (req, res, next) => {
       description: description ? description.trim() : null,
       contact_phone: contact_phone ? contact_phone.trim() : req.user.phone || null,
       contact_preference,
-      status: 'active',
+      status: 'registered',
+      confirmation_status: 'pending',
+      reconfirmed_at: null,
+      fulfilled_at: null,
       selected_donor_id: null,
       selected_at: null,
       created_at: new Date().toISOString(),
@@ -123,12 +130,12 @@ router.post('/', authenticateUser, async (req, res, next) => {
             id, requester_id, patient_name, blood_group, units_needed,
             hospital_name, hospital_address, city, latitude, longitude,
             urgency, needed_by, description, contact_phone, contact_preference,
-            status, created_at, updated_at
+            status, confirmation_status, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5,
             $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15,
-            $16, NOW(), NOW()
+            $16, $17, NOW(), NOW()
           )
           ON CONFLICT (id) DO NOTHING`,
           [
@@ -147,7 +154,8 @@ router.post('/', authenticateUser, async (req, res, next) => {
             newRequest.description,
             newRequest.contact_phone,
             newRequest.contact_preference,
-            newRequest.status
+            newRequest.status,
+            newRequest.confirmation_status
           ]
         );
       } catch (dbErr) {
@@ -460,10 +468,20 @@ router.post('/:id/send-donor-request', authenticateUser, async (req, res, next) 
     const notificationResult = await sendEmergencyBloodRequestNotification(donor, request);
 
     if (notificationResult && notificationResult.success) {
+      if (['registered', 'submitted', 'active'].includes(request.status)) {
+        request.status = 'alerting_donors';
+        request.updated_at = new Date().toISOString();
+        if (isPostgresConnected() && getPool()) {
+          try {
+            await getPool().query('UPDATE public.blood_requests SET status = $1, updated_at = NOW() WHERE id = $2', [request.status, request.id]);
+          } catch (_) {}
+        }
+      }
       return res.json({
         success: true,
         message: 'Telegram request sent successfully. Waiting for donor response.',
         status: 'sent',
+        request_status: request.status,
         donor_id: donor.id,
         distance_band: distanceBand
       });
@@ -479,6 +497,82 @@ router.post('/:id/send-donor-request', authenticateUser, async (req, res, next) 
     return res.status(502).json({
       success: false,
       error: notificationResult?.error || 'Telegram service temporarily unavailable.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/requests/:id/alert-donors
+// Stage 2: Alert potential eligible matching donors via Telegram and transition to alerting_donors
+router.post('/:id/alert-donors', authenticateUser, async (req, res, next) => {
+  try {
+    let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+    if (!request && isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+        if (dbRes.rows.length > 0) request = dbRes.rows[0];
+      } catch (_) {}
+    }
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Blood request not found.' });
+    }
+
+    if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to alert donors for this request.' });
+    }
+
+    if (['fulfilled', 'cancelled', 'closed', 'expired'].includes(request.status)) {
+      return res.status(400).json({ success: false, error: 'This blood request is no longer active.' });
+    }
+
+    const { radius_km = 30, max_recipients = 10 } = req.body;
+
+    let searchLat = request.latitude;
+    let searchLon = request.longitude;
+    if (searchLat == null || searchLon == null) {
+      const coords = resolveCityCoordinates(request.city);
+      if (coords) {
+        searchLat = coords.lat;
+        searchLon = coords.lon;
+      }
+    }
+    if (searchLat == null || searchLon == null) {
+      searchLat = 26.8467;
+      searchLon = 80.9462;
+    }
+
+    const nearbyDonors = await searchNearbyTelegramDonors({
+      latitude: searchLat,
+      longitude: searchLon,
+      radiusKm: parseFloat(radius_km),
+      bloodGroup: request.blood_group,
+      limit: parseInt(max_recipients, 10) * 2
+    });
+
+    const dispatchResult = await dispatchEmergencyRequestNotifications({
+      request,
+      eligibleDonors: nearbyDonors,
+      maxRecipients: parseInt(max_recipients, 10)
+    });
+
+    if (['registered', 'submitted', 'active'].includes(request.status)) {
+      request.status = 'alerting_donors';
+      request.updated_at = new Date().toISOString();
+      if (isPostgresConnected() && getPool()) {
+        try {
+          await getPool().query('UPDATE public.blood_requests SET status = $1, updated_at = NOW() WHERE id = $2', [request.status, request.id]);
+        } catch (_) {}
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Alerts dispatched to ${dispatchResult.sent_count} eligible donors.`,
+      request_status: request.status,
+      request,
+      ...dispatchResult
     });
   } catch (err) {
     next(err);
@@ -569,6 +663,7 @@ router.get('/:id/contact-requests', authenticateUser, async (req, res, next) => 
       }
 
       const isSelected = request.selected_donor_id === n.donor_id;
+      const canSelect = isAccepted && !isDeclined && request.status !== 'fulfilled' && request.status !== 'cancelled';
 
       // Status message per Section 6
       let statusMessage = 'Waiting for donor response.';
@@ -596,10 +691,12 @@ router.get('/:id/contact-requests', authenticateUser, async (req, res, next) => 
         verification_status: n.verification_status,
         availability_status: n.availability_status,
         status: isAccepted ? 'accepted' : isDeclined ? 'declined' : isExpired ? 'expired' : 'pending',
+        response_status: isAccepted ? 'accepted' : isDeclined ? 'declined' : 'pending',
         status_message: statusMessage,
         responded_at: n.responded_at,
         created_at: n.created_at,
         is_selected: isSelected,
+        can_select: canSelect,
         phone: validPhone,
         has_phone: Boolean(validPhone),
         phone_message: isAccepted
@@ -608,12 +705,27 @@ router.get('/:id/contact-requests', authenticateUser, async (req, res, next) => 
       };
     });
 
+    // Auto-transition Stage 2 (alerting_donors) to Stage 3 (donors_responded) if any responses received
+    const hasResponses = items.some((i) => i.status === 'accepted' || i.status === 'declined');
+    if (hasResponses && ['alerting_donors', 'notifications_queued'].includes(request.status)) {
+      request.status = 'donors_responded';
+      request.updated_at = new Date().toISOString();
+      if (isPostgresConnected() && getPool()) {
+        try {
+          await getPool().query('UPDATE public.blood_requests SET status = $1, updated_at = NOW() WHERE id = $2', [request.status, request.id]);
+        } catch (_) {}
+      }
+    }
+
     return res.json({
       success: true,
       request_id: request.id,
       request_status: request.status,
       selected_donor_id: request.selected_donor_id || null,
       selected_at: request.selected_at || null,
+      confirmation_status: request.confirmation_status || 'pending',
+      reconfirmed_at: request.reconfirmed_at || null,
+      fulfilled_at: request.fulfilled_at || null,
       count: items.length,
       contact_requests: items
     });
@@ -733,7 +845,7 @@ router.get('/:id/accepted-donors', authenticateUser, async (req, res, next) => {
 });
 
 // POST /api/requests/:id/select-donor
-// Select one accepting donor for coordination and reveal contact info
+// Stage 4: Requester manually selects one accepted donor & initiates reconfirmation
 router.post('/:id/select-donor', authenticateUser, async (req, res) => {
   let request = localStore.blood_requests.find((r) => r.id === req.params.id);
   if (!request && isPostgresConnected() && getPool()) {
@@ -751,21 +863,26 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
     return res.status(403).json({ success: false, error: 'Unauthorized to select a donor for this request.' });
   }
 
-  const { donor_id } = req.body;
+  if (['fulfilled', 'cancelled', 'closed', 'expired'].includes(request.status)) {
+    return res.status(400).json({ success: false, error: 'This blood request is no longer active.' });
+  }
+
+  const { donor_id, manual_confirm = false } = req.body;
   if (!donor_id) {
     return res.status(400).json({ success: false, error: 'donor_id is required.' });
   }
 
-  // Validate that this donor actually accepted this specific request!
+  // Validate that this donor actually responded and ACCEPTED this specific request!
+  // Rejected donors MUST NOT be selectable per requirement!
   let acceptedJob = (localStore.telegram_notifications || []).find(
-    (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
+    (j) => j.request_id === request.id && j.donor_id === donor_id
   ) || (localStore.whatsapp_notifications || []).find(
-    (j) => j.request_id === request.id && j.donor_id === donor_id && j.donor_response === 'accepted'
+    (j) => j.request_id === request.id && j.donor_id === donor_id
   );
   if (!acceptedJob && isPostgresConnected() && getPool()) {
     try {
       const pool = getPool();
-      const q = "SELECT * FROM public.telegram_notifications WHERE request_id = $1 AND donor_id = $2 AND donor_response = 'accepted' LIMIT 1";
+      const q = "SELECT * FROM public.telegram_notifications WHERE request_id = $1 AND donor_id = $2 LIMIT 1";
       const dbRes = await pool.query(q, [request.id, donor_id]);
       if (dbRes.rows.length > 0) acceptedJob = dbRes.rows[0];
     } catch (_) {}
@@ -774,7 +891,14 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
   if (!acceptedJob) {
     return res.status(400).json({
       success: false,
-      error: 'Cannot select donor: This donor has not accepted this emergency request.'
+      error: 'Cannot select donor: No response recorded for this donor on this request.'
+    });
+  }
+
+  if (acceptedJob.donor_response !== 'accepted') {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot select donor: Only donors who accepted should be eligible for the next selection stage. Rejected donors must not be selectable.'
     });
   }
 
@@ -783,19 +907,44 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
     return res.status(404).json({ success: false, error: 'Donor record not found.' });
   }
 
+  const nowIso = new Date().toISOString();
   request.selected_donor_id = donor_id;
-  request.selected_at = new Date().toISOString();
+  request.selected_at = nowIso;
   request.status = 'donor_selected';
-  request.updated_at = new Date().toISOString();
+  request.updated_at = nowIso;
+
+  let reconfirmResult = null;
+  if (manual_confirm) {
+    request.confirmation_status = 'confirmed';
+    request.reconfirmed_at = nowIso;
+  } else {
+    request.confirmation_status = 'pending';
+    request.reconfirmed_at = null;
+    // Dispatch reconfirmation alert via Telegram
+    try {
+      reconfirmResult = await sendDonorSelectionReconfirmation(donor, request);
+    } catch (tgErr) {
+      console.warn('Reconfirmation dispatch warning:', tgErr.message);
+    }
+  }
 
   if (isPostgresConnected() && getPool()) {
     try {
       const pool = getPool();
       await pool.query(
-        'UPDATE public.blood_requests SET selected_donor_id = $1, selected_at = NOW(), status = $2, updated_at = NOW() WHERE id = $3',
-        [donor_id, request.status, request.id]
+        `UPDATE public.blood_requests 
+         SET selected_donor_id = $1, 
+             selected_at = NOW(), 
+             confirmation_status = $2, 
+             reconfirmed_at = $3, 
+             status = $4, 
+             updated_at = NOW() 
+         WHERE id = $5`,
+        [donor_id, request.confirmation_status, request.reconfirmed_at, request.status, request.id]
       );
-    } catch (e) {}
+    } catch (e) {
+      console.warn('DB select-donor update error:', e.message);
+    }
   }
 
   // Audit event
@@ -806,14 +955,18 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
     action: 'donor_selected',
     entity_type: 'blood_request',
     entity_id: request.id,
-    metadata: { donor_id, patient_name: request.patient_name },
-    timestamp: new Date().toISOString()
+    metadata: { donor_id, patient_name: request.patient_name, manual_confirm },
+    timestamp: nowIso
   });
 
   return res.json({
     success: true,
-    message: `Donor ${donor.name} selected for coordination. Contact details are now enabled.`,
+    message: manual_confirm
+      ? `Donor ${donor.name} selected and confirmed. Contact details are enabled.`
+      : `Donor ${donor.name} selected. Confirmation request dispatched to donor. You may also contact them directly.`,
     request,
+    confirmation_status: request.confirmation_status,
+    reconfirmation_dispatched: Boolean(reconfirmResult?.success),
     selected_donor: {
       id: donor.id,
       name: donor.name,
@@ -825,10 +978,130 @@ router.post('/:id/select-donor', authenticateUser, async (req, res) => {
   });
 });
 
+// POST /api/requests/:id/reconfirm-donor
+// Stage 4: Donor reconfirms willingness/availability, or requester records phone confirmation
+router.post('/:id/reconfirm-donor', authenticateUser, async (req, res) => {
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (dbRes.rows.length > 0) request = dbRes.rows[0];
+    } catch (_) {}
+  }
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+  }
+
+  const { action, method = 'portal' } = req.body;
+  if (!['confirm', 'decline'].includes(action)) {
+    return res.status(400).json({ success: false, error: 'action must be "confirm" or "decline".' });
+  }
+
+  // Authorization: Requester/Admin or the selected donor themselves
+  let isAuthorized = false;
+  if (req.user.role === 'admin' || request.requester_id === req.user.id) {
+    isAuthorized = true;
+  } else {
+    const donor = (localStore.donors || []).find((d) => d.id === request.selected_donor_id && d.user_id === req.user.id);
+    if (donor) isAuthorized = true;
+    else if (isPostgresConnected() && getPool()) {
+      try {
+        const pool = getPool();
+        const dRes = await pool.query('SELECT id FROM public.donors WHERE id = $1 AND user_id = $2 LIMIT 1', [request.selected_donor_id, req.user.id]);
+        if (dRes.rows.length > 0) isAuthorized = true;
+      } catch (_) {}
+    }
+  }
+
+  if (!isAuthorized) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to submit reconfirmation for this donor selection.' });
+  }
+
+  const nowIso = new Date().toISOString();
+  if (action === 'confirm') {
+    request.confirmation_status = 'confirmed';
+    request.reconfirmed_at = nowIso;
+    request.status = 'donor_selected';
+    request.updated_at = nowIso;
+
+    if (isPostgresConnected() && getPool()) {
+      try {
+        await getPool().query(
+          `UPDATE public.blood_requests 
+           SET confirmation_status = 'confirmed', reconfirmed_at = NOW(), status = 'donor_selected', updated_at = NOW() 
+           WHERE id = $1`,
+          [request.id]
+        );
+      } catch (e) {}
+    }
+
+    localStore.audit_events.push({
+      action: 'donor_reconfirmed',
+      actor_id: req.user.id,
+      actor_role: req.user.role,
+      entity_type: 'blood_request',
+      entity_id: request.id,
+      metadata: { method, confirmation_status: 'confirmed' },
+      timestamp: nowIso
+    });
+
+    return res.json({
+      success: true,
+      message: 'Donor availability confirmed. You may now coordinate final donation.',
+      confirmation_status: 'confirmed',
+      request
+    });
+  } else {
+    // Declined
+    request.confirmation_status = 'declined';
+    request.reconfirmed_at = nowIso;
+    request.status = 'donors_responded';
+    const previousDonorId = request.selected_donor_id;
+    request.selected_donor_id = null; // Cleared so requester can select another eligible donor
+    request.updated_at = nowIso;
+
+    if (isPostgresConnected() && getPool()) {
+      try {
+        await getPool().query(
+          `UPDATE public.blood_requests 
+           SET confirmation_status = 'declined', reconfirmed_at = NOW(), status = 'donors_responded', selected_donor_id = NULL, updated_at = NOW() 
+           WHERE id = $1`,
+          [request.id]
+        );
+      } catch (e) {}
+    }
+
+    localStore.audit_events.push({
+      action: 'donor_declined_reconfirmation',
+      actor_id: req.user.id,
+      actor_role: req.user.role,
+      entity_type: 'blood_request',
+      entity_id: request.id,
+      metadata: { method, previous_donor_id: previousDonorId, confirmation_status: 'declined' },
+      timestamp: nowIso
+    });
+
+    return res.json({
+      success: true,
+      message: 'Donor declined reconfirmation. You may now select another eligible donor.',
+      confirmation_status: 'declined',
+      request
+    });
+  }
+});
+
 // POST /api/requests/:id/reselect-donor
 // Clear selection and allow picking another accepting donor
 router.post('/:id/reselect-donor', authenticateUser, async (req, res) => {
-  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (dbRes.rows.length > 0) request = dbRes.rows[0];
+    } catch (_) {}
+  }
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
   }
@@ -837,17 +1110,27 @@ router.post('/:id/reselect-donor', authenticateUser, async (req, res) => {
     return res.status(403).json({ success: false, error: 'Unauthorized to reselect for this request.' });
   }
 
+  const nowIso = new Date().toISOString();
   request.selected_donor_id = null;
   request.selected_at = null;
-  request.status = 'responses_received';
-  request.updated_at = new Date().toISOString();
+  request.confirmation_status = 'pending';
+  request.reconfirmed_at = null;
+  request.status = 'donors_responded';
+  request.updated_at = nowIso;
 
   if (isPostgresConnected() && getPool()) {
     try {
       const pool = getPool();
       await pool.query(
-        'UPDATE public.blood_requests SET selected_donor_id = NULL, selected_at = NULL, status = $1, updated_at = NOW() WHERE id = $2',
-        [request.status, request.id]
+        `UPDATE public.blood_requests 
+         SET selected_donor_id = NULL, 
+             selected_at = NULL, 
+             confirmation_status = 'pending', 
+             reconfirmed_at = NULL, 
+             status = 'donors_responded', 
+             updated_at = NOW() 
+         WHERE id = $1`,
+        [request.id]
       );
     } catch (e) {}
   }
@@ -859,9 +1142,172 @@ router.post('/:id/reselect-donor', authenticateUser, async (req, res) => {
   });
 });
 
+// POST /api/requests/:id/fulfill
+// Stage 5: Confirm blood received, mark fulfilled, and activate donor 3-month cooldown
+router.post('/:id/fulfill', authenticateUser, async (req, res) => {
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (dbRes.rows.length > 0) request = dbRes.rows[0];
+    } catch (_) {}
+  }
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+  }
+
+  if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to mark this request as fulfilled.' });
+  }
+
+  // Duplicate fulfillment prevention
+  if (request.status === 'fulfilled') {
+    return res.status(400).json({
+      success: false,
+      error: 'This blood request is already marked as fulfilled.',
+      fulfilled_at: request.fulfilled_at
+    });
+  }
+
+  // Cannot fulfill cancelled request
+  if (request.status === 'cancelled') {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot fulfill a cancelled blood request.'
+    });
+  }
+
+  if (!request.selected_donor_id) {
+    return res.status(400).json({
+      success: false,
+      error: 'Cannot fulfill request: No donor has been selected.'
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+  const today = nowIso.split('T')[0];
+
+  request.status = 'fulfilled';
+  request.fulfilled_at = nowIso;
+  request.updated_at = nowIso;
+
+  if (isPostgresConnected() && getPool()) {
+    try {
+      await getPool().query(
+        `UPDATE public.blood_requests 
+         SET status = 'fulfilled', fulfilled_at = NOW(), updated_at = NOW() 
+         WHERE id = $1`,
+        [request.id]
+      );
+    } catch (e) {
+      console.warn('DB fulfill update error:', e.message);
+    }
+  }
+
+  // Trigger 3-Month Notification Cooldown on the selected donor
+  let updatedDonor = null;
+  try {
+    updatedDonor = await recordCompletedDonation(
+      request.selected_donor_id,
+      today,
+      'request_fulfilled',
+      request.id
+    );
+  } catch (cooldownErr) {
+    console.warn('Cooldown activation warning:', cooldownErr.message);
+  }
+
+  localStore.audit_events.push({
+    action: 'request_fulfilled',
+    actor_id: req.user.id,
+    actor_role: req.user.role,
+    entity_type: 'blood_request',
+    entity_id: request.id,
+    metadata: {
+      selected_donor_id: request.selected_donor_id,
+      patient_name: request.patient_name,
+      cooldown_until: updatedDonor?.cooldown_until
+    },
+    timestamp: nowIso
+  });
+
+  return res.json({
+    success: true,
+    message: 'Blood donation confirmed and request fulfilled successfully. 3-month notification cooldown active for donor.',
+    request,
+    cooldown: {
+      donor_id: request.selected_donor_id,
+      cooldown_start: updatedDonor?.cooldown_start || nowIso,
+      cooldown_until: updatedDonor?.cooldown_until || null
+    }
+  });
+});
+
+// POST /api/requests/:id/cancel
+// Cancel request without applying cooldown
+router.post('/:id/cancel', authenticateUser, async (req, res) => {
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (dbRes.rows.length > 0) request = dbRes.rows[0];
+    } catch (_) {}
+  }
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Blood request not found.' });
+  }
+
+  if (req.user.role !== 'admin' && request.requester_id !== req.user.id) {
+    return res.status(403).json({ success: false, error: 'Unauthorized to cancel this request.' });
+  }
+
+  if (request.status === 'fulfilled') {
+    return res.status(400).json({ success: false, error: 'Cannot cancel an already fulfilled request.' });
+  }
+
+  const nowIso = new Date().toISOString();
+  request.status = 'cancelled';
+  request.updated_at = nowIso;
+
+  if (isPostgresConnected() && getPool()) {
+    try {
+      await getPool().query(
+        `UPDATE public.blood_requests 
+         SET status = 'cancelled', updated_at = NOW() 
+         WHERE id = $1`,
+        [request.id]
+      );
+    } catch (e) {}
+  }
+
+  localStore.audit_events.push({
+    action: 'request_cancelled',
+    actor_id: req.user.id,
+    actor_role: req.user.role,
+    entity_type: 'blood_request',
+    entity_id: request.id,
+    timestamp: nowIso
+  });
+
+  return res.json({
+    success: true,
+    message: 'Blood request cancelled. No cooldown applied.',
+    request
+  });
+});
+
 // PATCH /api/requests/:id/status
 router.patch('/:id/status', authenticateUser, async (req, res) => {
-  const request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  let request = localStore.blood_requests.find((r) => r.id === req.params.id);
+  if (!request && isPostgresConnected() && getPool()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query('SELECT * FROM public.blood_requests WHERE id = $1 LIMIT 1', [req.params.id]);
+      if (dbRes.rows.length > 0) request = dbRes.rows[0];
+    } catch (_) {}
+  }
   if (!request) {
     return res.status(404).json({ success: false, error: 'Blood request not found.' });
   }
@@ -876,14 +1322,26 @@ router.patch('/:id/status', authenticateUser, async (req, res) => {
     return res.status(400).json({ success: false, error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
   }
 
+  if (status === 'fulfilled' && request.status === 'fulfilled') {
+    return res.status(400).json({ success: false, error: 'This request is already marked as fulfilled.' });
+  }
+
+  const nowIso = new Date().toISOString();
   request.status = status;
-  request.updated_at = new Date().toISOString();
+  if (status === 'fulfilled') {
+    request.fulfilled_at = nowIso;
+  }
+  request.updated_at = nowIso;
 
   if (isPostgresConnected() && getPool()) {
     try {
       const pool = getPool();
       await pool.query(
-        'UPDATE public.blood_requests SET status = $1, updated_at = NOW() WHERE id = $2',
+        `UPDATE public.blood_requests 
+         SET status = $1, 
+             fulfilled_at = (CASE WHEN $1 = 'fulfilled' THEN NOW() ELSE fulfilled_at END),
+             updated_at = NOW() 
+         WHERE id = $2`,
         [status, request.id]
       );
     } catch (e) {}
@@ -891,7 +1349,7 @@ router.patch('/:id/status', authenticateUser, async (req, res) => {
 
   // If request is marked fulfilled and a donor was selected, record completed donation & trigger cooldown
   if (status === 'fulfilled' && request.selected_donor_id) {
-    recordCompletedDonation(request.selected_donor_id, new Date().toISOString().split('T')[0], 'request_fulfilled');
+    await recordCompletedDonation(request.selected_donor_id, nowIso.split('T')[0], 'request_fulfilled', request.id);
   }
 
   return res.json({

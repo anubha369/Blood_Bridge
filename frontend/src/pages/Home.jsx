@@ -98,8 +98,16 @@ export default function Home({ onOpenAI }) {
           
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-3 group" aria-label="BloodBridge Platform Home">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#881337] via-[#D71935] to-[#BE123C] flex items-center justify-center text-white shadow-md shadow-rose-950/20 group-hover:scale-105 transition-transform duration-300">
-              <Heart className="w-5 h-5 fill-white" />
+            <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shadow-rose-950/20 group-hover:scale-105 transition-transform duration-300 border border-slate-200 overflow-hidden">
+              <img
+                src="/images/bloodbridge-hero-emblem-transparent.png"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = '/images/bloodbridge-hero-emblem.jpg';
+                }}
+                alt="BloodBridge Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-[23px] sm:text-[25px] font-black tracking-tight text-[#0F172A]">

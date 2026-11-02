@@ -113,6 +113,26 @@ export default function DonorDashboard() {
     }
   };
 
+  const [reconfirmingId, setReconfirmingId] = useState(null);
+  const handleReconfirmAvailability = async (requestId, action) => {
+    setReconfirmingId(requestId);
+    try {
+      const res = await api.requests.reconfirmDonor(requestId, action, 'portal');
+      if (res.success) {
+        alert(res.message);
+        const updated = await api.donors.getContactRequests().catch(() => null);
+        const updatedNotifs = updated?.notifications || updated?.requests || [];
+        setIncomingRequests(updatedNotifs);
+      } else {
+        alert(res.error || 'Failed to submit confirmation.');
+      }
+    } catch (err) {
+      alert(`Reconfirmation error: ${err.message}`);
+    } finally {
+      setReconfirmingId(null);
+    }
+  };
+
   const fetchTelegramStatus = async () => {
     setTelegramLoading(true);
     try {
@@ -501,9 +521,52 @@ export default function DonorDashboard() {
                       </div>
                     </div>
                   ) : isAccepted ? (
-                    <div className="pt-2 border-t border-emerald-100 text-xs text-emerald-800 font-semibold flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>You accepted this request. Requester has access to coordinate with you.</span>
+                    <div className="pt-2 border-t border-emerald-100 space-y-2">
+                      {req.is_selected ? (
+                        req.confirmation_status === 'confirmed' ? (
+                          <div className="text-xs font-bold text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>You confirmed availability! Requester has your verified contact details.</span>
+                          </div>
+                        ) : req.confirmation_status === 'declined' ? (
+                          <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded-xl italic">
+                            You declined reconfirmation for this request.
+                          </div>
+                        ) : (
+                          <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 space-y-2">
+                            <div className="flex items-center gap-1.5 text-rose-900 font-bold text-xs">
+                              <Sparkles className="w-4 h-4 text-rose-600" />
+                              <span>You have been designated as the primary donor!</span>
+                            </div>
+                            <p className="text-[11px] text-rose-800">
+                              The requester selected you for this emergency. Please reconfirm your availability:
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleReconfirmAvailability(req.request_id, 'confirm')}
+                                disabled={reconfirmingId === req.request_id}
+                                className="flex-1 py-1.5 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm"
+                              >
+                                {reconfirmingId === req.request_id ? 'Confirming...' : 'Confirm Availability'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleReconfirmAvailability(req.request_id, 'decline')}
+                                disabled={reconfirmingId === req.request_id}
+                                className="py-1.5 px-3 text-xs font-semibold text-red-700 bg-white hover:bg-red-50 border border-red-200 rounded-lg"
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-xs text-emerald-800 font-semibold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>You accepted this request. Waiting for requester donor selection.</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="pt-2 border-t border-slate-200 text-xs text-slate-500 italic">
