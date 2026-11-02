@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { localStore } = require('../db/db');
+const { localStore, isPostgresConnected, getPool } = require('../db/db');
 const { authenticateUser, requireRole } = require('../middleware/auth');
 
 // All admin routes strictly require 'admin' role verified on server
@@ -198,11 +198,24 @@ router.get('/whatsapp-jobs', (req, res) => {
 });
 
 // GET /api/admin/credit-ledger
-router.get('/credit-ledger', (req, res) => {
+router.get('/credit-ledger', async (req, res) => {
+  if (isPostgresConnected()) {
+    try {
+      const pool = getPool();
+      const dbRes = await pool.query(`SELECT * FROM public.credit_ledger ORDER BY timestamp DESC LIMIT 100`);
+      return res.json({
+        success: true,
+        count: dbRes.rows.length,
+        entries: dbRes.rows
+      });
+    } catch (e) {
+      console.warn('DB credit-ledger query warning:', e.message);
+    }
+  }
   return res.json({
     success: true,
     count: (localStore.credit_ledger || []).length,
-    entries: [...(localStore.credit_ledger || [])].reverse().slice(0, 50)
+    entries: [...(localStore.credit_ledger || [])].reverse().slice(0, 100)
   });
 });
 

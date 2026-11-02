@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusCircle, Activity, Clock, CheckCircle2, AlertTriangle, AlertCircle, Users, MapPin, ChevronRight, Phone, Shield } from 'lucide-react';
+import { PlusCircle, Activity, Clock, CheckCircle2, AlertTriangle, AlertCircle, Users, MapPin, ChevronRight, Phone, Shield, Award } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function RequesterDashboard() {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
+  const [userCredits, setUserCredits] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -24,9 +25,15 @@ export default function RequesterDashboard() {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const res = await api.requests.getAll({ own_only: 'true' });
+      const [res, credRes] = await Promise.all([
+        api.requests.getAll({ own_only: 'true' }),
+        api.credits.getBalance().catch(() => null)
+      ]);
       if (res.success) {
         setRequests(res.requests || []);
+      }
+      if (credRes && credRes.success && credRes.balance !== undefined) {
+        setUserCredits(credRes.balance);
       }
     } catch (err) {
       setError(err.message || 'Failed to fetch requests.');
@@ -117,13 +124,21 @@ export default function RequesterDashboard() {
           </p>
         </div>
 
-        <Link
-          to="/requests/create"
-          className="inline-flex items-center gap-2.5 px-6 py-3.5 text-[17px] font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all whitespace-nowrap self-start sm:self-auto"
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>Create New Request</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          {userCredits !== null && (
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
+              <Award className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>{userCredits} Credits</span>
+            </div>
+          )}
+          <Link
+            to="/requests/create"
+            className="inline-flex items-center gap-2.5 px-6 py-3.5 text-[17px] font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-200 transition-all whitespace-nowrap self-start sm:self-auto"
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>Create New Request</span>
+          </Link>
+        </div>
       </div>
 
       {/* KPI Cards */}

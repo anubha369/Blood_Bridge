@@ -153,8 +153,14 @@ export const api = {
   // Credits & Recognition
   credits: {
     getBalance: () => request('/credits/balance'),
-    getHistory: () => request('/credits/history'),
-    earn: (payload) => request('/credits/earn', { method: 'POST', body: JSON.stringify(payload) })
+    getWallet: () => request('/credits/wallet'),
+    getHistory: (limit = 50) => request(`/credits/history?limit=${limit}`),
+    getCatalog: () => request('/credits/catalog'),
+    redeem: (benefitId) => request('/credits/redeem', { method: 'POST', body: JSON.stringify({ benefit_id: benefitId }) }),
+    checkMonthly: () => request('/credits/check-monthly', { method: 'POST' }),
+    getAdminStats: () => request('/credits/admin/stats'),
+    adminAdjust: (payload) => request('/credits/admin/adjust', { method: 'POST', body: JSON.stringify(payload) }),
+    processMonthlyRewards: () => request('/credits/admin/process-monthly', { method: 'POST' })
   },
 
   // Telegram Emergency Alerts & Account Linking

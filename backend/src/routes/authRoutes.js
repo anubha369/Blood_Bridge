@@ -194,6 +194,20 @@ router.post('/signup', authLimiter, async (req, res, next) => {
       }
     }
 
+    // Award Registration Reward (10 free credits, exactly once per account, duplicate prevented)
+    try {
+      const { awardCreditPoints } = require('../services/creditService');
+      await awardCreditPoints({
+        userId: newUser.id,
+        eventType: 'registration_reward',
+        points: 10,
+        idempotencyKey: `registration_reward_${newUser.id}`,
+        reason: 'Welcome Registration Reward'
+      });
+    } catch (creditErr) {
+      console.warn('Registration reward credit notice:', creditErr.message);
+    }
+
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email, role: newUser.role },
       config.jwtSecret,
@@ -633,6 +647,20 @@ router.post('/verify-email-otp', authLimiter, async (req, res, next) => {
       } catch (err) {
         console.warn('PostgreSQL insert verified user notice:', err.message);
       }
+    }
+
+    // Award Registration Reward (10 free credits, exactly once per account, duplicate prevented)
+    try {
+      const { awardCreditPoints } = require('../services/creditService');
+      await awardCreditPoints({
+        userId: newUser.id,
+        eventType: 'registration_reward',
+        points: 10,
+        idempotencyKey: `registration_reward_${newUser.id}`,
+        reason: 'Welcome Registration Reward'
+      });
+    } catch (creditErr) {
+      console.warn('Registration reward credit notice:', creditErr.message);
     }
 
     // Issue JWT Token

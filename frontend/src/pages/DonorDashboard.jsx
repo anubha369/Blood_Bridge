@@ -21,7 +21,10 @@ import {
   ExternalLink,
   Copy,
   RefreshCw,
-  Unlink
+  Unlink,
+  Gift,
+  Ticket,
+  TrendingUp
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +34,27 @@ export default function DonorDashboard() {
   const [donor, setDonor] = useState(null);
   const [cooldown, setCooldown] = useState(null);
   const [credits, setCredits] = useState({ balance: 0, history: [] });
+  const [wallet, setWallet] = useState({
+    balance: 0,
+    total_earned: 0,
+    total_redeemed: 0,
+    recent_transactions: [],
+    active_redemptions: [],
+    next_monthly_reward: {
+      is_tracking: false,
+      available_since: null,
+      days_accumulated: 0,
+      days_required: 30,
+      days_remaining: 30,
+      eligible: false
+    }
+  });
+  const [catalog, setCatalog] = useState([]);
+  const [redeemingBenefitId, setRedeemingBenefitId] = useState(null);
+  const [checkingMonthly, setCheckingMonthly] = useState(false);
+  const [redemptionSuccess, setRedemptionSuccess] = useState(null);
+  const [creditActionError, setCreditActionError] = useState(null);
+  const [copiedVoucherCode, setCopiedVoucherCode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState(null);
@@ -59,10 +83,11 @@ export default function DonorDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [profileRes, cooldownRes, creditRes, telegramRes, contactRequestsRes] = await Promise.all([
+      const [profileRes, cooldownRes, walletRes, catalogRes, telegramRes, contactRequestsRes] = await Promise.all([
         api.donors.getProfile().catch((e) => (e.status === 404 ? { donor: null } : Promise.reject(e))),
         api.donors.getCooldownStatus().catch(() => null),
-        api.credits.getHistory().catch(() => ({ balance: 0, history: [] })),
+        api.credits.getWallet().catch(() => null),
+        api.credits.getCatalog().catch(() => null),
         api.telegram.getStatus().catch(() => null),
         api.donors.getContactRequests().catch(() => ({ notifications: [] }))
       ]);
@@ -77,8 +102,16 @@ export default function DonorDashboard() {
         setCooldown(cooldownRes);
       }
 
-      if (creditRes && creditRes.success) {
-        setCredits({ balance: creditRes.balance, history: creditRes.history || [] });
+      if (walletRes && walletRes.success && walletRes.wallet) {
+        setWallet(walletRes.wallet);
+        setCredits({
+          balance: walletRes.wallet.balance,
+          history: walletRes.wallet.recent_transactions || []
+        });
+      }
+
+      if (catalogRes && catalogRes.success && catalogRes.catalog) {
+        setCatalog(catalogRes.catalog);
       }
 
       if (telegramRes && telegramRes.success) {
@@ -92,6 +125,75 @@ export default function DonorDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRedeemBenefit = async (benefit) => {
+    if (wallet.balance < benefit.cost) {
+      setCreditActionError(`Insufficient credits. You need ${benefit.cost} credits, but have ${wallet.balance}.`);
+      return;
+    }
+    const confirmed = window.confirm(`Redeem "${benefit.title}" for ${benefit.cost} credits?`);
+    if (!confirmed) return;
+
+    setRedeemingBenefitId(benefit.id);
+    setCreditActionError(null);
+    setRedemptionSuccess(null);
+    try {
+      const res = await api.credits.redeem(benefit.id);
+      if (res.success) {
+        setRedemptionSuccess(`Successfully redeemed "${benefit.title}"! ${res.voucher ? `Voucher Code: ${res.voucher.voucher_code}` : ''}`);
+        const walletRes = await api.credits.getWallet().catch(() => null);
+        if (walletRes && walletRes.success && walletRes.wallet) {
+          setWallet(walletRes.wallet);
+          setCredits({
+            balance: walletRes.wallet.balance,
+            history: walletRes.wallet.recent_transactions || []
+          });
+        }
+      } else {
+        setCreditActionError(res.error || 'Failed to redeem reward.');
+      }
+    } catch (err) {
+      setCreditActionError(err.message || 'Error occurred during redemption.');
+    } finally {
+      setRedeemingBenefitId(null);
+    }
+  };
+
+  const handleCheckMonthlyReward = async () => {
+    setCheckingMonthly(true);
+    setCreditActionError(null);
+    setRedemptionSuccess(null);
+    try {
+      const res = await api.credits.checkMonthly();
+      if (res.success) {
+        if (res.reward_awarded) {
+          setRedemptionSuccess(res.message);
+        } else {
+          setCreditActionError(res.message);
+        }
+        const walletRes = await api.credits.getWallet().catch(() => null);
+        if (walletRes && walletRes.success && walletRes.wallet) {
+          setWallet(walletRes.wallet);
+          setCredits({
+            balance: walletRes.wallet.balance,
+            history: walletRes.wallet.recent_transactions || []
+          });
+        }
+      } else {
+        setCreditActionError(res.error || 'Failed to check monthly reward.');
+      }
+    } catch (err) {
+      setCreditActionError(err.message || 'Error checking monthly reward.');
+    } finally {
+      setCheckingMonthly(false);
+    }
+  };
+
+  const handleCopyVoucher = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedVoucherCode(code);
+    setTimeout(() => setCopiedVoucherCode(null), 2500);
   };
 
   const handleRespondToRequest = async (requestId, action) => {
@@ -217,10 +319,11 @@ export default function DonorDashboard() {
       const res = await api.donors.toggleAvailability(newStatus);
       if (res.success) {
         setDonor({ ...donor, availability_status: newStatus });
-        // Refresh credits and cooldown
-        const credRes = await api.credits.getHistory().catch(() => null);
-        if (credRes && credRes.success) {
-          setCredits({ balance: credRes.balance, history: credRes.history || [] });
+        // Refresh wallet and credits
+        const walletRes = await api.credits.getWallet().catch(() => null);
+        if (walletRes && walletRes.success && walletRes.wallet) {
+          setWallet(walletRes.wallet);
+          setCredits({ balance: walletRes.wallet.balance, history: walletRes.wallet.recent_transactions || [] });
         }
       }
     } catch (err) {
@@ -874,59 +977,377 @@ export default function DonorDashboard() {
         )}
       </div>
 
-      {/* Credit Points & Participation Recognition Ledger */}
+      {/* Complete BloodBridge Credit & Recognition Wallet */}
       <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        
+        {/* Action Alerts */}
+        {redemptionSuccess && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-emerald-900">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-semibold">{redemptionSuccess}</span>
+            </div>
+            <button
+              onClick={() => setRedemptionSuccess(null)}
+              className="text-emerald-700 hover:text-emerald-900 font-bold px-2 py-0.5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {creditActionError && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-rose-900">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span className="font-semibold">{creditActionError}</span>
+            </div>
+            <button
+              onClick={() => setCreditActionError(null)}
+              className="text-rose-700 hover:text-rose-900 font-bold px-2 py-0.5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Header & Balance Summary */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Award className="w-5 h-5" />
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shadow-sm">
+              <Award className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                BloodBridge Recognition Points
-              </h2>
-              <p className="text-xs text-slate-500">
-                Civic participation ledger celebrating voluntary blood donor readiness
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900">
+                  Credit & Recognition Wallet
+                </h2>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  <Sparkles className="w-3 h-3 text-amber-600" />
+                  Voluntary Rewards
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Civic participation ledger celebrating voluntary blood donor availability and fulfilled donations
               </p>
             </div>
           </div>
 
-          <div className="bg-amber-50 px-5 py-2.5 rounded-2xl border border-amber-200 text-center sm:text-right">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-amber-800 block">Verified Balance</span>
-            <span className="text-[36px] font-black text-amber-600 leading-none">{credits.balance} Pts</span>
+          <button
+            onClick={fetchDonorData}
+            disabled={loading}
+            className="self-start md:self-center inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-600' : ''}`} />
+            Refresh Wallet
+          </button>
+        </div>
+
+        {/* 3 Wallet Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* 1. Verified Available Balance */}
+          <div className="bg-gradient-to-br from-amber-500/10 via-amber-50 to-white p-5 rounded-2xl border border-amber-200 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                Available Balance
+              </span>
+              <Award className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-3xl font-black text-amber-600 leading-none">
+                {wallet.balance}
+              </span>
+              <span className="text-sm font-bold text-amber-700">Credits</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Ready to redeem for platform recognition and partner benefits
+            </p>
+          </div>
+
+          {/* 2. Lifetime Earned */}
+          <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-50 to-white p-5 rounded-2xl border border-emerald-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+                Lifetime Earned
+              </span>
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-3xl font-black text-emerald-600 leading-none">
+                {wallet.total_earned}
+              </span>
+              <span className="text-sm font-bold text-emerald-700">Credits</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Earned via registration, fulfilled donations, and availability
+            </p>
+          </div>
+
+          {/* 3. Total Redeemed */}
+          <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-50 to-white p-5 rounded-2xl border border-indigo-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">
+                Total Redeemed
+              </span>
+              <Gift className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-3xl font-black text-indigo-600 leading-none">
+                {wallet.total_redeemed}
+              </span>
+              <span className="text-sm font-bold text-indigo-700">Credits</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Redeemed across {wallet.active_redemptions?.length || 0} claimed benefit vouchers
+            </p>
           </div>
         </div>
 
-        {/* Legal Disclaimer Box */}
-        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
-          <strong>Important Statutory Disclosure:</strong> Credit points carry zero cash value, cannot be traded or redeemed for money, and strictly <strong>never influence medical compatibility, blood allocation, or patient matching priority</strong> in compliance with the Drugs and Cosmetics Act.
+        {/* Monthly Availability Reward Tracker */}
+        <div className="p-5 bg-gradient-to-r from-sky-50 via-indigo-50/40 to-slate-50 rounded-2xl border border-sky-200/80 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-sky-600" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  Monthly Availability Reward (+10 Credits)
+                </h3>
+                {wallet.next_monthly_reward?.is_tracking ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    Tracking Active
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    <AlertTriangle className="w-2.5 h-2.5" />
+                    Paused
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-600 mt-1">
+                Maintain your emergency availability continuously for 30 full days to earn 10 reward credits. Pausing availability resets tracking.
+              </p>
+            </div>
+
+            <button
+              onClick={handleCheckMonthlyReward}
+              disabled={checkingMonthly}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 ${
+                wallet.next_monthly_reward?.eligible
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
+                  : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-300'
+              }`}
+            >
+              {checkingMonthly ? (
+                'Checking...'
+              ) : wallet.next_monthly_reward?.eligible ? (
+                'Claim 10 Credits Reward!'
+              ) : (
+                'Check Eligibility'
+              )}
+            </button>
+          </div>
+
+          {wallet.next_monthly_reward?.is_tracking ? (
+            <div className="space-y-2">
+              <div className="flex justify-between text-[11px] font-semibold text-slate-700">
+                <span>
+                  {wallet.next_monthly_reward?.days_accumulated || 0} of 30 continuous days completed
+                </span>
+                <span className="text-sky-700 font-bold">
+                  {wallet.next_monthly_reward?.days_remaining === 0
+                    ? 'Eligible for reward!'
+                    : `${wallet.next_monthly_reward?.days_remaining} days remaining`}
+                </span>
+              </div>
+              {/* Visual Progress Bar */}
+              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-sky-500 to-indigo-600 h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.round(((wallet.next_monthly_reward?.days_accumulated || 0) / 30) * 100))}%`
+                  }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Tracked continuously since {wallet.next_monthly_reward?.available_since ? new Date(wallet.next_monthly_reward.available_since).toLocaleDateString() : 'recent'}.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                Your donor availability is currently paused. Toggle your status to <strong>Available</strong> in the controls above to start tracking continuous days toward your next monthly reward.
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Ledger Entries */}
+        {/* Benefits & Redemptions Catalog */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <History className="w-3.5 h-3.5" />
-            Transaction History
-          </h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <Gift className="w-4 h-4 text-indigo-600" />
+                Available Recognition & Benefits Catalog
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Redeem your earned credits for legitimate, non-monetary volunteer honors and partner health vouchers
+              </p>
+            </div>
+          </div>
 
-          {credits.history.length === 0 ? (
-            <p className="text-xs text-slate-400 py-3 text-center">No credit events logged yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {credits.history.map((entry) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {(catalog.length > 0 ? catalog : [
+              { id: 'lifesaver_badge', title: 'Lifesaver Recognition Badge', cost: 15, description: 'Digital badge of honor displayed on your donor profile.' },
+              { id: 'voluntary_donor_certificate', title: 'Voluntary Donor Certificate', cost: 20, description: 'Official downloadable certificate acknowledging voluntary donation.' },
+              { id: 'priority_notification_routing', title: 'Priority Emergency Routing', cost: 25, description: 'Preferred routing in local blood alerts when urgent shortages arise.' },
+              { id: 'partner_health_screening_voucher', title: 'Partner Health Voucher', cost: 30, description: 'Voucher for complimentary wellness diagnostic checkups.' }
+            ]).map((benefit) => {
+              const canAfford = wallet.balance >= benefit.cost;
+              const isRedeeming = redeemingBenefitId === benefit.id;
+
+              return (
                 <div
-                  key={entry.id}
-                  className="p-3 bg-slate-50/70 rounded-xl border border-slate-200 flex items-center justify-between text-xs"
+                  key={benefit.id}
+                  className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3 hover:border-slate-300 transition-colors"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black rounded-lg bg-amber-100 text-amber-900 border border-amber-300">
+                        <Award className="w-3 h-3 text-amber-600" />
+                        {benefit.cost} Credits
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 leading-snug">
+                      {benefit.title}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      {benefit.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60">
+                    <button
+                      onClick={() => handleRedeemBenefit(benefit)}
+                      disabled={!canAfford || isRedeeming}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                        canAfford
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {isRedeeming ? 'Redeeming...' : canAfford ? 'Redeem Reward' : `Need ${benefit.cost - wallet.balance} more`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Active Vouchers & Redemptions */}
+        {wallet.active_redemptions && wallet.active_redemptions.length > 0 && (
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              <Ticket className="w-3.5 h-3.5 text-indigo-600" />
+              Active Claimed Benefit Vouchers ({wallet.active_redemptions.length})
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {wallet.active_redemptions.map((voucher) => (
+                <div
+                  key={voucher.id}
+                  className="bg-white p-3.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs"
                 >
                   <div className="space-y-0.5">
-                    <span className="font-semibold text-slate-900 block">{entry.reason}</span>
-                    <span className="text-[10px] text-slate-400">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                    <span className="font-bold text-slate-900 block">{voucher.benefit_name}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-mono font-bold text-indigo-700">
+                        {voucher.voucher_code}
+                      </code>
+                      <button
+                        onClick={() => handleCopyVoucher(voucher.voucher_code)}
+                        className="text-[10px] text-slate-500 hover:text-slate-800 font-semibold"
+                      >
+                        {copiedVoucherCode === voucher.voucher_code ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
                   </div>
-                  <span className="font-bold text-amber-600">+{entry.points} pts</span>
+                  <div className="text-right">
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800">
+                      {voucher.status}
+                    </span>
+                    <span className="block text-[10px] text-slate-400 mt-1">
+                      {new Date(voucher.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Auditable Transaction Ledger */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <History className="w-3.5 h-3.5" />
+            Verified Transaction History
+          </h3>
+
+          {!wallet.recent_transactions || wallet.recent_transactions.length === 0 ? (
+            <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl border border-slate-100">
+              No credit transactions logged yet. Complete registration or maintain availability to earn credits.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {wallet.recent_transactions.map((entry) => {
+                const isPositive = (entry.points || 0) > 0;
+                let badgeStyle = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                if (!isPositive) badgeStyle = 'bg-rose-100 text-rose-800 border-rose-300';
+                else if (entry.event_type === 'registration_reward') badgeStyle = 'bg-sky-100 text-sky-800 border-sky-300';
+                else if (entry.event_type === 'monthly_availability_reward') badgeStyle = 'bg-indigo-100 text-indigo-800 border-indigo-300';
+                else if (entry.event_type === 'admin_adjustment') badgeStyle = 'bg-purple-100 text-purple-800 border-purple-300';
+
+                return (
+                  <div
+                    key={entry.id}
+                    className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${badgeStyle}`}>
+                          {entry.event_type?.replace(/_/g, ' ')?.toUpperCase()}
+                        </span>
+                        <span className="font-bold text-slate-900">{entry.reason}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block">
+                        Logged on {new Date(entry.timestamp || entry.created_at).toLocaleString()}
+                        {entry.balance_after !== undefined ? ` • Balance after: ${entry.balance_after} Pts` : ''}
+                      </span>
+                    </div>
+
+                    <div className="self-end sm:self-center">
+                      <span className={`text-sm font-black ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isPositive ? `+${entry.points}` : entry.points} Pts
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
+        </div>
+
+        {/* Legal Statutory Disclaimer Notice */}
+        <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80 text-[11px] text-amber-950 leading-relaxed flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+          <div>
+            <strong>Statutory Compliance Disclosure (Section 27, Drugs & Cosmetics Act):</strong>
+            <p className="mt-0.5 text-amber-900">
+              BloodBridge Credit Points represent non-monetary volunteer recognition and carry strictly zero cash or financial redemption value. Credits <strong>never influence medical matching priority, clinical blood compatibility, emergency triage, or patient allocation</strong>. All blood donations are voluntary and non-remunerated.
+            </p>
+          </div>
         </div>
       </div>
 

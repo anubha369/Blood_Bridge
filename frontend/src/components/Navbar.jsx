@@ -27,7 +27,7 @@ export default function Navbar({ onOpenAI }) {
   const location = useLocation();
 
   useEffect(() => {
-    if (isAuthenticated && isDonor) {
+    if (isAuthenticated) {
       api.credits.getBalance()
         .then((res) => {
           if (res.success && res.balance !== undefined) {
@@ -209,11 +209,11 @@ export default function Navbar({ onOpenAI }) {
 
             {isAuthenticated ? (
               <div className="flex items-center gap-2 xl:gap-2.5 pl-2.5 border-l border-slate-800">
-                {/* Neatly Framed Points Display for Donors */}
-                {isDonor && creditPoints !== null && (
+                {/* Neatly Framed Points Display for Users & Donors */}
+                {creditPoints !== null && (
                   <Link
-                    to="/donor/dashboard"
-                    title="Non-monetary volunteer participation points"
+                    to={isDonor ? "/donor/dashboard" : "/requester/dashboard"}
+                    title="Non-monetary volunteer participation credits"
                     className="h-10 inline-flex items-center gap-1.5 px-3 text-[14px] xl:text-[15px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/35 rounded-lg hover:bg-amber-500/25 transition-all shadow-sm whitespace-nowrap"
                   >
                     <Award className="w-4 h-4 text-amber-400 flex-shrink-0" />
@@ -267,11 +267,11 @@ export default function Navbar({ onOpenAI }) {
 
           {/* 4. Mobile Menu & AI Assistant (< lg) */}
           <div className="flex lg:hidden items-center gap-2.5">
-            {isAuthenticated && isDonor && creditPoints !== null && (
+            {isAuthenticated && creditPoints !== null && (
               <Link
-                to="/donor/dashboard"
+                to={isDonor ? "/donor/dashboard" : "/requester/dashboard"}
                 className="h-10 inline-flex items-center gap-1.5 px-3 text-[15px] font-black text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl"
-                title="Volunteer Points"
+                title="Volunteer Credits"
               >
                 <Award className="w-4 h-4 text-amber-400" />
                 <span>{creditPoints}</span>
@@ -319,7 +319,7 @@ export default function Navbar({ onOpenAI }) {
                   </div>
                 </div>
 
-                {isDonor && creditPoints !== null && (
+                {creditPoints !== null && (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                     <Award className="w-3.5 h-3.5 text-amber-400" />
                     <span>{creditPoints} Pts</span>

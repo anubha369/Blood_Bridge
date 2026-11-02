@@ -1218,6 +1218,41 @@ router.post('/:id/fulfill', authenticateUser, async (req, res) => {
     console.warn('Cooldown activation warning:', cooldownErr.message);
   }
 
+  // Award Successful Blood Donation Reward (20 credits to donor, duplicate prevented)
+  try {
+    const { awardCreditPoints } = require('../services/creditService');
+    let donorUserId = updatedDonor?.user_id;
+    if (!donorUserId && isPostgresConnected() && getPool()) {
+      try {
+        const dRes = await getPool().query('SELECT user_id FROM public.donors WHERE id = $1 LIMIT 1', [request.selected_donor_id]);
+        if (dRes.rows.length > 0) donorUserId = dRes.rows[0].user_id;
+      } catch (_) {}
+    }
+    if (!donorUserId && localStore.donors) {
+      donorUserId = localStore.donors.find((d) => d.id === request.selected_donor_id)?.user_id;
+    }
+
+    if (donorUserId) {
+      await awardCreditPoints({
+        userId: donorUserId,
+        donorId: request.selected_donor_id,
+        eventType: 'successful_donation_reward',
+        points: 20,
+        idempotencyKey: `donation_reward_${request.id}_${request.selected_donor_id}`,
+        relatedRequestId: request.id,
+        reason: `Successful Blood Donation - Request #${request.id.substring(0, 8)}`,
+        metadata: {
+          request_id: request.id,
+          patient_name: request.patient_name,
+          blood_group: request.blood_group,
+          hospital_name: request.hospital_name
+        }
+      });
+    }
+  } catch (creditErr) {
+    console.warn('Donation credit reward warning:', creditErr.message);
+  }
+
   localStore.audit_events.push({
     action: 'request_fulfilled',
     actor_id: req.user.id,

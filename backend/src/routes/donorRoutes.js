@@ -246,18 +246,6 @@ router.post('/register', authenticateUser, async (req, res, next) => {
       }
     }
 
-    // Award initial profile completion points (50 points)
-    try {
-      awardCreditPoints({
-        userId: req.user.id,
-        donorId: newDonor.id,
-        eventType: 'profile_completion',
-        idempotencyKey: `init_reg_${newDonor.id}`
-      });
-    } catch (e) {
-      // Non-blocking for registration
-    }
-
     // Update user role to donor if not admin
     const userRecord = localStore.users.find((u) => u.id === req.user.id);
     if (userRecord && userRecord.role !== 'admin') {
@@ -443,9 +431,20 @@ router.post('/availability', authenticateUser, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Status must be "available" or "unavailable".' });
   }
 
+  const nowIso = new Date().toISOString();
   donor.availability_status = status;
-  donor.last_availability_confirmed_at = new Date().toISOString();
-  donor.updated_at = new Date().toISOString();
+  donor.last_availability_confirmed_at = nowIso;
+  donor.updated_at = nowIso;
+
+  if (status === 'available') {
+    // Resume or set tracking timestamp if not already tracking
+    if (!donor.available_since) {
+      donor.available_since = nowIso;
+    }
+  } else {
+    // Paused or unavailable: reset continuous available_since tracking timestamp per requirement
+    donor.available_since = null;
+  }
 
   if (isPostgresConnected() && getPool()) {
     try {
@@ -453,31 +452,38 @@ router.post('/availability', authenticateUser, async (req, res) => {
       await pool.query(
         `UPDATE public.donors SET
           availability_status = $1,
+          available_since = $2,
           last_availability_confirmed_at = NOW(),
           updated_at = NOW()
-        WHERE user_id = $2`,
-        [status, req.user.id]
+        WHERE user_id = $3`,
+        [status, donor.available_since, req.user.id]
       );
-    } catch (e) {}
-  }
 
-  // Award monthly availability confirmation points (10 pts) idempotently
-  const currentMonthKey = new Date().toISOString().slice(0, 7); // e.g. "2026-10"
-  try {
-    awardCreditPoints({
-      userId: req.user.id,
-      donorId: donor.id,
-      eventType: 'availability_update',
-      idempotencyKey: `avail_${donor.id}_${currentMonthKey}`
-    });
-  } catch (e) {
-    // Ignore duplicate
+      // Record period tracking in public.donor_availability_periods
+      if (status === 'available') {
+        await pool.query(
+          `INSERT INTO public.donor_availability_periods (donor_id, user_id, status, started_at)
+           VALUES ($1, $2, 'available', NOW())`,
+          [donor.id, req.user.id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE public.donor_availability_periods 
+           SET ended_at = NOW() 
+           WHERE donor_id = $1 AND status = 'available' AND ended_at IS NULL`,
+          [donor.id]
+        );
+      }
+    } catch (e) {
+      console.warn('DB availability update warning:', e.message);
+    }
   }
 
   return res.json({
     success: true,
-    message: `Availability updated to ${status}.`,
+    message: `Availability updated to ${status}. ${status === 'available' ? 'Continuous tracking active for monthly reward.' : 'Tracking paused; continuous availability clock reset.'}`,
     availability_status: donor.availability_status,
+    available_since: donor.available_since,
     last_availability_confirmed_at: donor.last_availability_confirmed_at
   });
 });

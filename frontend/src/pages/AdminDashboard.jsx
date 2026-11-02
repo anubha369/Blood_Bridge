@@ -18,7 +18,11 @@ import {
   Search,
   Filter,
   Check,
-  Phone
+  Phone,
+  Plus,
+  TrendingUp,
+  Gift,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -29,9 +33,21 @@ export default function AdminDashboard() {
   const [requests, setRequests] = useState([]);
   const [whatsappJobs, setWhatsappJobs] = useState([]);
   const [creditLedger, setCreditLedger] = useState([]);
+  const [adminCreditStats, setAdminCreditStats] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
   const [integrationLogs, setIntegrationLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Credit Management Admin States
+  const [processingMonthly, setProcessingMonthly] = useState(false);
+  const [monthlyProcessResult, setMonthlyProcessResult] = useState(null);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustUserId, setAdjustUserId] = useState('');
+  const [adjustPoints, setAdjustPoints] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjusting, setAdjusting] = useState(false);
+  const [adjustError, setAdjustError] = useState(null);
+  const [adjustSuccess, setAdjustSuccess] = useState(null);
 
   // Filter & Actions State
   const [donorFilter, setDonorFilter] = useState('all');
@@ -72,14 +88,15 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      const [sumRes, donRes, reqRes, waRes, credRes, logsRes, auditRes] = await Promise.all([
+      const [sumRes, donRes, reqRes, waRes, credRes, logsRes, auditRes, credStatsRes] = await Promise.all([
         api.admin.getSummary().catch(() => ({ success: false })),
         api.admin.getDonors().catch(() => ({ success: false })),
         api.requests.getAll().catch(() => ({ success: false })),
         api.admin.getWhatsappJobs().catch(() => ({ success: false })),
         api.admin.getCreditLedger().catch(() => ({ success: false })),
         api.admin.getIntegrationLogs({ limit: 20 }).catch(() => ({ success: false })),
-        api.admin.getAuditLogs().catch(() => ({ success: false }))
+        api.admin.getAuditLogs().catch(() => ({ success: false })),
+        api.credits.getAdminStats().catch(() => ({ success: false }))
       ]);
 
       if (sumRes.success) setMetrics(sumRes.metrics);
@@ -89,10 +106,73 @@ export default function AdminDashboard() {
       if (credRes.success) setCreditLedger(credRes.entries || []);
       if (logsRes.success) setIntegrationLogs(logsRes.logs || []);
       if (auditRes.success) setAuditLogs(auditRes.logs || []);
+      if (credStatsRes.success) setAdminCreditStats(credStatsRes.stats || null);
     } catch (err) {
       console.error('Error fetching admin console data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTriggerMonthlyProcessing = async () => {
+    setProcessingMonthly(true);
+    setMonthlyProcessResult(null);
+    try {
+      const res = await api.credits.processMonthlyRewards();
+      if (res.success) {
+        setMonthlyProcessResult({
+          type: 'success',
+          message: res.message || `Processed ${res.evaluated_donors || 0} donors. Awarded ${res.rewards_awarded || 0} monthly rewards (${res.total_credits_awarded || 0} credits).`
+        });
+        await fetchAdminData();
+      } else {
+        setMonthlyProcessResult({
+          type: 'error',
+          message: res.error || 'Failed to process monthly rewards.'
+        });
+      }
+    } catch (err) {
+      setMonthlyProcessResult({
+        type: 'error',
+        message: err.message || 'Error executing monthly rewards batch.'
+      });
+    } finally {
+      setProcessingMonthly(false);
+    }
+  };
+
+  const handleManualAdjustmentSubmit = async (e) => {
+    e.preventDefault();
+    if (!adjustUserId || !adjustPoints || !adjustReason) {
+      setAdjustError('User ID, Points amount, and Reason are all required.');
+      return;
+    }
+    setAdjusting(true);
+    setAdjustError(null);
+    setAdjustSuccess(null);
+    try {
+      const res = await api.credits.adminAdjust({
+        user_id: adjustUserId.trim(),
+        points: parseInt(adjustPoints, 10),
+        reason: adjustReason.trim()
+      });
+      if (res.success) {
+        setAdjustSuccess(`Successfully adjusted ${adjustPoints} credits for user ${adjustUserId}. New balance: ${res.balance_after}`);
+        await fetchAdminData();
+        setTimeout(() => {
+          setShowAdjustModal(false);
+          setAdjustUserId('');
+          setAdjustPoints('');
+          setAdjustReason('');
+          setAdjustSuccess(null);
+        }, 2000);
+      } else {
+        setAdjustError(res.error || 'Adjustment failed.');
+      }
+    } catch (err) {
+      setAdjustError(err.message || 'Error submitting credit adjustment.');
+    } finally {
+      setAdjusting(false);
     }
   };
 
@@ -700,17 +780,97 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 4: PARTICIPATION POINTS LEDGER */}
+      {/* TAB 4: PARTICIPATION POINTS & CREDIT MANAGEMENT */}
       {activeTab === 'ledger' && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-600" />
-              Non-Cash Donor Recognition Points Ledger
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Auditable ledger of volunteer engagement points awarded for readiness, verification, and community activity
-            </p>
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-600" />
+                Credit & Reward Management Console
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Auditable ledger and administrative controls for voluntary donor credits and platform rewards
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={handleTriggerMonthlyProcessing}
+                disabled={processingMonthly}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all shadow-indigo-100"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${processingMonthly ? 'animate-spin' : ''}`} />
+                {processingMonthly ? 'Evaluating Donors...' : 'Process Monthly Rewards'}
+              </button>
+
+              <button
+                onClick={() => setShowAdjustModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Manual Adjustment
+              </button>
+            </div>
+          </div>
+
+          {/* Monthly Process Result Alert */}
+          {monthlyProcessResult && (
+            <div className={`p-4 rounded-2xl text-xs flex items-center justify-between gap-3 ${
+              monthlyProcessResult.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border border-rose-200 text-rose-900'
+            }`}>
+              <div className="flex items-center gap-2">
+                {monthlyProcessResult.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{monthlyProcessResult.message}</span>
+              </div>
+              <button
+                onClick={() => setMonthlyProcessResult(null)}
+                className="font-bold px-2 py-0.5 hover:opacity-75"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Admin KPI Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200/80">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Circulating Credits</span>
+              <span className="text-2xl font-black text-amber-600 mt-1 block">
+                {adminCreditStats?.total_circulating_credits ?? creditLedger.reduce((sum, e) => sum + (e.points || 0), 0)} Pts
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">Across all active accounts</span>
+            </div>
+
+            <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200/80">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Issued</span>
+              <span className="text-2xl font-black text-emerald-600 mt-1 block">
+                {adminCreditStats?.total_credits_earned ?? '-'} Pts
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">Cumulative registration & rewards</span>
+            </div>
+
+            <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-200/80">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800 block">Total Redeemed</span>
+              <span className="text-2xl font-black text-indigo-600 mt-1 block">
+                {adminCreditStats?.total_credits_redeemed ?? '-'} Pts
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">Platform badges & vouchers</span>
+            </div>
+
+            <div className="p-4 bg-sky-50/70 rounded-2xl border border-sky-200/80">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-800 block">Active Tracking</span>
+              <span className="text-2xl font-black text-sky-600 mt-1 block">
+                {adminCreditStats?.total_donors_with_active_tracking ?? donors.filter(d => d.availability_status === 'available').length} Donors
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">Accumulating 30-day monthly reward</span>
+            </div>
           </div>
 
           {/* Legal Compliance Banner */}
@@ -725,15 +885,17 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Ledger Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-3">Ledger ID</th>
-                  <th className="py-3 px-3">Donor / User ID</th>
-                  <th className="py-3 px-3">Activity Type</th>
+                  <th className="py-3 px-3">User / Donor ID</th>
+                  <th className="py-3 px-3">Event Type</th>
                   <th className="py-3 px-3">Points</th>
                   <th className="py-3 px-3">Balance After</th>
+                  <th className="py-3 px-3">Reason</th>
                   <th className="py-3 px-3">Idempotency Key</th>
                   <th className="py-3 px-3 text-right">Awarded At</th>
                 </tr>
@@ -741,42 +903,140 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {creditLedger.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
-                      No points transactions recorded yet. Donors earn points upon profile completion and availability confirmations.
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                      No points transactions recorded yet. Users earn credits upon registration, donation fulfillment, and availability maintenance.
                     </td>
                   </tr>
                 ) : (
-                  creditLedger.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3.5 px-3 font-mono text-[10px] text-slate-400">
-                        {entry.id.substring(0, 8)}...
-                      </td>
-                      <td className="py-3.5 px-3 font-mono font-bold text-slate-800">
-                        {entry.user_id ? entry.user_id.substring(0, 12) : 'System'}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                          {entry.activity_type}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 font-black text-emerald-600">
-                        +{entry.points}
-                      </td>
-                      <td className="py-3.5 px-3 font-bold text-slate-900">
-                        {entry.balance_after || '-'}
-                      </td>
-                      <td className="py-3.5 px-3 font-mono text-[10px] text-slate-400">
-                        {entry.idempotency_key}
-                      </td>
-                      <td className="py-3.5 px-3 text-right text-[10px] text-slate-400">
-                        {new Date(entry.created_at || Date.now()).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))
+                  creditLedger.map((entry) => {
+                    const isPositive = (entry.points || 0) > 0;
+                    const eventName = entry.event_type || entry.activity_type || 'credit_event';
+                    let badgeClass = 'bg-slate-100 text-slate-800';
+                    if (eventName === 'registration_reward') badgeClass = 'bg-sky-100 text-sky-800';
+                    else if (eventName === 'successful_donation_reward') badgeClass = 'bg-emerald-100 text-emerald-800';
+                    else if (eventName === 'monthly_availability_reward') badgeClass = 'bg-indigo-100 text-indigo-800';
+                    else if (eventName === 'credit_redemption') badgeClass = 'bg-rose-100 text-rose-800';
+                    else if (eventName === 'admin_adjustment') badgeClass = 'bg-purple-100 text-purple-800';
+
+                    return (
+                      <tr key={entry.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3.5 px-3 font-mono text-[10px] text-slate-400">
+                          {entry.id ? entry.id.substring(0, 8) + '...' : '-'}
+                        </td>
+                        <td className="py-3.5 px-3 font-mono font-bold text-slate-800">
+                          {entry.user_id ? entry.user_id.substring(0, 12) + '...' : 'System'}
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <span className={`font-semibold px-2 py-0.5 rounded text-[10px] uppercase ${badgeClass}`}>
+                            {eventName.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className={`py-3.5 px-3 font-black ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {isPositive ? `+${entry.points}` : entry.points}
+                        </td>
+                        <td className="py-3.5 px-3 font-bold text-slate-900">
+                          {entry.balance_after !== undefined && entry.balance_after !== null ? entry.balance_after : '-'}
+                        </td>
+                        <td className="py-3.5 px-3 text-slate-700 max-w-[200px] truncate" title={entry.reason}>
+                          {entry.reason || '-'}
+                        </td>
+                        <td className="py-3.5 px-3 font-mono text-[10px] text-slate-400 max-w-[120px] truncate" title={entry.idempotency_key}>
+                          {entry.idempotency_key || '-'}
+                        </td>
+                        <td className="py-3.5 px-3 text-right text-[10px] text-slate-400 whitespace-nowrap">
+                          {new Date(entry.timestamp || entry.created_at || Date.now()).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Manual Adjustment Modal */}
+          {showAdjustModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Manual Credit Adjustment</h3>
+                    <p className="text-xs text-slate-500">Audited administrator credit award or deduction</p>
+                  </div>
+                  <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+
+                {adjustSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold">
+                    {adjustSuccess}
+                  </div>
+                )}
+
+                {adjustError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-semibold">
+                    {adjustError}
+                  </div>
+                )}
+
+                <form onSubmit={handleManualAdjustmentSubmit} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Target User ID *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. user UUID or system ID"
+                      value={adjustUserId}
+                      onChange={(e) => setAdjustUserId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Points Adjustment (Positive for award, Negative for deduction) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 10 or -15"
+                      value={adjustPoints}
+                      onChange={(e) => setAdjustPoints(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Audit Justification *</label>
+                    <textarea
+                      required
+                      rows={2}
+                      placeholder="e.g. Special community campaign participation correction"
+                      value={adjustReason}
+                      onChange={(e) => setAdjustReason(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdjustModal(false)}
+                      className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={adjusting}
+                      className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow"
+                    >
+                      {adjusting ? 'Submitting...' : 'Apply Adjustment'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
