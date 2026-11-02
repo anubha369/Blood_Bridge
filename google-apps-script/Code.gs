@@ -20,7 +20,7 @@
  * 1. In your Google Sheet, open: Extensions -> Apps Script
  * 2. Replace everything in Code.gs with this entire file and click Save (💾).
  * 3. Open Project Settings (Gear Icon) -> Script Properties and add:
- *    - BLOODBRIDGE_WEBHOOK_URL: https://statistical-aspects-miracle-piano.trycloudflare.com/api/integrations/google-forms/webhook
+ *    - BLOODBRIDGE_WEBHOOK_URL: https://opposition-durham-powers-britain.trycloudflare.com/api/integrations/google-forms/webhook
  *    - BLOODBRIDGE_SECRET_KEY: (Your backend secret from backend/.env GOOGLE_FORM_WEBHOOK_SECRET)
  * 4. Open Triggers (Clock Icon) -> Add Trigger:
  *    - Function: onFormSubmit
@@ -39,7 +39,7 @@ function onFormSubmit(e) {
   // Read Script Properties
   var scriptProperties = PropertiesService.getScriptProperties();
   var webhookUrl = scriptProperties.getProperty('BLOODBRIDGE_WEBHOOK_URL') || 
-                   'https://statistical-aspects-miracle-piano.trycloudflare.com/api/integrations/google-forms/webhook';
+                   'https://opposition-durham-powers-britain.trycloudflare.com/api/integrations/google-forms/webhook';
   var secretKey = scriptProperties.getProperty('BLOODBRIDGE_SECRET_KEY');
   
   if (!secretKey) {
@@ -249,7 +249,7 @@ function recordSyncStatus(sheet, row, statusText) {
 function testBloodBridgeWebhook() {
   var scriptProperties = PropertiesService.getScriptProperties();
   var webhookUrl = scriptProperties.getProperty('BLOODBRIDGE_WEBHOOK_URL') || 
-                   'https://statistical-aspects-miracle-piano.trycloudflare.com/api/integrations/google-forms/webhook';
+                   'https://opposition-durham-powers-britain.trycloudflare.com/api/integrations/google-forms/webhook';
   var secretKey = scriptProperties.getProperty('BLOODBRIDGE_SECRET_KEY');
   
   Logger.log('=== BloodBridge Webhook Connectivity Diagnostic ===');
