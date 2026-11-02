@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function Signup() {
-  const { signup, sendOtp } = useAuth();
+  const { signup, sendOtp, registerInitiate } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -87,8 +87,8 @@ export default function Signup() {
     const fullPhone = `+91 ${phone10.slice(0, 5)} ${phone10.slice(5)}`;
 
     try {
-      // 1. Register User in backend database
-      const user = await signup({
+      // 1. Initiate registration and dispatch 6-digit email OTP via Brevo
+      const initRes = await registerInitiate({
         name,
         username: username || email.split('@')[0],
         email,
@@ -97,26 +97,20 @@ export default function Signup() {
         phone: fullPhone
       });
 
-      // 2. Dispatch OTP challenge
-      let challengeId = null;
-      try {
-        const otpRes = await sendOtp(fullPhone);
-        if (otpRes.success) {
-          challengeId = otpRes.challenge_id;
-        }
-      } catch (otpErr) {
-        console.warn('Notice: OTP challenge initialized:', otpErr.message);
+      if (!initRes || !initRes.success) {
+        throw new Error(initRes?.error || 'Could not initiate registration. Please check your details.');
       }
 
-      // 3. Navigate to OTP Verification page with context
+      // 2. Navigate to OTP Verification page with email context
       navigate(
-        `/verify-otp?phone=${encodeURIComponent(fullPhone)}&role=${user.role}&challenge_id=${challengeId || ''}`,
+        `/verify-otp?email=${encodeURIComponent(email)}&role=${role === 'patient' ? 'requester' : role}&challenge_id=${initRes.challenge_id || ''}&phone=${encodeURIComponent(fullPhone)}`,
         {
           state: {
-            user,
+            email,
+            email_masked: initRes.email_masked,
             phone: fullPhone,
-            role: user.role,
-            challenge_id: challengeId
+            role: role === 'patient' ? 'requester' : role,
+            challenge_id: initRes.challenge_id
           }
         }
       );
@@ -371,7 +365,7 @@ export default function Signup() {
                 disabled={loading}
                 className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
-                <span>{loading ? 'Creating Account & Sending OTP...' : 'Complete Registration & Send OTP'}</span>
+                <span>{loading ? 'Sending Verification Code...' : 'Complete Registration & Send Email OTP'}</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
             </div>

@@ -124,7 +124,10 @@ export const api = {
     resetPassword: (token, new_password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, new_password }) }),
     sendOtp: (payload) => request('/auth/send-otp', { method: 'POST', body: JSON.stringify(payload) }),
     verifyOtp: (payload) => request('/auth/verify-otp', { method: 'POST', body: JSON.stringify(payload) }),
-    resendOtp: (payload) => request('/auth/resend-otp', { method: 'POST', body: JSON.stringify(payload) })
+    resendOtp: (payload) => request('/auth/resend-otp', { method: 'POST', body: JSON.stringify(payload) }),
+    registerInitiate: (payload) => request('/auth/register-initiate', { method: 'POST', body: JSON.stringify(payload) }),
+    verifyEmailOtp: (payload) => request('/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(payload) }),
+    resendEmailOtp: (payload) => request('/auth/resend-email-otp', { method: 'POST', body: JSON.stringify(payload) })
   },
 
   // Donors

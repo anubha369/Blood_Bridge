@@ -48,6 +48,11 @@ const config = {
   msg91OtpExpiry: parseInt(process.env.MSG91_OTP_EXPIRY || '5', 10),
   msg91OtpLength: parseInt(process.env.MSG91_OTP_LENGTH || '6', 10),
 
+  // Brevo Transactional Email Configuration
+  brevoApiKey: process.env.BREVO_API_KEY || '',
+  brevoSenderEmail: process.env.BREVO_SENDER_EMAIL || 'vedikadubey16@gmail.com',
+  brevoSenderName: process.env.BREVO_SENDER_NAME || 'Blood Bridge',
+
   // Spatial search defaults
   defaultSearchRadiusKm: 25,
   maxSearchRadiusKm: 150,

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Smartphone,
+  Mail,
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
@@ -13,11 +14,12 @@ import {
 } from 'lucide-react';
 
 export default function VerifyOtp() {
-  const { verifyOtp, resendOtp, user } = useAuth();
+  const { verifyOtp, resendOtp, verifyEmailOtp, resendEmailOtp, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const searchParams = new URLSearchParams(location.search);
+  const emailParam = searchParams.get('email') || location.state?.email || user?.email || '';
   const phoneParam = searchParams.get('phone') || location.state?.phone || user?.phone || '';
   const roleParam = searchParams.get('role') || location.state?.role || user?.role || 'donor';
   const initialChallengeId = searchParams.get('challenge_id') || location.state?.challenge_id || '';
@@ -34,6 +36,15 @@ export default function VerifyOtp() {
   const [canResend, setCanResend] = useState(false);
 
   const inputRef = useRef(null);
+
+  // Masked email format helper: p***a@example.com
+  const getMaskedEmail = (em) => {
+    if (location.state?.email_masked) return location.state.email_masked;
+    if (!em || !em.includes('@')) return 'your email';
+    const [name, domain] = em.split('@');
+    const masked = name.length <= 2 ? `${name[0]}***` : `${name[0]}***${name[name.length - 1]}`;
+    return `${masked}@${domain}`;
+  };
 
   // Masked phone format helper: +91 ******3210
   const getMaskedPhone = (p) => {
@@ -85,12 +96,18 @@ export default function VerifyOtp() {
     setError(null);
 
     try {
-      const res = await verifyOtp(phoneParam, code, challengeId);
-      if (res.success || res.verified) {
-        setVerifiedSuccess(true);
-        showToast('Two-factor SMS verification completed successfully!');
+      let res;
+      if (emailParam) {
+        res = await verifyEmailOtp(emailParam, code, challengeId);
       } else {
-        setError(res.error || 'Verification failed. Please check the code.');
+        res = await verifyOtp(phoneParam, code, challengeId);
+      }
+
+      if (res && (res.success || res.verified)) {
+        setVerifiedSuccess(true);
+        showToast(emailParam ? 'Email verified successfully! Welcome to BloodBridge.' : 'Identity verified successfully!');
+      } else {
+        setError(res?.error || 'Verification failed. Please check the code.');
       }
     } catch (err) {
       setError(err.message || 'Incorrect verification code. Please try again.');
@@ -111,13 +128,19 @@ export default function VerifyOtp() {
     setError(null);
 
     try {
-      const res = await resendOtp(phoneParam, challengeId);
-      if (res.success) {
+      let res;
+      if (emailParam) {
+        res = await resendEmailOtp(emailParam, challengeId);
+      } else {
+        res = await resendOtp(phoneParam, challengeId);
+      }
+
+      if (res && res.success) {
         setCountdown(60);
         setCanResend(false);
-        showToast('New verification code dispatched via SMS.');
+        showToast(emailParam ? 'New 6-digit verification code sent to your email.' : 'New verification code dispatched via SMS.');
       } else {
-        setError(res.error || 'Could not resend OTP. Please wait a moment.');
+        setError(res?.error || 'Could not resend verification code. Please wait a moment.');
       }
     } catch (err) {
       setError(err.message || 'Resend failed. Please try again.');
@@ -128,7 +151,7 @@ export default function VerifyOtp() {
 
   const handleContinue = () => {
     if (roleParam === 'donor') {
-      navigate('/donor/registration');
+      navigate('/donor/dashboard');
     } else {
       navigate('/requester/dashboard');
     }
@@ -177,38 +200,31 @@ export default function VerifyOtp() {
           {/* Card Header */}
           <div className="text-center space-y-2">
             <div className="text-[11px] font-black uppercase tracking-widest text-[#D71935]">
-              SMS TWO-FACTOR VERIFICATION
+              {emailParam ? 'EMAIL VERIFICATION (BREVO)' : 'SMS TWO-FACTOR VERIFICATION'}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
               Enter Verification Code
             </h1>
             <p className="text-xs text-slate-500">
-              Protecting the healthcare donor registry with real-time SMS authentication.
+              {emailParam
+                ? 'Securing your BloodBridge registry account with real-time email verification.'
+                : 'Protecting the healthcare donor registry with real-time SMS authentication.'}
             </p>
           </div>
 
-          {/* Masked Mobile Display Card */}
+          {/* Masked Recipient Display Card */}
           <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex items-center gap-3 text-xs text-slate-700">
             <div className="w-8 h-8 rounded-xl bg-rose-50 text-[#D71935] flex items-center justify-center flex-shrink-0">
-              <Smartphone className="w-4 h-4" />
+              {emailParam ? <Mail className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
             </div>
             <div>
-              <span className="text-slate-500">Code sent via SMS to:</span>{' '}
+              <span className="text-slate-500">
+                {emailParam ? 'Code sent via Brevo to:' : 'Code sent via SMS to:'}
+              </span>{' '}
               <strong className="text-slate-900 font-mono text-sm tracking-wide">
-                {getMaskedPhone(phoneParam)}
+                {emailParam ? getMaskedEmail(emailParam) : getMaskedPhone(phoneParam)}
               </strong>
             </div>
-          </div>
-
-          {/* Demo / Evaluation Code Badge */}
-          <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between text-xs text-amber-900">
-            <span className="font-semibold flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              Demo / Evaluation Code:
-            </span>
-            <span className="font-mono font-black text-sm bg-amber-100/90 px-2.5 py-0.5 rounded-lg border border-amber-300">
-              123456
-            </span>
           </div>
 
           {/* Error Banner */}
@@ -226,9 +242,11 @@ export default function VerifyOtp() {
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-900">Phone Verified Successfully</h3>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {emailParam ? 'Email Verified Successfully!' : 'Phone Verified Successfully'}
+                </h3>
                 <p className="text-xs text-slate-500">
-                  Your identity has been authenticated against the Indian 2FA registry.
+                  Your BloodBridge account is activated and your healthcare credentials have been registered.
                 </p>
               </div>
 
@@ -237,7 +255,7 @@ export default function VerifyOtp() {
                 onClick={handleContinue}
                 className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group"
               >
-                <span>Continue to {roleParam === 'donor' ? 'Donor Registration' : 'Requester Dashboard'}</span>
+                <span>Continue to {roleParam === 'donor' ? 'Donor Portal' : 'Requester Portal'}</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
             </div>
@@ -246,7 +264,7 @@ export default function VerifyOtp() {
               {/* Six-digit OTP input */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-700 text-center">
-                  Six-digit OTP Code
+                  Six-digit Verification Code
                 </label>
                 <div className="flex justify-center">
                   <input
@@ -259,44 +277,42 @@ export default function VerifyOtp() {
                     value={otp}
                     onChange={handleOtpChange}
                     placeholder="••••••"
-                    className="w-48 text-center text-2xl font-mono tracking-[0.5em] py-3 px-4 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-[#D71935] focus:ring-4 focus:ring-[#D71935]/10 outline-none transition-all"
-                    autoComplete="one-time-code"
+                    className="w-48 py-3 text-center font-mono font-black text-2xl tracking-[0.45em] bg-slate-50 border border-slate-300 rounded-2xl focus:ring-4 focus:ring-[#D71935]/20 focus:border-[#D71935] transition-all shadow-inner"
                   />
                 </div>
+                <p className="text-[11px] text-center text-slate-400">
+                  Check your inbox and spam folder. Code expires in 5 minutes.
+                </p>
               </div>
 
               {/* Verify Button */}
               <button
                 type="submit"
-                disabled={loading || otp.length < 6}
+                disabled={loading || otp.length !== 6}
                 className="w-full py-3.5 px-4 text-xs font-bold text-white bg-[#D71935] hover:bg-[#be123c] rounded-2xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
-                <span>{loading ? 'Verifying OTP...' : 'Verify OTP'}</span>
-                <CheckCircle2 className="w-4 h-4" />
+                <span>{loading ? 'Verifying Code...' : 'Verify & Complete Registration'}</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
 
-              {/* Resend OTP Row */}
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-600 pt-1">
-                <span>Didn't receive the SMS code?</span>
-                {canResend ? (
-                  <button
-                    type="button"
-                    onClick={handleResend}
-                    className="font-bold text-[#D71935] hover:underline inline-flex items-center gap-1"
-                  >
-                    <RotateCw className="w-3 h-3" />
-                    <span>Resend OTP</span>
-                  </button>
-                ) : (
-                  <span className="font-mono text-slate-400">Resend in {countdown}s</span>
-                )}
-              </div>
-
-              {/* Return to Sign-Up Link */}
-              <div className="text-center pt-1">
-                <Link to="/signup" className="text-xs text-slate-500 hover:text-slate-800 underline">
-                  Return to Sign-Up
-                </Link>
+              {/* Resend OTP Section */}
+              <div className="text-center pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500">Didn't receive the code?</span>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={!canResend || loading}
+                  className={`font-bold transition-colors flex items-center gap-1 ${
+                    canResend
+                      ? 'text-[#D71935] hover:underline cursor-pointer'
+                      : 'text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <span>
+                    {canResend ? 'Resend Code' : `Resend in ${countdown}s`}
+                  </span>
+                </button>
               </div>
             </form>
           )}
@@ -304,18 +320,23 @@ export default function VerifyOtp() {
           {/* Security Notice */}
           <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
             <Shield className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-            <span>Powered by MSG91 SMS Gateway &bull; 5-Minute Expiration</span>
+            <span>BloodBridge will never ask for your verification code.</span>
           </div>
         </div>
       </main>
 
-      {/* Toast Notification */}
+      {/* Toast Notification Banner */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#0F172A] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs animate-in slide-in-from-bottom duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold py-3 px-4 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-bottom-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="w-full py-6 text-center text-xs text-slate-400 border-t border-slate-200/80 bg-white">
+        © 2026 BloodBridge Vision-X • Healthcare Emergency Coordination Network
+      </footer>
     </div>
   );
 }

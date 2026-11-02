@@ -76,6 +76,29 @@ export function AuthProvider({ children }) {
     return await api.auth.resendOtp({ phone, challenge_id: challengeId });
   };
 
+  const registerInitiate = async (payload) => {
+    return await api.auth.registerInitiate(payload);
+  };
+
+  const verifyEmailOtp = async (email, otp, challengeId) => {
+    const res = await api.auth.verifyEmailOtp({ email, otp, challenge_id: challengeId });
+    if (res.success && res.token) {
+      localStorage.setItem('bloodbridge_token', res.token);
+      setUser(res.user);
+      return res;
+    }
+    return res;
+  };
+
+  const resendEmailOtp = async (email, challengeId) => {
+    return await api.auth.resendEmailOtp({ email, challenge_id: challengeId });
+  };
+
+  const setSessionUser = (userData, token) => {
+    if (token) localStorage.setItem('bloodbridge_token', token);
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.removeItem('bloodbridge_token');
     setUser(null);
@@ -112,6 +135,10 @@ export function AuthProvider({ children }) {
         sendOtp,
         verifyOtp,
         resendOtp,
+        registerInitiate,
+        verifyEmailOtp,
+        resendEmailOtp,
+        setSessionUser,
         logout,
         refreshUser,
         loginAsDemo,
