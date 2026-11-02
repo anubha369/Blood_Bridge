@@ -24,7 +24,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const defaultRole: UserRole = route.params?.defaultRole === 'requester' ? 'requester' : 'donor';
-  const { signup } = useAuth();
+  const { registerInitiate, signup } = useAuth();
 
   const [role, setRole] = useState<UserRole>(defaultRole);
   const [name, setName] = useState('');
@@ -64,10 +64,15 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({
       setLoading(true);
       setError(null);
 
+      const fullPhone = phone.trim().startsWith('+91')
+        ? phone.trim()
+        : `+91 ${phone.trim()}`;
+
       const payload = {
         name: name.trim(),
+        username: email.trim().split('@')[0],
         email: email.trim().toLowerCase(),
-        phone: phone.trim(),
+        phone: fullPhone,
         password: password,
         role: role,
         blood_group: bloodGroup,
@@ -76,18 +81,39 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({
         consent_to_contact: consentToContact
       };
 
-      const user = await signup(payload);
-      Alert.alert(
-        'Account Registered',
-        role === 'donor'
-          ? 'Welcome to the BloodBridge Donor Network! You have received +50 registration reward points.'
-          : 'Welcome to BloodBridge! Your requester account is ready.'
-      );
+      // 1. Dispatch 6-digit OTP verification via backend
+      try {
+        const initRes = await registerInitiate(payload);
+        if (initRes && initRes.success) {
+          navigation.navigate('VerifyOtp', {
+            email: payload.email,
+            phone: payload.phone,
+            role: payload.role,
+            challenge_id: initRes.challenge_id,
+            email_masked: initRes.email_masked
+          });
+          return;
+        }
+      } catch (initErr: any) {
+        // If register-initiate failed specifically because user exists
+        if (initErr.message?.toLowerCase().includes('already registered') || initErr.message?.toLowerCase().includes('exists')) {
+          throw initErr;
+        }
+        // Otherwise attempt direct signup fallback
+        const user = await signup(payload);
+        Alert.alert(
+          'Account Registered',
+          role === 'donor'
+            ? 'Welcome to the BloodBridge Donor Network! You have received +50 registration reward points.'
+            : 'Welcome to BloodBridge! Your requester account is ready.'
+        );
 
-      if (user.role === 'donor') {
-        navigation.replace('DonorMain');
-      } else {
-        navigation.replace('RequesterMain');
+        if (user.role === 'donor') {
+          navigation.replace('DonorMain');
+        } else {
+          navigation.replace('RequesterMain');
+        }
+        return;
       }
     } catch (err: any) {
       setError(err.message || 'Registration failed.');

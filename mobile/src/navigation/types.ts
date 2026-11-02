@@ -9,6 +9,14 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   PrivacyPolicy: undefined;
   HowItWorks: undefined;
+  VerifyOtp: {
+    email?: string;
+    phone?: string;
+    role?: 'donor' | 'requester' | 'admin';
+    challenge_id?: string;
+    email_masked?: string;
+  };
+  DonorRegistration: undefined;
 
   // Main Role Hubs
   RequesterMain: NavigatorScreenParams<RequesterTabParamList>;

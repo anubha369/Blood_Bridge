@@ -10,6 +10,7 @@ import { RegisterScreen } from '../screens/public/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/public/ForgotPasswordScreen';
 import { PrivacyPolicyScreen } from '../screens/public/PrivacyPolicyScreen';
 import { HowItWorksScreen } from '../screens/public/HowItWorksScreen';
+import { VerifyOtpScreen } from '../screens/public/VerifyOtpScreen';
 
 // Tab Navigators
 import { RequesterTabNavigator } from './RequesterTabNavigator';
@@ -33,6 +34,7 @@ import { ConsentScreen } from '../screens/donor/ConsentScreen';
 import { DonationConfirmationScreen } from '../screens/donor/DonationConfirmationScreen';
 import { DonorProfileScreen } from '../screens/donor/DonorProfileScreen';
 import { ContactRequestsScreen } from '../screens/donor/ContactRequestsScreen';
+import { DonorRegistrationScreen } from '../screens/donor/DonorRegistrationScreen';
 
 // Common Detail Screens
 import { CreditWalletScreen } from '../screens/common/CreditWalletScreen';
@@ -57,6 +59,7 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
       <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
+      <Stack.Screen name="VerifyOtp" component={VerifyOtpScreen} />
 
       {/* Main Tab Portals */}
       <Stack.Screen name="RequesterMain" component={RequesterTabNavigator} />
@@ -73,6 +76,7 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="BloodBankDirectory" component={BloodBankDirectoryScreen} />
 
       {/* Donor Detail / Modal Screens */}
+      <Stack.Screen name="DonorRegistration" component={DonorRegistrationScreen} />
       <Stack.Screen name="Availability" component={AvailabilityScreen} />
       <Stack.Screen name="Consent" component={ConsentScreen} />
       <Stack.Screen name="DonationConfirmation" component={DonationConfirmationScreen} />

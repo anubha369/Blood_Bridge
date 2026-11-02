@@ -98,6 +98,48 @@ export const RequesterDashboardScreen: React.FC<{ navigation: any }> = ({ naviga
         </TouchableOpacity>
       </View>
 
+      {/* 3 Primary Navigation Options: Create Request | Donor Portal | Clinical AI */}
+      <View style={styles.primaryActionsRow}>
+        {/* A. Create Request */}
+        <TouchableOpacity
+          style={[styles.primaryActionCard, styles.createRequestCard]}
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('CreateRequest')}
+        >
+          <View style={[styles.primaryIconBox, { backgroundColor: THEME.colors.primary }]}>
+            <Ionicons name="add" size={20} color="#FFFFFF" />
+          </View>
+          <Text style={styles.primaryActionTitle}>Create Request</Text>
+          <Text style={styles.primaryActionSub}>Emergency Dispatch</Text>
+        </TouchableOpacity>
+
+        {/* B. Donor Portal */}
+        <TouchableOpacity
+          style={[styles.primaryActionCard, styles.donorPortalCard]}
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('DonorMain')}
+        >
+          <View style={[styles.primaryIconBox, { backgroundColor: THEME.colors.navy }]}>
+            <Ionicons name="heart" size={18} color="#FFFFFF" />
+          </View>
+          <Text style={styles.primaryActionTitle}>Donor Portal</Text>
+          <Text style={styles.primaryActionSub}>Volunteer Center</Text>
+        </TouchableOpacity>
+
+        {/* C. Clinical AI */}
+        <TouchableOpacity
+          style={[styles.primaryActionCard, styles.clinicalAICard]}
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('AIAssistant')}
+        >
+          <View style={[styles.primaryIconBox, { backgroundColor: '#B45309' }]}>
+            <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+          </View>
+          <Text style={styles.primaryActionTitle}>Clinical AI</Text>
+          <Text style={styles.primaryActionSub}>Medical RAG</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Emergency Action Banner */}
       <Card variant="urgent" style={styles.emergencyCard}>
         <View style={styles.emergencyCardHeader}>
@@ -338,6 +380,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#B45309'
+  },
+  primaryActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14
+  },
+  primaryActionCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...THEME.shadows.sm
+  },
+  createRequestCard: {
+    borderColor: '#FECDD3',
+    backgroundColor: '#FFF1F2'
+  },
+  donorPortalCard: {
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC'
+  },
+  clinicalAICard: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB'
+  },
+  primaryIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6
+  },
+  primaryActionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: THEME.colors.navy,
+    textAlign: 'center'
+  },
+  primaryActionSub: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: THEME.colors.slate500,
+    marginTop: 2,
+    textAlign: 'center'
   },
   emergencyCard: {
     marginBottom: 14,
