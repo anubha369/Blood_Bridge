@@ -163,6 +163,23 @@ export const api = {
     processMonthlyRewards: () => request('/credits/admin/process-monthly', { method: 'POST' })
   },
 
+  // Places & Hospitals Autocomplete (Google Places API New Proxy)
+  places: {
+    getConfig: () => request('/places/config'),
+    searchHospitals: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/places/hospitals?${qs}`);
+    },
+    searchLocations: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/places/locations?${qs}`);
+    },
+    getDetails: (placeId, sessionToken) => {
+      const qs = sessionToken ? `?session_token=${encodeURIComponent(sessionToken)}` : '';
+      return request(`/places/details/${placeId}${qs}`);
+    }
+  },
+
   // Telegram Emergency Alerts & Account Linking
   telegram: {
     getStatus: () => request('/telegram/status'),

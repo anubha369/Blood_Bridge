@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
@@ -17,7 +17,12 @@ import {
   Send,
   MessageSquare,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Search,
+  X,
+  Loader2,
+  Edit3,
+  Navigation
 } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -29,21 +34,47 @@ export default function CreateRequest() {
 
   // Natural Language Auto-Fill / Assistant State
   const [showAiAssistant, setShowAiAssistant] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('Need 2 units of B+ blood urgently at KGMU Hospital Lucknow tomorrow morning');
+  const [aiPrompt, setAiPrompt] = useState('Need 2 units of B+ blood urgently at Max Hospital Vaishali Ghaziabad tomorrow morning');
   const [parsingAI, setParsingAI] = useState(false);
 
   // Step 1: Blood Requirement Fields
   const [bloodGroup, setBloodGroup] = useState('B+');
   const [unitsNeeded, setUnitsNeeded] = useState(1);
-  const [city, setCity] = useState('Lucknow');
+  const [city, setCity] = useState('Ghaziabad');
   const [hospitalName, setHospitalName] = useState('');
   const [urgency, setUrgency] = useState('urgent');
   const [contactPhone, setContactPhone] = useState('');
+
+  // Location Autocomplete State
+  const [locationQuery, setLocationQuery] = useState('Ghaziabad');
+  const [locationCoords, setLocationCoords] = useState({ lat: 28.6692, lon: 77.4538 }); // Default Ghaziabad
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationDropdownRef = useRef(null);
+
+  // Hospital Places Autocomplete State
+  const [selectedHospitalPlace, setSelectedHospitalPlace] = useState(null);
+  const [placeId, setPlaceId] = useState('');
+  const [hospitalLat, setHospitalLat] = useState(null);
+  const [hospitalLng, setHospitalLng] = useState(null);
+  const [hospitalQuery, setHospitalQuery] = useState('');
+  const [hospitalSuggestions, setHospitalSuggestions] = useState([]);
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
+  const [manualHospitalEntry, setManualHospitalEntry] = useState(false);
+  const [hospitalSessionToken, setHospitalSessionToken] = useState(() =>
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session_${Math.random().toString(36).substring(2)}_${Date.now()}`
+  );
+  const [placesConfig, setPlacesConfig] = useState(null);
+  const [highlightedHospitalIndex, setHighlightedHospitalIndex] = useState(-1);
+  const hospitalDropdownRef = useRef(null);
 
   // Step 2: Patient & Location Details
   const [patientName, setPatientName] = useState('');
   const [patientAge, setPatientAge] = useState('');
   const [hospitalAddress, setHospitalAddress] = useState('');
+  const [wardBed, setWardBed] = useState('');
   const [neededBy, setNeededBy] = useState('');
   const [description, setDescription] = useState('');
 
@@ -70,19 +101,185 @@ export default function CreateRequest() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  // Load backend locations & places config
   useEffect(() => {
-    async function loadLocations() {
+    async function loadInitialData() {
       try {
-        const res = await api.donors.getLocations();
-        if (res.success && res.locations) {
-          setLocations(res.locations);
+        const [locRes, configRes] = await Promise.all([
+          api.donors.getLocations().catch(() => null),
+          api.places.getConfig().catch(() => null)
+        ]);
+        if (locRes && locRes.success && locRes.locations) {
+          setLocations(locRes.locations);
+        }
+        if (configRes && configRes.success) {
+          setPlacesConfig(configRes);
         }
       } catch (err) {
         // Fallback silently
       }
     }
-    loadLocations();
+    loadInitialData();
   }, []);
+
+  // Click-outside listener for autocomplete dropdowns
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (hospitalDropdownRef.current && !hospitalDropdownRef.current.contains(event.target)) {
+        setShowHospitalDropdown(false);
+      }
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target)) {
+        setShowLocationDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Debounced location search
+  useEffect(() => {
+    if (!showLocationDropdown || !locationQuery || locationQuery.trim().length < 2) {
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLoadingLocations(true);
+      try {
+        const res = await api.places.searchLocations({
+          input: locationQuery.trim(),
+          session_token: hospitalSessionToken
+        });
+        if (res && res.success) {
+          setLocationSuggestions(res.suggestions || []);
+        }
+      } catch (err) {
+        console.warn('Location search failed:', err);
+      } finally {
+        setLoadingLocations(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [locationQuery, showLocationDropdown, hospitalSessionToken]);
+
+  // Debounced hospital search
+  const fetchHospitals = async (query, currentCity, coords) => {
+    setLoadingHospitals(true);
+    try {
+      const res = await api.places.searchHospitals({
+        input: query || '',
+        city: currentCity || city,
+        latitude: coords?.lat ?? locationCoords?.lat,
+        longitude: coords?.lon ?? locationCoords?.lon,
+        session_token: hospitalSessionToken
+      });
+      if (res && res.success) {
+        setHospitalSuggestions(res.suggestions || []);
+      }
+    } catch (err) {
+      console.warn('Hospital search failed:', err);
+    } finally {
+      setLoadingHospitals(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showHospitalDropdown || manualHospitalEntry) return;
+
+    const timer = setTimeout(() => {
+      fetchHospitals(hospitalQuery, city, locationCoords);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [hospitalQuery, city, locationCoords, showHospitalDropdown, manualHospitalEntry]);
+
+  // Handler for selecting a city / locality
+  const handleSelectLocation = (loc) => {
+    const chosenCity = loc.city || loc.name;
+    setCity(chosenCity);
+    setLocationQuery(loc.full_name || loc.name);
+    const coords = loc.latitude && loc.longitude ? { lat: loc.latitude, lon: loc.longitude } : null;
+    if (coords) {
+      setLocationCoords(coords);
+    }
+    setShowLocationDropdown(false);
+
+    // If hospital was previously selected from another city, reset it
+    if (selectedHospitalPlace && selectedHospitalPlace.city && selectedHospitalPlace.city !== chosenCity) {
+      setSelectedHospitalPlace(null);
+      setHospitalName('');
+      setPlaceId('');
+      setHospitalAddress('');
+      setHospitalLat(null);
+      setHospitalLng(null);
+      setHospitalQuery('');
+    }
+
+    // Refresh hospital suggestions for the new location
+    fetchHospitals('', chosenCity, coords);
+  };
+
+  // Handler for selecting a hospital from autocomplete
+  const handleSelectHospital = (hosp) => {
+    setHospitalName(hosp.name);
+    setPlaceId(hosp.place_id || '');
+    const addr = hosp.address || hosp.full_text || '';
+    setHospitalAddress(addr);
+    setHospitalLat(hosp.latitude || null);
+    setHospitalLng(hosp.longitude || null);
+    setSelectedHospitalPlace(hosp);
+    setHospitalQuery(hosp.name);
+    setShowHospitalDropdown(false);
+    setManualHospitalEntry(false);
+    setError(null);
+  };
+
+  // Handler for clearing selected hospital
+  const handleClearSelectedHospital = () => {
+    setSelectedHospitalPlace(null);
+    setPlaceId('');
+    setHospitalName('');
+    setHospitalQuery('');
+    setHospitalLat(null);
+    setHospitalLng(null);
+    setHospitalAddress('');
+    setShowHospitalDropdown(true);
+    fetchHospitals('', city, locationCoords);
+  };
+
+  // Handler for using custom hospital name if not found in Places
+  const handleUseCustomHospitalName = (customName) => {
+    const trimmed = (customName || hospitalQuery).trim();
+    if (!trimmed) return;
+    setHospitalName(trimmed);
+    setSelectedHospitalPlace(null);
+    setPlaceId('');
+    setHospitalLat(locationCoords?.lat || null);
+    setHospitalLng(locationCoords?.lon || null);
+    setShowHospitalDropdown(false);
+    setManualHospitalEntry(true);
+  };
+
+  // Keyboard navigation inside hospital dropdown
+  const handleHospitalKeyDown = (e) => {
+    if (!showHospitalDropdown || hospitalSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedHospitalIndex((prev) => (prev + 1) % hospitalSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedHospitalIndex((prev) => (prev - 1 + hospitalSuggestions.length) % hospitalSuggestions.length);
+    } else if (e.key === 'Enter') {
+      if (highlightedHospitalIndex >= 0 && highlightedHospitalIndex < hospitalSuggestions.length) {
+        e.preventDefault();
+        handleSelectHospital(hospitalSuggestions[highlightedHospitalIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowHospitalDropdown(false);
+    }
+  };
 
   // Parse natural language with smart assistant
   const handleParseWithAI = async (e) => {
@@ -97,11 +294,22 @@ export default function CreateRequest() {
         const p = res.parsed_request;
         if (p.blood_group) setBloodGroup(p.blood_group);
         if (p.units_needed) setUnitsNeeded(p.units_needed);
-        if (p.hospital_name && p.hospital_name !== 'City Emergency Hospital') setHospitalName(p.hospital_name);
-        if (p.location?.city) setCity(p.location.city);
+        if (p.hospital_name && p.hospital_name !== 'City Emergency Hospital') {
+          setHospitalName(p.hospital_name);
+          setHospitalQuery(p.hospital_name);
+        }
+        if (p.location?.city) {
+          setCity(p.location.city);
+          setLocationQuery(p.location.city);
+        }
         if (p.urgency) setUrgency(p.urgency);
         if (p.needed_by) setNeededBy(p.needed_by);
         setShowAiAssistant(false);
+        // Automatically search hospital based on AI parsed text
+        if (p.hospital_name) {
+          setShowHospitalDropdown(true);
+          fetchHospitals(p.hospital_name, p.location?.city || city, locationCoords);
+        }
       }
     } catch (err) {
       setError(err.message || 'Could not extract fields with assistant.');
@@ -114,7 +322,7 @@ export default function CreateRequest() {
   const handleStep1Next = (e) => {
     e.preventDefault();
     if (!bloodGroup || !unitsNeeded || !city || !hospitalName) {
-      setError('Please provide blood group, units, city, and hospital name.');
+      setError('Please provide blood group, units, city/location, and hospital name.');
       return;
     }
     setError(null);
@@ -133,17 +341,34 @@ export default function CreateRequest() {
     setError(null);
 
     try {
+      let finalAddress = hospitalAddress ? hospitalAddress.trim() : null;
+      if (wardBed.trim()) {
+        finalAddress = finalAddress ? `${finalAddress} • Ward/Bed: ${wardBed.trim()}` : `Ward/Bed: ${wardBed.trim()}`;
+      }
+
       const payload = {
         patient_name: patientName.trim(),
         blood_group: bloodGroup,
         units_needed: parseInt(unitsNeeded, 10),
         hospital_name: hospitalName.trim(),
-        hospital_address: hospitalAddress ? hospitalAddress.trim() : null,
+        hospital_address: finalAddress,
         city: city.trim(),
         urgency,
         needed_by: neededBy || null,
         description: description ? description.trim() : null,
-        contact_phone: contactPhone ? contactPhone.trim() : null
+        contact_phone: contactPhone ? contactPhone.trim() : null,
+        place_id: placeId || null,
+        latitude: hospitalLat || (locationCoords ? locationCoords.lat : null),
+        longitude: hospitalLng || (locationCoords ? locationCoords.lon : null),
+        hospital_place_metadata: selectedHospitalPlace ? {
+          place_id: placeId,
+          name: hospitalName,
+          formatted_address: selectedHospitalPlace.address || hospitalAddress,
+          city: city,
+          latitude: hospitalLat,
+          longitude: hospitalLng,
+          types: selectedHospitalPlace.types || []
+        } : null
       };
 
       const res = await api.requests.create(payload);
@@ -396,54 +621,393 @@ export default function CreateRequest() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-rose-500" />
-                  <span>City / District *</span>
-                </label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                >
-                  {locations.length > 0 ? (
-                    locations.map((loc) => (
-                      <option key={loc.name} value={loc.name}>
-                        {loc.name} {loc.state ? `(${loc.state})` : ''}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Lucknow">Lucknow (Uttar Pradesh)</option>
-                      <option value="Kanpur">Kanpur (Uttar Pradesh)</option>
-                      <option value="Varanasi">Varanasi (Uttar Pradesh)</option>
-                      <option value="Prayagraj">Prayagraj (Uttar Pradesh)</option>
-                      <option value="Agra">Agra (Uttar Pradesh)</option>
-                      <option value="Ghaziabad">Ghaziabad (Uttar Pradesh)</option>
-                      <option value="Noida">Noida (Uttar Pradesh)</option>
-                      <option value="Bareilly">Bareilly (Uttar Pradesh)</option>
-                      <option value="Gorakhpur">Gorakhpur (Uttar Pradesh)</option>
-                      <option value="Jaipur">Jaipur (Rajasthan)</option>
-                      <option value="Delhi">Delhi (NCR)</option>
-                    </>
+            {/* Location & Hospital Selection */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                {/* 1. Location Field with Autocomplete */}
+                <div className="relative" ref={locationDropdownRef}>
+                  <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-rose-500" />
+                      <span>City / Location *</span>
+                    </span>
+                    {locationCoords && (
+                      <span className="text-[11px] font-mono text-slate-400 font-normal">
+                        {locationCoords.lat.toFixed(2)}°, {locationCoords.lon.toFixed(2)}°
+                      </span>
+                    )}
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={locationQuery}
+                      onChange={(e) => {
+                        setLocationQuery(e.target.value);
+                        setShowLocationDropdown(true);
+                      }}
+                      onFocus={() => {
+                        setShowLocationDropdown(true);
+                      }}
+                      placeholder="e.g. Ghaziabad, Noida, Delhi..."
+                      className="w-full pl-10 pr-10 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                    />
+                    <MapPin className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    {loadingLocations ? (
+                      <Loader2 className="w-4 h-4 text-rose-500 animate-spin absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    ) : locationQuery ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocationQuery('');
+                          setLocationSuggestions([]);
+                        }}
+                        className="text-slate-400 hover:text-slate-600 absolute right-3.5 top-1/2 -translate-y-1/2"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {/* Location Suggestions Dropdown */}
+                  {showLocationDropdown && (
+                    <div className="absolute left-0 right-0 mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+                      <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                        <span>Select City / Area</span>
+                        <span className="text-[10px] text-slate-400">Refines nearby hospitals</span>
+                      </div>
+                      {locationSuggestions.length > 0 ? (
+                        locationSuggestions.map((loc, idx) => (
+                          <button
+                            key={loc.place_id || loc.id || `${loc.name}_${idx}`}
+                            type="button"
+                            onClick={() => handleSelectLocation(loc)}
+                            className="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 flex items-start gap-2.5 border-b border-slate-50 last:border-0 transition-colors"
+                          >
+                            <MapPin className="w-4 h-4 text-rose-500 mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-slate-800">
+                                {loc.name}
+                              </div>
+                              <div className="text-xs text-slate-500 truncate">
+                                {loc.full_name || loc.state || ''}
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-3 text-xs text-slate-500 text-center">
+                          {loadingLocations ? (
+                            <span className="flex items-center justify-center gap-1.5">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                              <span>Searching locations...</span>
+                            </span>
+                          ) : (
+                            <span>Type to search Indian cities and districts</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
-                </select>
+
+                  {/* Quick Select Location Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="text-[11px] font-medium text-slate-400 mr-1">Quick select:</span>
+                    {['Ghaziabad', 'Noida', 'Delhi', 'Lucknow', 'Jaipur'].map((quickCity) => (
+                      <button
+                        key={quickCity}
+                        type="button"
+                        onClick={() => {
+                          const coordsMap = {
+                            Ghaziabad: { lat: 28.6692, lon: 77.4538 },
+                            Noida: { lat: 28.5355, lon: 77.3910 },
+                            Delhi: { lat: 28.6139, lon: 77.2090 },
+                            Lucknow: { lat: 26.8467, lon: 80.9462 },
+                            Jaipur: { lat: 26.9124, lon: 75.7873 }
+                          };
+                          handleSelectLocation({
+                            name: quickCity,
+                            city: quickCity,
+                            full_name: `${quickCity}, India`,
+                            latitude: coordsMap[quickCity]?.lat,
+                            longitude: coordsMap[quickCity]?.lon
+                          });
+                        }}
+                        className={`px-2.5 py-1 text-xs rounded-lg font-semibold border transition-all ${
+                          city === quickCity
+                            ? 'bg-rose-100/70 border-rose-300 text-rose-800 shadow-sm'
+                            : 'bg-slate-100/80 border-slate-200 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {quickCity}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Hospital Name Field with Autocomplete or Manual Input */}
+                <div className="relative" ref={hospitalDropdownRef}>
+                  <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-slate-600" />
+                      <span>Hospital or Blood Bank *</span>
+                    </span>
+                    {!manualHospitalEntry && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualHospitalEntry(true);
+                          setShowHospitalDropdown(false);
+                        }}
+                        className="text-xs font-semibold text-rose-600 hover:text-rose-700 underline"
+                      >
+                        Enter manually
+                      </button>
+                    )}
+                  </label>
+
+                  {/* Case A: Hospital already selected from places */}
+                  {selectedHospitalPlace && !manualHospitalEntry ? (
+                    <div className="p-3.5 bg-rose-50/60 border border-rose-200 rounded-2xl relative space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-3.5 h-3.5" />
+                          </span>
+                          <span className="text-sm font-extrabold text-slate-900 leading-snug">
+                            {selectedHospitalPlace.name}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearSelectedHospital}
+                          title="Change hospital"
+                          className="px-2 py-1 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 rounded-lg flex items-center gap-1 hover:bg-rose-200 transition-colors flex-shrink-0"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>Change</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-start gap-1.5 text-xs text-slate-600 pl-8">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2 leading-relaxed">
+                          {selectedHospitalPlace.address || selectedHospitalPlace.full_text || hospitalAddress}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pl-8 pt-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[11px] font-bold">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          Verified Place
+                        </span>
+                        {placeId && (
+                          <span className="text-[10px] font-mono text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            ID: {placeId.slice(0, 16)}...
+                          </span>
+                        )}
+                        {hospitalLat && hospitalLng && (
+                          <span className="text-[10px] font-mono text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            {hospitalLat.toFixed(3)}°N, {hospitalLng.toFixed(3)}°E
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : manualHospitalEntry ? (
+                    /* Case B: Manual Hospital Entry */
+                    <div className="space-y-1.5">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          value={hospitalName}
+                          onChange={(e) => setHospitalName(e.target.value)}
+                          placeholder="e.g. District Civil Hospital"
+                          className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualHospitalEntry(false);
+                            setShowHospitalDropdown(true);
+                            fetchHospitals(hospitalName, city, locationCoords);
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 flex items-center gap-1"
+                        >
+                          <Search className="w-3 h-3" />
+                          <span>Autocomplete</span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>Manual mode active. Please ensure the hospital name is accurate.</span>
+                      </p>
+                    </div>
+                  ) : (
+                    /* Case C: Searchable Dropdown Input */
+                    <div className="relative">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          value={hospitalQuery}
+                          onChange={(e) => {
+                            setHospitalQuery(e.target.value);
+                            setHospitalName(e.target.value);
+                            setShowHospitalDropdown(true);
+                            setHighlightedHospitalIndex(-1);
+                          }}
+                          onFocus={() => {
+                            setShowHospitalDropdown(true);
+                            if (hospitalSuggestions.length === 0) {
+                              fetchHospitals(hospitalQuery, city, locationCoords);
+                            }
+                          }}
+                          onKeyDown={handleHospitalKeyDown}
+                          placeholder={`Search hospital in ${city || 'area'}...`}
+                          className="w-full pl-10 pr-10 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium"
+                        />
+                        <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        {loadingHospitals ? (
+                          <Loader2 className="w-4 h-4 text-rose-500 animate-spin absolute right-3.5 top-1/2 -translate-y-1/2" />
+                        ) : hospitalQuery ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHospitalQuery('');
+                              setHospitalName('');
+                            }}
+                            className="text-slate-400 hover:text-slate-600 absolute right-3.5 top-1/2 -translate-y-1/2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {/* Hospital Suggestions Dropdown Menu */}
+                      {showHospitalDropdown && (
+                        <div className="absolute left-0 right-0 mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-72 overflow-y-auto">
+                          <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            <span>
+                              {hospitalQuery ? `Matching Hospitals in ${city}` : `Suggested Hospitals in ${city}`}
+                            </span>
+                            <span className="text-[10px] text-rose-600">
+                              {hospitalSuggestions.length} available
+                            </span>
+                          </div>
+
+                          {hospitalSuggestions.length > 0 ? (
+                            <div>
+                              {hospitalSuggestions.map((hosp, idx) => {
+                                const isHighlighted = highlightedHospitalIndex === idx;
+                                return (
+                                  <button
+                                    key={hosp.place_id || `${hosp.name}_${idx}`}
+                                    type="button"
+                                    onClick={() => handleSelectHospital(hosp)}
+                                    onMouseEnter={() => setHighlightedHospitalIndex(idx)}
+                                    className={`w-full px-3.5 py-3 text-left flex items-start gap-3 border-b border-slate-100 last:border-0 transition-colors ${
+                                      isHighlighted ? 'bg-rose-50/80 text-rose-900' : 'hover:bg-slate-50 text-slate-800'
+                                    }`}
+                                  >
+                                    <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                      <Building2 className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-bold leading-snug">
+                                        {hosp.name}
+                                      </div>
+                                      <div className="text-xs text-slate-500 truncate mt-0.5">
+                                        {hosp.address || hosp.full_text || hosp.city}
+                                      </div>
+                                      {hosp.types && hosp.types.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {hosp.types.slice(0, 2).map((t) => (
+                                            <span
+                                              key={t}
+                                              className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium capitalize"
+                                            >
+                                              {t.replace(/_/g, ' ')}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-slate-300 self-center flex-shrink-0" />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            /* Empty State */
+                            <div className="p-4 text-center space-y-3">
+                              <p className="text-xs text-slate-600 leading-relaxed">
+                                No hospitals found matching &ldquo;<span className="font-bold text-slate-800">{hospitalQuery}</span>&rdquo; in {city}.
+                              </p>
+                              <div className="flex flex-wrap items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUseCustomHospitalName(hospitalQuery)}
+                                  className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm"
+                                >
+                                  Use &ldquo;{hospitalQuery}&rdquo; as hospital name
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setManualHospitalEntry(true);
+                                    setShowHospitalDropdown(false);
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg"
+                                >
+                                  Enter manually
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Dropdown Footer Fallback */}
+                          <div className="px-3.5 py-2.5 bg-slate-50/90 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                            <span>Can&apos;t find your hospital?</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setManualHospitalEntry(true);
+                                setShowHospitalDropdown(false);
+                              }}
+                              className="font-bold text-rose-600 hover:text-rose-700 underline"
+                            >
+                              Enter manually &rarr;
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Provider Info Pill */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+                    <span>
+                      {placesConfig?.configured
+                        ? '⚡ Powered by Google Places API (New)'
+                        : '📍 National Healthcare Directory (India)'}
+                    </span>
+                    {!manualHospitalEntry && (
+                      <span className="text-[10px] text-slate-400">
+                        Use Arrow keys &amp; Enter to select
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
-                  <Building2 className="w-4 h-4 text-slate-500" />
-                  <span>Hospital or Blood Bank Name *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={hospitalName}
-                  onChange={(e) => setHospitalName(e.target.value)}
-                  placeholder="e.g. KGMU Centenary Hospital"
-                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                />
+              {/* Medical Coordination Disclaimer Notice */}
+              <div className="flex items-start gap-2.5 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-xs text-amber-900">
+                <Shield className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">
+                  <strong>Coordination Notice:</strong> Hospital suggestions and geographical coordinates are provided for navigation and transit coordination only. BloodBridge does not claim hospitals have verified real-time blood bank inventory.
+                </span>
               </div>
             </div>
 
@@ -514,16 +1078,64 @@ export default function CreateRequest() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Hospital Ward / Bed / Department</label>
-            <input
-              type="text"
-              value={hospitalAddress}
-              onChange={(e) => setHospitalAddress(e.target.value)}
-              placeholder="e.g. Emergency Casualty Block, 3rd Floor, ICU Bed 12"
-              className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-            />
-          </div>
+          {/* Hospital Address Context & Specific Ward/Bed */}
+          {selectedHospitalPlace ? (
+            <div className="space-y-3">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Verified Hospital Location</span>
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Places Verified
+                  </span>
+                </div>
+                <div className="text-[16px] font-bold text-slate-900">{hospitalName}</div>
+                <div className="text-xs text-slate-600 leading-relaxed">
+                  {hospitalAddress || selectedHospitalPlace.address || selectedHospitalPlace.full_text}
+                </div>
+                <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-400 font-mono">
+                  {placeId && <span>Place ID: {placeId}</span>}
+                  {hospitalLat && hospitalLng && (
+                    <span>Coords: {hospitalLat.toFixed(4)}°, {hospitalLng.toFixed(4)}°</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  <span>Specific Ward / Floor / Bed / Room (Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={wardBed}
+                  onChange={(e) => setWardBed(e.target.value)}
+                  placeholder="e.g. ICU Bed 4, 3rd Floor Emergency Wing"
+                  className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Verified street address was auto-filled from Places. You only need to add internal room/ward guidance.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[17px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-slate-500" />
+                <span>Hospital Address / Location Details</span>
+              </label>
+              <input
+                type="text"
+                value={hospitalAddress}
+                onChange={(e) => setHospitalAddress(e.target.value)}
+                placeholder="e.g. Sector 12, Main Road, Near Metro Station"
+                className="w-full px-4 py-3 text-[17px] bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-[17px] font-semibold text-slate-800 mb-1.5">Needed By Date / Time (Optional)</label>

@@ -19,6 +19,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const creditRoutes = require('./routes/creditRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
 const telegramRoutes = require('./routes/telegramRoutes');
+const placesRoutes = require('./routes/placesRoutes');
 
 const app = express();
 
@@ -91,6 +92,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/telegram', telegramRoutes);
+app.use('/api/places', placesRoutes);
 
 // Catch-all 404 handler for all unmatched routes (guarantees JSON format)
 app.use((req, res) => {

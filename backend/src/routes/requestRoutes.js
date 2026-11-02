@@ -61,6 +61,8 @@ router.post('/', authenticateUser, async (req, res, next) => {
       city,
       latitude,
       longitude,
+      place_id,
+      hospital_place_metadata,
       urgency = 'urgent',
       needed_by,
       description,
@@ -105,6 +107,8 @@ router.post('/', authenticateUser, async (req, res, next) => {
       city: city.trim(),
       latitude: lat,
       longitude: lon,
+      place_id: place_id ? place_id.trim() : null,
+      hospital_place_metadata: hospital_place_metadata || {},
       urgency: ['emergency', 'urgent', 'scheduled'].includes(urgency) ? urgency : 'urgent',
       needed_by: needed_by || null,
       description: description ? description.trim() : null,
@@ -130,12 +134,12 @@ router.post('/', authenticateUser, async (req, res, next) => {
             id, requester_id, patient_name, blood_group, units_needed,
             hospital_name, hospital_address, city, latitude, longitude,
             urgency, needed_by, description, contact_phone, contact_preference,
-            status, confirmation_status, created_at, updated_at
+            status, confirmation_status, place_id, hospital_place_metadata, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5,
             $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15,
-            $16, $17, NOW(), NOW()
+            $16, $17, $18, $19, NOW(), NOW()
           )
           ON CONFLICT (id) DO NOTHING`,
           [
@@ -155,7 +159,9 @@ router.post('/', authenticateUser, async (req, res, next) => {
             newRequest.contact_phone,
             newRequest.contact_preference,
             newRequest.status,
-            newRequest.confirmation_status
+            newRequest.confirmation_status,
+            newRequest.place_id,
+            JSON.stringify(newRequest.hospital_place_metadata)
           ]
         );
       } catch (dbErr) {
