@@ -17,8 +17,10 @@ import { Button } from '../../components/Button';
 import { LoadingScreen } from '../../components/LoadingScreen';
 import { api } from '../../services/api';
 import { CreditTransaction, CreditCatalogItem } from '../../constants/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const CreditWalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<number>(0);
   const [lifetimeEarned, setLifetimeEarned] = useState<number>(0);
   const [tier, setTier] = useState<string>('Bronze');
@@ -130,20 +132,20 @@ export const CreditWalletScreen: React.FC<{ navigation: any }> = ({ navigation }
   };
 
   if (loading && !refreshing) {
-    return <LoadingScreen message="Loading BloodBridge Life Saver Credit Wallet..." />;
+    return <LoadingScreen message="Loading Life Saver Credit Wallet..." />;
   }
 
   return (
     <View style={styles.container}>
       <Header
-        title="Credit Wallet & Rewards"
-        subtitle="Life Saver Recognition Points"
+        title="Life Saver Rewards"
+        subtitle="Recognition & Community Points"
         showBack
         onBack={() => navigation.goBack()}
       />
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -152,18 +154,20 @@ export const CreditWalletScreen: React.FC<{ navigation: any }> = ({ navigation }
           />
         }
       >
-        {/* Wallet Hero Card */}
+        {/* Wallet Balance Card */}
         <Card variant="elevated" style={styles.walletCard}>
           <View style={styles.walletTop}>
             <View>
-              <Text style={styles.walletLabel}>AVAILABLE LIFE SAVER BALANCE</Text>
+              <Text style={styles.walletLabel}>CURRENT AVAILABLE BALANCE</Text>
               <View style={styles.balanceRow}>
-                <Ionicons name="sparkles" size={28} color={THEME.colors.gold} />
                 <Text style={styles.balanceNum}>{balance}</Text>
-                <Text style={styles.balanceUnit}>pts</Text>
+                <Text style={styles.balanceUnit}>Life Saver Pts</Text>
               </View>
             </View>
-            <Badge label={tier} variant="brand" />
+            <View style={styles.tierBadge}>
+              <Ionicons name="trophy" size={14} color="#D97706" />
+              <Text style={styles.tierText}>{tier}</Text>
+            </View>
           </View>
 
           <View style={styles.walletStatsRow}>
@@ -173,72 +177,71 @@ export const CreditWalletScreen: React.FC<{ navigation: any }> = ({ navigation }
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatVal}>{transactions.length}</Text>
-              <Text style={styles.walletStatSub}>Transactions</Text>
+              <Text style={styles.walletStatVal}>NBTC Altruistic</Text>
+              <Text style={styles.walletStatSub}>100% Unpaid Rewards</Text>
             </View>
           </View>
 
-          {/* Monthly availability claim button */}
           <Button
-            title="Check / Claim Monthly Availability Reward (+25 pts)"
-            variant="outline"
-            size="sm"
+            title="Check Monthly Availability Reward (+25 Pts)"
+            variant="primary"
+            size="md"
             loading={checkingMonthly}
-            icon={<Ionicons name="calendar-outline" size={16} color={THEME.colors.primary} />}
             onPress={handleClaimMonthly}
-            style={{ marginTop: 14 }}
+            style={styles.claimMonthlyBtn}
           />
         </Card>
 
-        {/* Reward Rules Breakdown */}
+        {/* Earning Rules Card */}
         <Card variant="outlined" style={styles.rulesCard}>
-          <Text style={styles.rulesTitle}>How to Earn Recognition Points:</Text>
+          <Text style={styles.rulesTitle}>HOW POINTS ARE AWARDED:</Text>
           <View style={styles.ruleItem}>
-            <Ionicons name="checkmark-circle" size={16} color={THEME.colors.success} />
-            <Text style={styles.ruleText}>+50 pts: Completing verified volunteer registration</Text>
+            <Ionicons name="checkmark-circle" size={15} color={THEME.colors.success} />
+            <Text style={styles.ruleText}>+50 pts: Successful registration & phone verification</Text>
           </View>
           <View style={styles.ruleItem}>
-            <Ionicons name="checkmark-circle" size={16} color={THEME.colors.success} />
-            <Text style={styles.ruleText}>+100 pts: Each confirmed emergency whole blood donation</Text>
+            <Ionicons name="checkmark-circle" size={15} color={THEME.colors.success} />
+            <Text style={styles.ruleText}>+100 pts: Confirmed clinical blood donation at verified hospital</Text>
           </View>
           <View style={styles.ruleItem}>
-            <Ionicons name="checkmark-circle" size={16} color={THEME.colors.success} />
-            <Text style={styles.ruleText}>+25 pts: Monthly active availability bonus</Text>
+            <Ionicons name="checkmark-circle" size={15} color={THEME.colors.success} />
+            <Text style={styles.ruleText}>+25 pts: Maintaining active availability status each calendar month</Text>
           </View>
         </Card>
 
-        {/* Benefits Redemption Catalog */}
-        <Text style={styles.sectionHeader}>Redeem Recognition Benefits ({catalog.length})</Text>
-        {catalog.map((item) => {
-          const canAfford = balance >= item.points_cost;
-          return (
-            <Card key={item.id} variant="elevated" style={styles.catalogCard}>
-              <View style={styles.catalogRow}>
-                <View style={styles.catalogIconCircle}>
-                  <Ionicons name="gift" size={22} color={THEME.colors.primary} />
+        {/* Catalog Benefits */}
+        {catalog.length > 0 && (
+          <View>
+            <Text style={styles.sectionHeader}>Redeemable Health Partner Benefits</Text>
+            {catalog.map((item) => (
+              <Card key={item.id} variant="elevated" style={styles.catalogCard}>
+                <View style={styles.catalogRow}>
+                  <View style={styles.catalogIconCircle}>
+                    <Ionicons name="gift" size={20} color={THEME.colors.primary} />
+                  </View>
+                  <View style={styles.catalogTextCol}>
+                    <Text style={styles.catalogItemTitle}>{item.title}</Text>
+                    <Text style={styles.catalogItemDesc}>{item.description}</Text>
+                    <Text style={styles.costText}>{item.points_cost} points needed</Text>
+                  </View>
+                  <Button
+                    title="Redeem"
+                    size="sm"
+                    variant={balance >= item.points_cost ? 'primary' : 'outline'}
+                    disabled={balance < item.points_cost || redeemingId === item.id}
+                    loading={redeemingId === item.id}
+                    onPress={() => handleRedeem(item)}
+                  />
                 </View>
-                <View style={styles.catalogTextCol}>
-                  <Text style={styles.catalogItemTitle}>{item.title}</Text>
-                  <Text style={styles.catalogItemDesc}>{item.description}</Text>
-                  <Text style={styles.costText}>{item.points_cost} Points Required</Text>
-                </View>
-                <Button
-                  title={canAfford ? 'Redeem' : 'Locked'}
-                  variant={canAfford ? 'primary' : 'outline'}
-                  size="sm"
-                  disabled={!canAfford}
-                  loading={redeemingId === item.id}
-                  onPress={() => handleRedeem(item)}
-                />
-              </View>
-            </Card>
-          );
-        })}
+              </Card>
+            ))}
+          </View>
+        )}
 
-        {/* Transaction History */}
-        <Text style={styles.sectionHeader}>Transaction Ledger ({transactions.length})</Text>
+        {/* Recent Transactions */}
+        <Text style={styles.sectionHeader}>Transaction History</Text>
         {transactions.length === 0 ? (
-          <Text style={styles.emptyText}>No transaction records found.</Text>
+          <Text style={styles.emptyText}>No point activity recorded yet.</Text>
         ) : (
           transactions.map((tx) => {
             const isEarn = tx.type === 'earn' || tx.type === 'bonus' || tx.amount > 0;
@@ -284,16 +287,20 @@ export const CreditWalletScreen: React.FC<{ navigation: any }> = ({ navigation }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background
+    backgroundColor: THEME.colors.slate50
   },
   scrollContent: {
-    padding: THEME.spacing.base
+    paddingHorizontal: 16,
+    paddingTop: 12
   },
   walletCard: {
     padding: 18,
     marginBottom: 14,
-    backgroundColor: '#FFFDFD',
-    borderColor: THEME.colors.crimsonBorder
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadows.sm
   },
   walletTop: {
     flexDirection: 'row',
@@ -302,9 +309,9 @@ const styles = StyleSheet.create({
     marginBottom: 14
   },
   walletLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate500,
     letterSpacing: 0.8
   },
   balanceRow: {
@@ -314,20 +321,38 @@ const styles = StyleSheet.create({
     gap: 6
   },
   balanceNum: {
-    fontSize: 34,
+    fontSize: 36,
     fontWeight: '900',
-    color: THEME.colors.navy
+    color: THEME.colors.navy,
+    letterSpacing: -0.5
   },
   balanceUnit: {
     fontSize: 14,
     fontWeight: '700',
-    color: THEME.colors.textMuted
+    color: THEME.colors.slate500
+  },
+  tierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16
+  },
+  tierText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#B45309'
   },
   walletStatsRow: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: THEME.colors.borderLight,
-    paddingTop: 12
+    borderTopColor: THEME.colors.slate100,
+    paddingTop: 12,
+    marginBottom: 14
   },
   walletStatItem: {
     flex: 1
@@ -339,58 +364,67 @@ const styles = StyleSheet.create({
   },
   walletStatSub: {
     fontSize: 11,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate500,
     marginTop: 2
   },
   walletStatDivider: {
     width: 1,
-    backgroundColor: THEME.colors.borderLight,
+    backgroundColor: THEME.colors.slate100,
     marginHorizontal: 12
   },
+  claimMonthlyBtn: {
+    width: '100%'
+  },
   rulesCard: {
-    padding: 12,
+    padding: 14,
     marginBottom: 16,
-    backgroundColor: '#F8FAFC'
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16
   },
   rulesTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: THEME.colors.navy,
-    marginBottom: 8
+    marginBottom: 8,
+    letterSpacing: 0.5
   },
   ruleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4
+    gap: 8,
+    marginBottom: 6
   },
   ruleText: {
     fontSize: 12,
-    color: THEME.colors.textSecondary
+    color: THEME.colors.slate700,
+    flex: 1,
+    lineHeight: 16
   },
   sectionHeader: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
     color: THEME.colors.navy,
     marginTop: 6,
-    marginBottom: 10
+    marginBottom: 10,
+    letterSpacing: -0.2
   },
   catalogCard: {
-    padding: 12,
-    marginBottom: 10
+    padding: 14,
+    marginBottom: 10,
+    borderRadius: 16
   },
   catalogRow: {
     flexDirection: 'row',
     alignItems: 'center'
   },
   catalogIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: THEME.colors.crimsonLight,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: THEME.colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10
+    marginRight: 12
   },
   catalogTextCol: {
     flex: 1,
@@ -398,24 +432,25 @@ const styles = StyleSheet.create({
   },
   catalogItemTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     color: THEME.colors.navy
   },
   catalogItemDesc: {
-    fontSize: 11,
-    color: THEME.colors.textMuted,
+    fontSize: 12,
+    color: THEME.colors.slate600,
     marginTop: 2,
-    lineHeight: 15
+    lineHeight: 16
   },
   costText: {
     fontSize: 11,
     fontWeight: '800',
-    color: THEME.colors.gold,
+    color: '#D97706',
     marginTop: 4
   },
   txCard: {
-    padding: 10,
-    marginBottom: 6
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 14
   },
   txRow: {
     flexDirection: 'row',
@@ -434,12 +469,12 @@ const styles = StyleSheet.create({
   },
   txReason: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: THEME.colors.navy
   },
   txDate: {
     fontSize: 11,
-    color: THEME.colors.textLight,
+    color: THEME.colors.slate400,
     marginTop: 2
   },
   txAmount: {
@@ -448,9 +483,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate400,
     fontStyle: 'italic',
     paddingVertical: 10
   }
 });
-

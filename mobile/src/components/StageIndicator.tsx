@@ -6,39 +6,71 @@ import { CONFIG } from '../constants/config';
 import { RequestStatus } from '../constants/types';
 
 interface StageIndicatorProps {
-  status: RequestStatus;
+  status?: RequestStatus;
+  currentStatus?: RequestStatus;
   selectedDonorId?: string | null;
   hasResponses?: boolean;
+  compact?: boolean;
 }
 
 export const StageIndicator: React.FC<StageIndicatorProps> = ({
   status,
+  currentStatus,
   selectedDonorId,
-  hasResponses = false
+  hasResponses = false,
+  compact = false
 }) => {
+  const activeStatus = (currentStatus || status || 'registered') as RequestStatus;
+
   // Determine current stage index (0 to 4)
   let currentStage = 0;
-  if (['registered', 'pending'].includes(status)) currentStage = 0;
-  else if (['alerting_donors', 'alerting', 'active'].includes(status)) currentStage = 1;
-  else if (['donors_responded', 'responses_received'].includes(status)) currentStage = 2;
-  else if (status === 'donor_selected') currentStage = 3;
-  else if (status === 'fulfilled') currentStage = 4;
-  else if (status === 'cancelled') currentStage = -1;
+  if (['registered', 'pending'].includes(activeStatus)) currentStage = 0;
+  else if (['alerting_donors', 'alerting', 'active'].includes(activeStatus)) currentStage = 1;
+  else if (['donors_responded', 'responses_received'].includes(activeStatus)) currentStage = 2;
+  else if (activeStatus === 'donor_selected') currentStage = 3;
+  else if (activeStatus === 'fulfilled') currentStage = 4;
+  else if (activeStatus === 'cancelled') currentStage = -1;
 
-  // Auto-advance visual stage if donor is selected or responses exist
   if (currentStage < 3 && selectedDonorId) {
     currentStage = 3;
   } else if (currentStage < 2 && hasResponses) {
     currentStage = 2;
   }
 
-  const isCancelled = status === 'cancelled';
+  const isCancelled = activeStatus === 'cancelled';
 
   if (isCancelled) {
     return (
       <View style={styles.cancelledBanner}>
-        <Ionicons name="close-circle" size={20} color={THEME.colors.urgent} />
-        <Text style={styles.cancelledText}>This Blood Request has been CANCELLED</Text>
+        <Ionicons name="close-circle" size={16} color={THEME.colors.urgent} />
+        <Text style={styles.cancelledText}>Blood Request Cancelled</Text>
+      </View>
+    );
+  }
+
+  if (compact) {
+    const stageNames = ['Registered', 'Alerting', 'Responded', 'Selected', 'Fulfilled'];
+    return (
+      <View style={styles.compactContainer}>
+        <View style={styles.compactBarRow}>
+          {stageNames.map((name, idx) => {
+            const isCompleted = currentStage > idx;
+            const isCurrent = currentStage === idx;
+            return (
+              <View
+                key={name}
+                style={[
+                  styles.compactSegment,
+                  isCompleted && styles.compactSegmentCompleted,
+                  isCurrent && styles.compactSegmentCurrent
+                ]}
+              />
+            );
+          })}
+        </View>
+        <Text style={styles.compactLabel}>
+          Stage {Math.max(1, currentStage + 1)} of 5: {stageNames[Math.max(0, currentStage)]}
+        </Text>
       </View>
     );
   }
@@ -105,14 +137,10 @@ export const StageIndicator: React.FC<StageIndicatorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.borderRadius.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: THEME.colors.borderLight,
-    marginBottom: THEME.spacing.md,
-    ...THEME.shadows.sm
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8
   },
   stepsRow: {
     flexDirection: 'row',
@@ -125,8 +153,8 @@ const styles = StyleSheet.create({
   },
   connector: {
     flex: 1,
-    height: 3,
-    backgroundColor: THEME.colors.borderLight,
+    height: 2.5,
+    backgroundColor: THEME.colors.slate200,
     marginTop: 13,
     marginHorizontal: -4
   },
@@ -134,11 +162,11 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.primary
   },
   circle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: THEME.colors.slate100,
+    borderWidth: 1.5,
     borderColor: THEME.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
@@ -154,18 +182,18 @@ const styles = StyleSheet.create({
     ...THEME.shadows.emergency
   },
   stepNum: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.textMuted
+    fontSize: 11,
+    fontWeight: '800',
+    color: THEME.colors.slate500
   },
   stepNumCurrent: {
     color: '#FFFFFF'
   },
   label: {
-    fontSize: 10,
-    color: THEME.colors.textMuted,
+    fontSize: 9.5,
+    color: THEME.colors.slate500,
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '600',
     lineHeight: 12
   },
   labelCurrent: {
@@ -174,23 +202,46 @@ const styles = StyleSheet.create({
   },
   labelCompleted: {
     color: THEME.colors.navy,
-    fontWeight: '600'
+    fontWeight: '700'
+  },
+  compactContainer: {
+    marginVertical: 4
+  },
+  compactBarRow: {
+    flexDirection: 'row',
+    gap: 4,
+    height: 4,
+    marginBottom: 4
+  },
+  compactSegment: {
+    flex: 1,
+    borderRadius: 2,
+    backgroundColor: THEME.colors.slate200
+  },
+  compactSegmentCompleted: {
+    backgroundColor: THEME.colors.success
+  },
+  compactSegmentCurrent: {
+    backgroundColor: THEME.colors.primary
+  },
+  compactLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.slate600
   },
   cancelledBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.urgentBg,
-    borderRadius: THEME.borderRadius.md,
-    padding: 12,
+    backgroundColor: '#FFF1F2',
+    borderRadius: 10,
+    padding: 8,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    marginBottom: THEME.spacing.md
+    borderColor: '#FECDD3'
   },
   cancelledText: {
     color: THEME.colors.urgent,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    marginLeft: 8
+    marginLeft: 6
   }
 });
-

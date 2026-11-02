@@ -37,12 +37,19 @@ export interface BloodRequest {
   latitude?: number;
   longitude?: number;
   urgency_level: UrgencyLevel;
+  urgency?: UrgencyLevel;
+  city?: string;
   contact_number: string;
   notes?: string;
   status: RequestStatus;
   selected_donor_id?: string | null;
   selected_donor_name?: string | null;
   selected_donor_phone?: string | null;
+  selected_donor?: {
+    id: string;
+    name: string;
+    phone: string;
+  } | null;
   confirmation_status?: 'pending' | 'confirmed' | 'declined';
   donors_alerted_count?: number;
   responses_count?: number;
@@ -100,10 +107,12 @@ export interface DonorProfile {
 }
 
 export interface CooldownStatus {
-  inCooldown: boolean;
-  daysRemaining: number;
-  cooldownUntil: string | null;
-  lastDonationDate: string | null;
+  inCooldown?: boolean;
+  can_donate?: boolean;
+  daysRemaining?: number;
+  days_remaining?: number;
+  cooldownUntil?: string | null;
+  lastDonationDate?: string | null;
 }
 
 export interface CreditTransaction {
@@ -137,11 +146,17 @@ export interface BloodBank {
   name: string;
   address: string;
   city: string;
+  state?: string;
+  postal_code?: string;
   phone: string;
   operating_hours?: string;
-  verified: boolean;
+  verified?: boolean;
   distance_km?: number;
-  available_groups: Record<BloodGroup, number>;
+  distance_band?: string;
+  source_of_info?: string;
+  last_updated?: string;
+  inventory_summary?: Record<string, number>;
+  available_groups?: Record<BloodGroup, number>;
 }
 
 export interface ChatMessage {
@@ -152,4 +167,3 @@ export interface ChatMessage {
   sources?: string[];
   grounded?: boolean;
 }
-

@@ -14,16 +14,16 @@ import { THEME } from '../../constants/theme';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { BloodGroupSelector } from '../../components/BloodGroupSelector';
-import { Header } from '../../components/Header';
-import { MedicalDisclaimerBanner } from '../../components/MedicalDisclaimerBanner';
 import { useAuth } from '../../context/AuthContext';
 import { BloodGroup, UserRole } from '../../constants/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({
   navigation,
   route
 }) => {
-  const defaultRole: UserRole = route.params?.defaultRole || 'donor';
+  const insets = useSafeAreaInsets();
+  const defaultRole: UserRole = route.params?.defaultRole === 'requester' ? 'requester' : 'donor';
   const { signup } = useAuth();
 
   const [role, setRole] = useState<UserRole>(defaultRole);
@@ -80,7 +80,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({
       Alert.alert(
         'Account Registered',
         role === 'donor'
-          ? 'Welcome to the BloodBridge Donor Network! You have been awarded +50 registration reward points.'
+          ? 'Welcome to the BloodBridge Donor Network! You have received +50 registration reward points.'
           : 'Welcome to BloodBridge! Your requester account is ready.'
       );
 
@@ -97,206 +97,368 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Header
-        title="Create Account"
-        subtitle="Join BloodBridge Healthcare Network"
-        showBack
-        onBack={() => navigation.goBack()}
-      />
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <MedicalDisclaimerBanner />
-
-        {/* Role Selector */}
-        <Text style={styles.sectionLabel}>Select Your Primary Role</Text>
-        <View style={styles.roleTabs}>
+    <View style={styles.screen}>
+      {/* Header Bar matching Login */}
+      <View style={[styles.headerBar, { paddingTop: insets.top + 6 }]}>
+        <View style={styles.headerContent}>
           <TouchableOpacity
-            style={[styles.roleTab, role === 'donor' && styles.roleTabActive]}
-            onPress={() => setRole('donor')}
-          >
-            <Ionicons
-              name="heart"
-              size={18}
-              color={role === 'donor' ? '#FFFFFF' : THEME.colors.primary}
-            />
-            <Text style={[styles.roleTabText, role === 'donor' && styles.roleTabTextActive]}>
-              Volunteer Donor
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.roleTab, role === 'requester' && styles.roleTabActive]}
-            onPress={() => setRole('requester')}
-          >
-            <Ionicons
-              name="pulse"
-              size={18}
-              color={role === 'requester' ? '#FFFFFF' : THEME.colors.urgent}
-            />
-            <Text style={[styles.roleTabText, role === 'requester' && styles.roleTabTextActive]}>
-              Patient / Requester
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {error && (
-          <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={18} color={THEME.colors.urgent} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <Input
-          label="Full Name"
-          placeholder="e.g. Rahul Verma"
-          icon="person-outline"
-          value={name}
-          onChangeText={setName}
-        />
-
-        <Input
-          label="Email Address"
-          placeholder="e.g. rahul@example.com"
-          icon="mail-outline"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-
-        <Input
-          label="Mobile Phone Number"
-          placeholder="10-digit mobile (e.g. 9876543210)"
-          icon="call-outline"
-          keyboardType="phone-pad"
-          value={phone}
-          onChangeText={setPhone}
-        />
-
-        <Input
-          label="Password"
-          placeholder="At least 6 characters"
-          icon="lock-closed-outline"
-          isPassword
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        {role === 'donor' && (
-          <BloodGroupSelector
-            label="Your Blood Group"
-            selectedGroup={bloodGroup}
-            onSelect={setBloodGroup}
-          />
-        )}
-
-        <View style={styles.locationRow}>
-          <Input
-            label="City"
-            placeholder="e.g. Jaipur"
-            icon="location-outline"
-            value={city}
-            onChangeText={setCity}
-            containerStyle={{ flex: 1, marginRight: 8 }}
-          />
-          <Input
-            label="Area / Neighborhood"
-            placeholder="e.g. Malviya Nagar"
-            value={area}
-            onChangeText={setArea}
-            containerStyle={{ flex: 1 }}
-          />
-        </View>
-
-        {role === 'donor' && (
-          <TouchableOpacity
-            style={styles.consentRow}
+            style={styles.logoRow}
+            onPress={() => navigation.navigate('Welcome')}
             activeOpacity={0.8}
-            onPress={() => setConsentToContact(!consentToContact)}
           >
-            <Ionicons
-              name={consentToContact ? 'checkbox' : 'square-outline'}
-              size={22}
-              color={THEME.colors.primary}
-            />
-            <Text style={styles.consentText}>
-              I consent to receive urgent, emergency blood availability requests when patients nearby
-              require my compatible blood group.
+            <View style={styles.logoDrop}>
+              <Ionicons name="water" size={24} color={THEME.colors.primary} />
+            </View>
+            <Text style={styles.logoText}>
+              <Text style={styles.logoRed}>Blood</Text>
+              <Text style={styles.logoNavy}>Bridge</Text>
             </Text>
           </TouchableOpacity>
-        )}
 
-        <Button
-          title={role === 'donor' ? 'Register as Volunteer Donor' : 'Register as Blood Requester'}
-          variant="primary"
-          size="lg"
-          loading={loading}
-          onPress={handleRegister}
-          style={{ marginTop: 12 }}
-        />
-
-        <View style={styles.bottomRow}>
-          <Text style={styles.bottomPrompt}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginLink}> Sign In</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Welcome')}
+            style={styles.returnBtn}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={14} color={THEME.colors.slate600} />
+            <Text style={styles.returnBtnText}>Return to Home</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 24 }
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.cardWrapper}>
+            <View style={styles.registerCard}>
+              {/* Category Header */}
+              <View style={styles.cardHeader}>
+                <Text style={styles.portalTag}>SECURE HEALTHCARE PORTAL</Text>
+                <Text style={styles.welcomeHeading}>Create Account</Text>
+                <Text style={styles.welcomeSub}>
+                  Register to join the BloodBridge emergency coordination registry.
+                </Text>
+              </View>
+
+              {/* Role Tabs */}
+              <View style={styles.roleTabsContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleTab,
+                    role === 'donor' && styles.roleTabActive
+                  ]}
+                  onPress={() => setRole('donor')}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.roleTabText,
+                      role === 'donor' && styles.roleTabTextActiveCrimson
+                    ]}
+                  >
+                    Volunteer Donor
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.roleTab,
+                    role === 'requester' && styles.roleTabActive
+                  ]}
+                  onPress={() => setRole('requester')}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.roleTabText,
+                      role === 'requester' && styles.roleTabTextActiveNavy
+                    ]}
+                  >
+                    Patient / Hospital
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {error && (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="alert-circle" size={18} color="#B91C1C" />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              {/* Form Inputs */}
+              <View style={styles.formSection}>
+                <Input
+                  label="Full Legal Name"
+                  placeholder="e.g. Rahul Sharma"
+                  icon="person-outline"
+                  value={name}
+                  onChangeText={setName}
+                />
+
+                <Input
+                  label="Email Address"
+                  placeholder="e.g. rahul@example.com"
+                  icon="mail-outline"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+
+                <Input
+                  label="Mobile Phone Number (+91)"
+                  placeholder="10-digit mobile (e.g. 9876543210)"
+                  icon="call-outline"
+                  keyboardType="phone-pad"
+                  value={phone}
+                  onChangeText={setPhone}
+                />
+
+                <Input
+                  label="Password"
+                  placeholder="At least 6 characters"
+                  icon="lock-closed-outline"
+                  isPassword
+                  value={password}
+                  onChangeText={setPassword}
+                />
+
+                {role === 'donor' && (
+                  <BloodGroupSelector
+                    label="Your Blood Group"
+                    selectedGroup={bloodGroup}
+                    onSelect={setBloodGroup}
+                  />
+                )}
+
+                <View style={styles.locationRow}>
+                  <Input
+                    label="City"
+                    placeholder="e.g. Jaipur"
+                    icon="location-outline"
+                    value={city}
+                    onChangeText={setCity}
+                    containerStyle={{ flex: 1, marginRight: 8 }}
+                  />
+                  <Input
+                    label="Area / Neighborhood"
+                    placeholder="e.g. Malviya Nagar"
+                    value={area}
+                    onChangeText={setArea}
+                    containerStyle={{ flex: 1 }}
+                  />
+                </View>
+
+                {role === 'donor' && (
+                  <TouchableOpacity
+                    style={styles.consentRow}
+                    activeOpacity={0.8}
+                    onPress={() => setConsentToContact(!consentToContact)}
+                  >
+                    <Ionicons
+                      name={consentToContact ? 'checkbox' : 'square-outline'}
+                      size={22}
+                      color={THEME.colors.primary}
+                    />
+                    <Text style={styles.consentText}>
+                      I consent to receive urgent, emergency blood availability requests when patients nearby
+                      require my compatible blood group.
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <Button
+                  title={role === 'donor' ? 'Register as Volunteer Donor' : 'Register as Blood Requester'}
+                  variant="primary"
+                  size="lg"
+                  showArrow
+                  loading={loading}
+                  onPress={handleRegister}
+                  style={styles.submitBtn}
+                />
+
+                <View style={styles.switchAuthRow}>
+                  <Text style={styles.switchAuthText}>Already have an account? </Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                    <Text style={styles.switchAuthLink}>Sign in</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Security Badge */}
+              <View style={styles.securityRow}>
+                <Ionicons name="shield-checkmark-outline" size={14} color={THEME.colors.slate400} />
+                <Text style={styles.securityText}>
+                  Protected by 256-Bit SSL & Healthcare Registry Standards
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  flex: {
+  screen: {
     flex: 1,
-    backgroundColor: THEME.colors.background
+    backgroundColor: THEME.colors.slate50
+  },
+  flex: {
+    flex: 1
+  },
+  headerBar: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.colors.border,
+    paddingHorizontal: 16,
+    paddingBottom: 12
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  logoDrop: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  logoText: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5
+  },
+  logoRed: {
+    color: THEME.colors.primary
+  },
+  logoNavy: {
+    color: THEME.colors.navy
+  },
+  returnBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: THEME.colors.borderDark,
+    backgroundColor: '#FFFFFF'
+  },
+  returnBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.slate600
   },
   scrollContent: {
-    padding: THEME.spacing.base
+    paddingHorizontal: 16,
+    paddingTop: 16
   },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
+  cardWrapper: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center'
+  },
+  registerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadows.md
+  },
+  cardHeader: {
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  portalTag: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: THEME.colors.primary,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 6
+  },
+  welcomeHeading: {
+    fontSize: 30,
+    fontWeight: '900',
     color: THEME.colors.navy,
-    marginBottom: 8
+    letterSpacing: -0.6,
+    marginBottom: 4
   },
-  roleTabs: {
+  welcomeSub: {
+    fontSize: 14,
+    color: THEME.colors.slate600,
+    textAlign: 'center'
+  },
+  roleTabsContainer: {
     flexDirection: 'row',
-    gap: 10,
+    backgroundColor: THEME.colors.slate100,
+    borderRadius: 16,
+    padding: 4,
     marginBottom: 20
   },
   roleTab: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: THEME.colors.border
+    borderRadius: 12
   },
   roleTabActive: {
-    backgroundColor: THEME.colors.primary,
-    borderColor: THEME.colors.primary,
-    ...THEME.shadows.emergency
+    backgroundColor: '#FFFFFF',
+    ...THEME.shadows.sm
   },
   roleTabText: {
     fontSize: 13,
     fontWeight: '700',
-    color: THEME.colors.navy,
-    marginLeft: 6
+    color: THEME.colors.slate600
   },
-  roleTabTextActive: {
-    color: '#FFFFFF'
+  roleTabTextActiveCrimson: {
+    color: THEME.colors.primary,
+    fontWeight: '800'
+  },
+  roleTabTextActiveNavy: {
+    color: THEME.colors.navy,
+    fontWeight: '800'
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#B91C1C',
+    fontWeight: '600'
+  },
+  formSection: {
+    marginBottom: 10
   },
   locationRow: {
     flexDirection: 'row'
@@ -304,52 +466,51 @@ const styles = StyleSheet.create({
   consentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#FFFDFD',
+    backgroundColor: '#FFF5F5',
     borderWidth: 1,
-    borderColor: THEME.colors.crimsonBorder,
-    borderRadius: THEME.borderRadius.md,
+    borderColor: '#FECDD3',
+    borderRadius: 12,
     padding: 12,
-    marginVertical: 12
+    marginVertical: 14
   },
   consentText: {
     flex: 1,
     fontSize: 12,
-    color: THEME.colors.textSecondary,
+    color: THEME.colors.slate700,
     marginLeft: 10,
-    lineHeight: 17
+    lineHeight: 18
   },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.urgentBg,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: THEME.borderRadius.md,
-    padding: 12,
-    marginBottom: 16
+  submitBtn: {
+    width: '100%',
+    marginTop: 6
   },
-  errorText: {
-    color: THEME.colors.urgent,
-    fontSize: 13,
-    marginLeft: 8,
-    flex: 1,
-    fontWeight: '500'
-  },
-  bottomRow: {
+  switchAuthRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    paddingBottom: 24
+    marginTop: 16,
+    marginBottom: 8
   },
-  bottomPrompt: {
-    fontSize: 14,
-    color: THEME.colors.textMuted
+  switchAuthText: {
+    fontSize: 13,
+    color: THEME.colors.slate500
   },
-  loginLink: {
-    fontSize: 14,
+  switchAuthLink: {
+    fontSize: 13,
     fontWeight: '800',
     color: THEME.colors.primary
+  },
+  securityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: THEME.colors.slate100
+  },
+  securityText: {
+    fontSize: 11,
+    color: THEME.colors.slate400
   }
 });
-

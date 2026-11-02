@@ -18,11 +18,13 @@ import { StageIndicator } from '../../components/StageIndicator';
 import { LoadingScreen } from '../../components/LoadingScreen';
 import { api } from '../../services/api';
 import { BloodRequest, DonorCandidate, ContactRequest } from '../../constants/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = ({
   navigation,
   route
 }) => {
+  const insets = useSafeAreaInsets();
   const { requestId } = route.params;
 
   const [request, setRequest] = useState<BloodRequest | null>(null);
@@ -141,11 +143,19 @@ export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = 
         subtitle={`Request #${request.id.slice(0, 8)}`}
         showBack
         onBack={() => navigation.goBack()}
-        isEmergency={request.urgency_level === 'critical'}
+        rightAction={
+          <TouchableOpacity
+            style={styles.refreshIconBtn}
+            onPress={onRefresh}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="refresh" size={18} color={THEME.colors.slate700} />
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -154,16 +164,14 @@ export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = 
           />
         }
       >
-        {/* Five-Stage Journey Progress Tracker */}
-        <Text style={styles.sectionHeader}>Five-Stage Coordination Lifecycle</Text>
-        <StageIndicator
-          status={request.status}
-          selectedDonorId={request.selected_donor_id}
-          hasResponses={contactRequests.length > 0}
-        />
+        {/* 5-Stage Journey Progress Indicator */}
+        <Text style={styles.sectionHeader}>COORDINATION LIFECYCLE (5-STAGE)</Text>
+        <Card variant="elevated" style={styles.stageCard}>
+          <StageIndicator currentStatus={request.status} />
+        </Card>
 
-        {/* Primary Request Overview Card */}
-        <Card variant={request.urgency_level === 'critical' ? 'urgent' : 'elevated'}>
+        {/* Request Details Summary Card */}
+        <Card variant="elevated" style={styles.metaCard}>
           <View style={styles.cardTopRow}>
             <View style={styles.bloodCircle}>
               <Text style={styles.bloodText}>{request.blood_group}</Text>
@@ -172,25 +180,27 @@ export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = 
               <Text style={styles.patientName}>{request.patient_name || 'Emergency Patient'}</Text>
               <Text style={styles.hospitalName}>{request.hospital_name}</Text>
               {request.hospital_address && (
-                <Text style={styles.hospitalAddress} numberOfLines={1}>
-                  {request.hospital_address}
-                </Text>
+                <Text style={styles.hospitalAddress}>{request.hospital_address}</Text>
               )}
             </View>
             <Badge
-              label={request.status.replace('_', ' ')}
+              label={request.status.toUpperCase()}
               variant={isFulfilled ? 'success' : isCancelled ? 'neutral' : 'urgent'}
             />
           </View>
 
           <View style={styles.specsRow}>
             <View style={styles.specItem}>
-              <Ionicons name="water" size={16} color={THEME.colors.primary} />
-              <Text style={styles.specLabel}>{request.units_needed} Units Required</Text>
+              <Ionicons name="water-outline" size={16} color={THEME.colors.primary} />
+              <Text style={styles.specLabel}>{request.units_needed} Unit(s) Needed</Text>
             </View>
             <View style={styles.specItem}>
-              <Ionicons name="time" size={16} color={THEME.colors.warning} />
-              <Text style={styles.specLabel}>{request.urgency_level.toUpperCase()} Priority</Text>
+              <Ionicons name="alert-circle-outline" size={16} color="#D97706" />
+              <Text style={styles.specLabel}>{request.urgency?.toUpperCase() || 'URGENT'}</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Ionicons name="location-outline" size={16} color={THEME.colors.slate500} />
+              <Text style={styles.specLabel}>{request.city || 'Nearby Radius'}</Text>
             </View>
           </View>
 
@@ -202,32 +212,27 @@ export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = 
           )}
         </Card>
 
-        {/* Selected Donor Card (Stage 4 & 5) */}
-        {request.selected_donor_id && (
+        {/* Active Selected Donor Card */}
+        {request.selected_donor && (
           <Card variant="elevated" style={styles.selectedDonorCard}>
             <View style={styles.selectedDonorHeader}>
-              <Ionicons name="checkmark-circle" size={24} color={THEME.colors.success} />
-              <Text style={styles.selectedDonorTitle}>Confirmed Donor Matched</Text>
+              <Ionicons name="checkmark-circle" size={20} color={THEME.colors.success} />
+              <Text style={styles.selectedDonorTitle}>Confirmed Attending Donor</Text>
             </View>
-            <Text style={styles.selectedDonorName}>
-              {request.selected_donor_name || 'Volunteer Donor'}
-            </Text>
-            {request.selected_donor_phone && (
-              <View style={styles.phoneRow}>
-                <Ionicons name="call" size={16} color={THEME.colors.primary} />
-                <Text style={styles.selectedDonorPhone}>{request.selected_donor_phone}</Text>
-              </View>
-            )}
-
+            <Text style={styles.selectedDonorName}>{request.selected_donor.name}</Text>
+            <View style={styles.phoneRow}>
+              <Ionicons name="call" size={16} color={THEME.colors.primary} />
+              <Text style={styles.selectedDonorPhone}>{request.selected_donor.phone}</Text>
+            </View>
             {!isFulfilled && (
               <Button
-                title="Confirm Blood Received (Fulfill Request)"
+                title="Confirm Blood Received & Close Request"
                 variant="primary"
-                icon={<Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />}
+                size="md"
                 onPress={() =>
                   navigation.navigate('ConfirmFulfillment', {
                     requestId: request.id,
-                    donorName: request.selected_donor_name
+                    donorId: request.selected_donor?.id
                   })
                 }
                 style={{ marginTop: 12 }}
@@ -236,50 +241,66 @@ export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = 
           </Card>
         )}
 
-        {/* Action Bar (Alert Broadcast / Donor Responses) */}
-        {!isFulfilled && !isCancelled && (
-          <View style={styles.actionSection}>
+        {/* Action Controls by Stage */}
+        <View style={styles.actionSection}>
+          {request.status === 'registered' && (
             <Button
               title="Broadcast Emergency Alert to Donors"
-              variant="crimson"
+              variant="primary"
               size="lg"
+              showArrow
               loading={alerting}
-              icon={<Ionicons name="megaphone" size={18} color="#FFFFFF" />}
               onPress={handleBroadcastAlert}
-              style={{ marginBottom: 10 }}
             />
+          )}
 
+          {(request.status === 'alerting_donors' ||
+            request.status === 'donors_responded' ||
+            hasAcceptedDonors) && (
             <Button
-              title={`View Responding Donors (${contactRequests.length})`}
-              variant="outline"
-              size="md"
-              icon={<Ionicons name="people" size={18} color={THEME.colors.primary} />}
+              title={`View Donor Responses (${contactRequests.length})`}
+              variant="primary"
+              size="lg"
+              showArrow
               onPress={() =>
                 navigation.navigate('DonorResponses', {
                   requestId: request.id,
-                  contactRequests
+                  contactRequests: contactRequests
                 })
               }
               style={{ marginBottom: 10 }}
             />
-          </View>
-        )}
+          )}
 
-        {/* Nearby Compatible Candidates */}
-        <Card variant="outlined" style={styles.candidatesCard}>
+          {request.status === 'donor_selected' && !request.selected_donor && (
+            <Button
+              title="Select & Confirm Responding Donor"
+              variant="primary"
+              size="lg"
+              onPress={() =>
+                navigation.navigate('SelectDonor', {
+                  requestId: request.id,
+                  contactRequests: contactRequests
+                })
+              }
+            />
+          )}
+        </View>
+
+        {/* Matching Candidates Pool */}
+        <Card variant="elevated" style={styles.candidatesCard}>
           <View style={styles.candidatesHeader}>
-            <Ionicons name="location" size={18} color={THEME.colors.primary} />
+            <Ionicons name="locate-outline" size={18} color={THEME.colors.primary} />
             <Text style={styles.candidatesTitle}>
-              Nearby Compatible Donors ({candidates.length})
+              Compatible Donors in Radius ({candidates.length})
             </Text>
           </View>
           <Text style={styles.candidatesDesc}>
-            Calculated via PostGIS spatial engine within 30km. Exact coordinates are protected by
-            privacy bands.
+            Evaluated using PostGIS spatial indexing & red blood cell compatibility matrix:
           </Text>
 
-          {candidates.slice(0, 5).map((cand, idx) => (
-            <View key={cand.id || idx} style={styles.candidateRow}>
+          {candidates.slice(0, 5).map((cand) => (
+            <View key={cand.id} style={styles.candidateRow}>
               <View style={styles.candPill}>
                 <Text style={styles.candBlood}>{cand.blood_group}</Text>
               </View>
@@ -308,16 +329,36 @@ export const RequestTrackingScreen: React.FC<{ navigation: any; route: any }> = 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background
+    backgroundColor: THEME.colors.slate50
+  },
+  refreshIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: THEME.colors.slate100,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   scrollContent: {
-    padding: THEME.spacing.base
+    paddingHorizontal: 16,
+    paddingTop: 12
   },
   sectionHeader: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '800',
-    color: THEME.colors.navy,
+    color: THEME.colors.slate500,
+    letterSpacing: 0.8,
     marginBottom: 8
+  },
+  stageCard: {
+    padding: 16,
+    marginBottom: 14,
+    borderRadius: 18
+  },
+  metaCard: {
+    padding: 16,
+    marginBottom: 14,
+    borderRadius: 18
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -331,7 +372,8 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12
+    marginRight: 12,
+    ...THEME.shadows.emergency
   },
   bloodText: {
     fontSize: 18,
@@ -348,12 +390,12 @@ const styles = StyleSheet.create({
   },
   hospitalName: {
     fontSize: 13,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate600,
     marginTop: 2
   },
   hospitalAddress: {
     fontSize: 11,
-    color: THEME.colors.textLight,
+    color: THEME.colors.slate400,
     marginTop: 1
   },
   specsRow: {
@@ -361,9 +403,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: THEME.colors.borderLight,
+    borderTopColor: THEME.colors.slate100,
     borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.borderLight
+    borderBottomColor: THEME.colors.slate100
   },
   specItem: {
     flexDirection: 'row',
@@ -376,9 +418,9 @@ const styles = StyleSheet.create({
     color: THEME.colors.navy
   },
   notesBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: THEME.borderRadius.sm,
-    padding: 8,
+    backgroundColor: THEME.colors.slate50,
+    borderRadius: 10,
+    padding: 10,
     marginTop: 10
   },
   notesLabel: {
@@ -389,12 +431,15 @@ const styles = StyleSheet.create({
   },
   notesText: {
     fontSize: 12,
-    color: THEME.colors.textSecondary,
+    color: THEME.colors.slate700,
     lineHeight: 16
   },
   selectedDonorCard: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0'
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14
   },
   selectedDonorHeader: {
     flexDirection: 'row',
@@ -404,7 +449,7 @@ const styles = StyleSheet.create({
   selectedDonorTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: THEME.colors.success,
+    color: THEME.colors.successText,
     marginLeft: 8
   },
   selectedDonorName: {
@@ -425,10 +470,12 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
   actionSection: {
-    marginVertical: 12
+    marginVertical: 10
   },
   candidatesCard: {
-    marginBottom: 16
+    marginBottom: 16,
+    borderRadius: 18,
+    padding: 16
   },
   candidatesHeader: {
     flexDirection: 'row',
@@ -442,9 +489,9 @@ const styles = StyleSheet.create({
     marginLeft: 6
   },
   candidatesDesc: {
-    fontSize: 11,
-    color: THEME.colors.textMuted,
-    lineHeight: 15,
+    fontSize: 12,
+    color: THEME.colors.slate500,
+    lineHeight: 16,
     marginBottom: 12
   },
   candidateRow: {
@@ -452,13 +499,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.borderLight
+    borderBottomColor: THEME.colors.slate100
   },
   candPill: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: THEME.colors.crimsonLight,
+    backgroundColor: THEME.colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10
@@ -478,12 +525,12 @@ const styles = StyleSheet.create({
   },
   candDist: {
     fontSize: 11,
-    color: THEME.colors.textMuted
+    color: THEME.colors.slate500
   },
   cancelBtn: {
     alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 20
+    paddingVertical: 14,
+    marginBottom: 16
   },
   cancelText: {
     fontSize: 13,
@@ -498,8 +545,7 @@ const styles = StyleSheet.create({
   },
   notFoundText: {
     fontSize: 14,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate500,
     marginBottom: 16
   }
 });
-

@@ -19,12 +19,12 @@ export const DonorTabNavigator: React.FC = () => {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: THEME.colors.primary,
-        tabBarInactiveTintColor: THEME.colors.navySubtle,
+        tabBarInactiveTintColor: THEME.colors.slate400,
         tabBarStyle: {
-          backgroundColor: THEME.colors.card,
-          borderTopColor: THEME.colors.borderLight,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: THEME.colors.border,
           borderTopWidth: 1,
-          height: 60,
+          height: 62,
           paddingBottom: 8,
           paddingTop: 6
         },
@@ -38,7 +38,7 @@ export const DonorTabNavigator: React.FC = () => {
         name="DonorDashboard"
         component={DonorDashboardScreen}
         options={{
-          tabBarLabel: 'Dashboard',
+          tabBarLabel: 'Portal',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart" size={size} color={color} />
           )
@@ -48,7 +48,7 @@ export const DonorTabNavigator: React.FC = () => {
         name="ContactRequests"
         component={ContactRequestsScreen}
         options={{
-          tabBarLabel: 'Requests',
+          tabBarLabel: 'Alerts',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
           )
@@ -60,7 +60,7 @@ export const DonorTabNavigator: React.FC = () => {
         options={{
           tabBarLabel: 'Rewards',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="gift-outline" size={size} color={color} />
+            <Ionicons name="trophy-outline" size={size} color={color} />
           )
         }}
       />
@@ -68,7 +68,7 @@ export const DonorTabNavigator: React.FC = () => {
         name="AIAssistant"
         component={AIAssistantScreen}
         options={{
-          tabBarLabel: 'AI Assistant',
+          tabBarLabel: 'Clinical AI',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="sparkles" size={size} color={color} />
           )
@@ -87,4 +87,3 @@ export const DonorTabNavigator: React.FC = () => {
     </Tab.Navigator>
   );
 };
-

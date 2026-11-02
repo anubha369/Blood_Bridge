@@ -5,8 +5,10 @@ import {
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
-  TextStyle
+  TextStyle,
+  View
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
 
 export type ButtonVariant = 'primary' | 'crimson' | 'secondary' | 'outline' | 'danger' | 'ghost';
@@ -19,6 +21,8 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   icon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  showArrow?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
@@ -31,6 +35,8 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   disabled = false,
   icon,
+  rightIcon,
+  showArrow = false,
   style,
   textStyle
 }) => {
@@ -39,35 +45,56 @@ export const Button: React.FC<ButtonProps> = ({
   const getContainerStyle = () => {
     switch (variant) {
       case 'crimson':
-        return { backgroundColor: THEME.colors.crimson };
+      case 'primary':
+        return {
+          backgroundColor: THEME.colors.primary,
+          ...THEME.shadows.sm
+        };
       case 'secondary':
-        return { backgroundColor: THEME.colors.navy };
+        return {
+          backgroundColor: THEME.colors.card,
+          borderWidth: 2,
+          borderColor: THEME.colors.borderDark
+        };
       case 'outline':
         return {
-          backgroundColor: 'transparent',
+          backgroundColor: THEME.colors.card,
           borderWidth: 1.5,
-          borderColor: THEME.colors.primary
+          borderColor: THEME.colors.borderDark
         };
       case 'danger':
-        return { backgroundColor: THEME.colors.urgent };
+        return {
+          backgroundColor: THEME.colors.urgent
+        };
       case 'ghost':
-        return { backgroundColor: 'transparent' };
-      case 'primary':
+        return {
+          backgroundColor: 'transparent'
+        };
       default:
-        return { backgroundColor: THEME.colors.primary };
+        return {
+          backgroundColor: THEME.colors.primary
+        };
     }
   };
 
   const getTextColor = () => {
-    if (variant === 'outline' || variant === 'ghost') {
+    if (variant === 'secondary') {
+      return THEME.colors.navy;
+    }
+    if (variant === 'outline') {
+      return THEME.colors.navy;
+    }
+    if (variant === 'ghost') {
       return THEME.colors.primary;
     }
     return THEME.colors.textInverse;
   };
 
+  const textColor = getTextColor();
+
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={0.88}
       onPress={onPress}
       disabled={isDisabled}
       style={[
@@ -80,15 +107,14 @@ export const Button: React.FC<ButtonProps> = ({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={getTextColor()} size="small" />
+        <ActivityIndicator color={textColor} size="small" />
       ) : (
-        <>
-          {icon && <>{icon}</>}
+        <View style={styles.innerRow}>
+          {icon && <View style={styles.leftIconBox}>{icon}</View>}
           <Text
             style={[
               styles.text,
-              { color: getTextColor() },
-              icon ? { marginLeft: 8 } : {},
+              { color: textColor },
               size === 'sm' && styles.textSm,
               size === 'lg' && styles.textLg,
               textStyle
@@ -96,7 +122,16 @@ export const Button: React.FC<ButtonProps> = ({
           >
             {title}
           </Text>
-        </>
+          {showArrow && (
+            <Ionicons
+              name="arrow-forward"
+              size={size === 'lg' ? 18 : 16}
+              color={textColor}
+              style={styles.arrowIcon}
+            />
+          )}
+          {rightIcon && <View style={styles.rightIconBox}>{rightIcon}</View>}
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -104,18 +139,21 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   base: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: THEME.borderRadius.md,
-    ...THEME.shadows.sm
+    borderRadius: THEME.borderRadius.lg // 16px rounded-2xl
+  },
+  innerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   sizeSm: {
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: THEME.borderRadius.sm
+    borderRadius: THEME.borderRadius.md
   },
   sizeLg: {
     paddingVertical: 16,
@@ -123,18 +161,27 @@ const styles = StyleSheet.create({
     borderRadius: THEME.borderRadius.lg
   },
   text: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.3
+    letterSpacing: -0.1
   },
   textSm: {
     fontSize: 13
   },
   textLg: {
-    fontSize: 17
+    fontSize: 18,
+    fontWeight: '800'
+  },
+  leftIconBox: {
+    marginRight: 8
+  },
+  rightIconBox: {
+    marginLeft: 8
+  },
+  arrowIcon: {
+    marginLeft: 8
   },
   disabled: {
-    opacity: 0.55
+    opacity: 0.5
   }
 });
-

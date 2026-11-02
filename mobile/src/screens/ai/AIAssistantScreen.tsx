@@ -14,17 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { Card } from '../../components/Card';
-import { Badge } from '../../components/Badge';
 import { MedicalDisclaimerBanner } from '../../components/MedicalDisclaimerBanner';
 import { api } from '../../services/api';
 import { ChatMessage } from '../../constants/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-0',
     sender: 'assistant',
     text:
-      'Hello! I am your BloodBridge Clinical AI Assistant, powered by Groq LLM and our medical RAG knowledge base. Ask me about blood donation eligibility, clinical cross-matching protocols, cooldown rules, or how to create emergency requests.',
+      'Hello! I am your BloodBridge Clinical AI Assistant, powered by Groq LLM and our verified RAG medical knowledge base. Ask me about blood donation eligibility, clinical cross-matching protocols, 90-day cooldown rules, or how to create emergency requests.',
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     grounded: true,
     sources: ['BloodBridge Medical Eligibility Guidelines (NBTC/WHO)']
@@ -39,6 +39,7 @@ const FAQ_CHIPS = [
 ];
 
 export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,7 +65,6 @@ export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation })
     setLoading(true);
 
     try {
-      // Build conversation history for API
       const history = messages.slice(-4).map((m) => ({
         role: m.sender === 'user' ? 'user' : 'assistant',
         content: m.text
@@ -89,7 +89,7 @@ export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation })
         id: `err-${Date.now()}`,
         sender: 'assistant',
         text:
-          'Our AI service is momentarily unavailable. BloodBridge clinical rule: Whole blood donation requires a 90-day cooldown, and clinical cross-matching must be verified at authorized medical centers.',
+          'Clinical AI service is temporarily offline. Clinical guideline: Whole blood donation requires a 90-day cooldown, and final transfusion cross-matching must be performed by certified blood bank pathologists.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -102,30 +102,36 @@ export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation })
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <Header
-        title="BloodBridge AI Assistant"
-        subtitle="Groq Intelligence & Clinical RAG"
+        title="Clinical AI Assistant"
+        subtitle="Groq Llama-3 & Grounded RAG Corpus"
         showBack
         onBack={() => navigation.goBack()}
+        rightAction={
+          <View style={styles.headerBadge}>
+            <Ionicons name="sparkles" size={14} color="#D71935" />
+            <Text style={styles.headerBadgeText}>AI Active</Text>
+          </View>
+        }
       />
 
       <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
         showsVerticalScrollIndicator={false}
       >
         <MedicalDisclaimerBanner />
 
         {/* Quick Question Pills */}
         <View style={styles.faqSection}>
-          <Text style={styles.faqLabel}>Frequently Asked Clinical Questions:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+          <Text style={styles.faqLabel}>QUICK CLINICAL TOPICS:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
             {FAQ_CHIPS.map((chip, idx) => (
               <TouchableOpacity
                 key={idx}
                 style={styles.chip}
+                activeOpacity={0.8}
                 onPress={() => handleSend(chip)}
               >
                 <Text style={styles.chipText}>{chip}</Text>
@@ -166,16 +172,14 @@ export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation })
                   {msg.text}
                 </Text>
 
-                {/* RAG Source References */}
+                {/* Grounded RAG Sources */}
                 {msg.sources && msg.sources.length > 0 && (
                   <View style={styles.sourcesContainer}>
-                    <Text style={styles.sourcesTitle}>Grounded RAG Sources:</Text>
-                    {msg.sources.map((src, sIdx) => (
-                      <View key={sIdx} style={styles.sourcePill}>
-                        <Ionicons name="document-text-outline" size={12} color={THEME.colors.primary} />
-                        <Text style={styles.sourceText} numberOfLines={1}>
-                          {src}
-                        </Text>
+                    <Text style={styles.sourcesTitle}>VERIFIED CLINICAL SOURCES:</Text>
+                    {msg.sources.map((s, i) => (
+                      <View key={i} style={styles.sourcePill}>
+                        <Ionicons name="checkmark-circle" size={12} color={THEME.colors.success} />
+                        <Text style={styles.sourceText} numberOfLines={1}>{s}</Text>
                       </View>
                     ))}
                   </View>
@@ -201,17 +205,17 @@ export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation })
             </View>
             <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
               <ActivityIndicator size="small" color={THEME.colors.primary} />
-              <Text style={styles.typingText}>Consulting Medical RAG Corpus...</Text>
+              <Text style={styles.typingText}>Consulting Verified Medical Corpus...</Text>
             </View>
           </View>
         )}
       </ScrollView>
 
       {/* Input Field */}
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
         <TextInput
-          placeholder="Ask about blood groups, donation eligibility..."
-          placeholderTextColor={THEME.colors.textLight}
+          placeholder="Ask clinical question (e.g. eligibility, cooldown)..."
+          placeholderTextColor={THEME.colors.slate400}
           value={input}
           onChangeText={setInput}
           onSubmitEditing={() => handleSend()}
@@ -232,42 +236,58 @@ export const AIAssistantScreen: React.FC<{ navigation: any }> = ({ navigation })
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background
+    backgroundColor: THEME.colors.slate50
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 14
+  },
+  headerBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: THEME.colors.primary
   },
   scrollContent: {
-    padding: THEME.spacing.base,
-    paddingBottom: 20
+    paddingHorizontal: 16,
+    paddingTop: 12
   },
   faqSection: {
-    marginBottom: 14
+    marginBottom: 16
   },
   faqLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
-    marginBottom: 6
+    fontWeight: '800',
+    color: THEME.colors.slate500,
+    letterSpacing: 0.5,
+    marginBottom: 8
   },
-  chipsScroll: {
-    flexDirection: 'row',
+  chipsRow: {
     gap: 6
   },
   chip: {
-    backgroundColor: THEME.colors.card,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: THEME.colors.border,
-    borderRadius: THEME.borderRadius.round,
+    borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginRight: 6
+    ...THEME.shadows.sm
   },
   chipText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: THEME.colors.navy
+    fontWeight: '700',
+    color: THEME.colors.slate700
   },
   bubbleRow: {
     flexDirection: 'row',
-    marginBottom: 12
+    marginBottom: 14
   },
   bubbleRowUser: {
     justifyContent: 'flex-end'
@@ -276,105 +296,108 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start'
   },
   avatarCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: THEME.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    marginTop: 4
+    marginTop: 2
   },
   bubble: {
     maxWidth: '82%',
-    borderRadius: THEME.borderRadius.lg,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
     ...THEME.shadows.sm
   },
   bubbleUser: {
     backgroundColor: THEME.colors.primary,
-    borderBottomRightRadius: 2
+    borderBottomRightRadius: 4
   },
   bubbleAssistant: {
-    backgroundColor: THEME.colors.card,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: THEME.colors.borderLight,
-    borderBottomLeftRadius: 2
+    borderColor: THEME.colors.border,
+    borderBottomLeftRadius: 4
   },
   bubbleText: {
     fontSize: 14,
-    lineHeight: 20
+    lineHeight: 21
   },
   bubbleTextUser: {
     color: '#FFFFFF',
-    fontWeight: '500'
+    fontWeight: '600'
   },
   bubbleTextAssistant: {
-    color: THEME.colors.text
+    color: THEME.colors.navy,
+    fontWeight: '500'
   },
   sourcesContainer: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: THEME.colors.borderLight
+    borderTopColor: THEME.colors.slate100
   },
   sourcesTitle: {
     fontSize: 10,
     fontWeight: '800',
     color: THEME.colors.primary,
     marginBottom: 4,
-    textTransform: 'uppercase'
+    letterSpacing: 0.5
   },
   sourcePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     marginTop: 2
   },
   sourceText: {
     fontSize: 11,
-    color: THEME.colors.textMuted
+    color: THEME.colors.slate600,
+    fontWeight: '500'
   },
   timeText: {
     fontSize: 10,
-    marginTop: 4,
+    marginTop: 6,
     alignSelf: 'flex-end'
   },
   timeTextUser: {
-    color: 'rgba(255,255,255,0.7)'
+    color: 'rgba(255,255,255,0.75)'
   },
   timeTextAssistant: {
-    color: THEME.colors.textLight
+    color: THEME.colors.slate400
   },
   typingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 10
+    paddingVertical: 12
   },
   typingText: {
     fontSize: 12,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate500,
     fontStyle: 'italic'
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.card,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: THEME.colors.borderLight,
+    borderTopColor: THEME.colors.border,
     paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingTop: 10
   },
   textInput: {
     flex: 1,
-    height: 44,
-    backgroundColor: '#F1F5F9',
-    borderRadius: THEME.borderRadius.round,
+    height: 46,
+    backgroundColor: THEME.colors.slate100,
+    borderRadius: 23,
     paddingHorizontal: 16,
     fontSize: 14,
     color: THEME.colors.navy,
-    marginRight: 8
+    marginRight: 8,
+    fontWeight: '500'
   },
   sendBtn: {
     width: 44,
@@ -383,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    ...THEME.shadows.emergency
+    ...THEME.shadows.sm
   },
   sendBtnDisabled: {
     opacity: 0.4

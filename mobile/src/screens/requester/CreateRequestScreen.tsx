@@ -21,9 +21,10 @@ import { MedicalDisclaimerBanner } from '../../components/MedicalDisclaimerBanne
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { BloodGroup, UrgencyLevel } from '../../constants/types';
-import { CONFIG } from '../../constants/config';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | null>('B+');
@@ -130,6 +131,12 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
     }
   };
 
+  const urgencyOptions: { level: UrgencyLevel; label: string; color: string }[] = [
+    { level: 'critical', label: 'CRITICAL', color: '#B91C1C' },
+    { level: 'urgent', label: 'URGENT', color: '#D97706' },
+    { level: 'standard', label: 'STANDARD', color: '#2563EB' }
+  ];
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -137,79 +144,85 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
     >
       <Header
         title="Create Blood Request"
-        subtitle="Initiate Emergency Geo-Dispatch"
+        subtitle="AI-Assisted Emergency Dispatch"
         showBack
         onBack={() => navigation.goBack()}
-        isEmergency
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Groq AI Natural Language Assistant Banner */}
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <MedicalDisclaimerBanner />
+
+        {/* Groq AI Parser Banner */}
         <TouchableOpacity
-          activeOpacity={0.85}
           style={styles.aiBanner}
+          activeOpacity={0.88}
           onPress={() => setAiModalVisible(true)}
         >
           <View style={styles.aiIconBadge}>
             <Ionicons name="sparkles" size={18} color="#FFFFFF" />
           </View>
           <View style={styles.aiTextCol}>
-            <Text style={styles.aiTitle}>Groq AI Natural Language Auto-Fill</Text>
+            <Text style={styles.aiTitle}>Auto-Fill with Groq AI Parser</Text>
             <Text style={styles.aiSubtitle}>
-              Paste emergency doctor notes or WhatsApp message to auto-populate form
+              Paste doctor prescription, WhatsApp, or natural message to auto-extract details
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={THEME.colors.crimson} />
+          <Ionicons name="chevron-forward" size={18} color={THEME.colors.primary} />
         </TouchableOpacity>
-
-        <MedicalDisclaimerBanner />
 
         {error && (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={18} color={THEME.colors.urgent} />
+            <Ionicons name="alert-circle" size={18} color="#B91C1C" />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        {/* Blood Group Selector */}
+        {/* Required Blood Group */}
         <BloodGroupSelector
           label="Required Blood Group *"
           selectedGroup={bloodGroup}
           onSelect={setBloodGroup}
         />
 
-        {/* Units & Urgency */}
+        {/* Units Needed & Urgency Level */}
         <View style={styles.row}>
           <Input
-            label="Units Needed (Bags) *"
+            label="Units Needed *"
             placeholder="e.g. 2"
             keyboardType="number-pad"
             value={unitsNeeded}
             onChangeText={setUnitsNeeded}
-            containerStyle={{ flex: 1, marginRight: 10 }}
+            containerStyle={{ width: 120, marginRight: 12 }}
           />
+
           <View style={{ flex: 1 }}>
-            <Text style={styles.inputLabel}>Urgency Priority *</Text>
+            <Text style={styles.inputLabel}>Urgency Priority</Text>
             <View style={styles.urgencyTabs}>
-              {CONFIG.URGENCY_LEVELS.map((u) => {
-                const isSelected = urgencyLevel === u.id;
+              {urgencyOptions.map((opt) => {
+                const isSelected = urgencyLevel === opt.level;
                 return (
                   <TouchableOpacity
-                    key={u.id}
-                    onPress={() => setUrgencyLevel(u.id as UrgencyLevel)}
+                    key={opt.level}
                     style={[
                       styles.urgencyTab,
-                      isSelected && { backgroundColor: u.color, borderColor: u.color }
+                      isSelected && {
+                        backgroundColor: opt.color,
+                        borderColor: opt.color
+                      }
                     ]}
+                    onPress={() => setUrgencyLevel(opt.level)}
                   >
                     <Text
                       style={[
                         styles.urgencyTabText,
                         isSelected && { color: '#FFFFFF', fontWeight: '800' }
                       ]}
-                      numberOfLines={1}
                     >
-                      {u.id.toUpperCase()}
+                      {opt.label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -218,62 +231,62 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
           </View>
         </View>
 
-        {/* Hospital & Location Details */}
+        {/* Hospital Details */}
         <Input
-          label="Hospital / Medical Facility Name *"
-          placeholder="e.g. SMS Hospital, Jaipur"
+          label="Hospital or Transfusion Facility *"
+          placeholder="e.g. Fortis Escorts Hospital"
           icon="business-outline"
           value={hospitalName}
           onChangeText={setHospitalName}
         />
 
         <Input
-          label="Hospital Address / Department"
-          placeholder="e.g. ICU Block 3, Tonk Road"
+          label="Hospital Address / Locality"
+          placeholder="e.g. JLN Marg, Malviya Nagar, Jaipur"
           icon="location-outline"
           value={hospitalAddress}
           onChangeText={setHospitalAddress}
         />
 
-        {/* Patient & Emergency Contact */}
-        <View style={styles.row}>
-          <Input
-            label="Patient Name"
-            placeholder="e.g. Anita Sharma"
-            icon="person-outline"
-            value={patientName}
-            onChangeText={setPatientName}
-            containerStyle={{ flex: 1, marginRight: 10 }}
-          />
-          <Input
-            label="Emergency Contact Phone *"
-            placeholder="e.g. 9876543210"
-            icon="call-outline"
-            keyboardType="phone-pad"
-            value={contactNumber}
-            onChangeText={setContactNumber}
-            containerStyle={{ flex: 1 }}
-          />
-        </View>
-
+        {/* Patient Name */}
         <Input
-          label="Clinical Notes / Special Requirements"
-          placeholder="e.g. Fresh frozen plasma needed, surgery scheduled at 2 PM"
+          label="Patient Name"
+          placeholder="e.g. Rajiv Kumar (or Anonymous)"
+          icon="person-outline"
+          value={patientName}
+          onChangeText={setPatientName}
+        />
+
+        {/* Contact Phone */}
+        <Input
+          label="Attendant Emergency Contact Phone *"
+          placeholder="10-digit emergency phone number"
+          icon="call-outline"
+          keyboardType="phone-pad"
+          value={contactNumber}
+          onChangeText={setContactNumber}
+        />
+
+        {/* Medical Notes */}
+        <Input
+          label="Clinical Notes / Replacement Criteria"
+          placeholder="e.g. Surgery scheduled tomorrow 9 AM. Replacement donor accepted."
           multiline
           numberOfLines={3}
           value={notes}
           onChangeText={setNotes}
-          style={{ height: 70, textAlignVertical: 'top' }}
+          style={{ height: 75, textAlignVertical: 'top' }}
         />
 
+        {/* Submit Button */}
         <Button
-          title="Publish Blood Request"
+          title="Create & Dispatch Blood Request"
           variant="primary"
           size="lg"
-          icon={<Ionicons name="send" size={18} color="#FFFFFF" />}
+          showArrow
           loading={loading}
           onPress={handleSubmit}
-          style={{ marginTop: 12, marginBottom: 30 }}
+          style={{ marginTop: 12, marginBottom: 20 }}
         />
       </ScrollView>
 
@@ -285,12 +298,12 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
         >
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="sparkles" size={20} color={THEME.colors.primary} />
                 <Text style={styles.modalTitle}>Groq AI Natural Language Parser</Text>
               </View>
               <TouchableOpacity onPress={() => setAiModalVisible(false)}>
-                <Ionicons name="close" size={24} color={THEME.colors.textMuted} />
+                <Ionicons name="close" size={24} color={THEME.colors.slate400} />
               </TouchableOpacity>
             </View>
 
@@ -333,27 +346,28 @@ export const CreateRequestScreen: React.FC<{ navigation: any }> = ({ navigation 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: THEME.colors.background
+    backgroundColor: THEME.colors.slate50
   },
   scrollContent: {
-    padding: THEME.spacing.base
+    paddingHorizontal: 16,
+    paddingTop: 12
   },
   aiBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF0F2',
+    backgroundColor: '#FFF1F2',
     borderWidth: 1.5,
-    borderColor: THEME.colors.crimsonBorder,
-    borderRadius: THEME.borderRadius.lg,
+    borderColor: '#FECDD3',
+    borderRadius: 16,
     padding: 12,
-    marginBottom: 14,
+    marginBottom: 16,
     ...THEME.shadows.sm
   },
   aiIconBadge: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: THEME.colors.crimson,
+    backgroundColor: THEME.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10
@@ -368,53 +382,54 @@ const styles = StyleSheet.create({
   },
   aiSubtitle: {
     fontSize: 11,
-    color: THEME.colors.textMuted,
-    marginTop: 2
+    color: THEME.colors.slate600,
+    marginTop: 2,
+    lineHeight: 15
   },
   row: {
     flexDirection: 'row'
   },
   inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: THEME.colors.navy,
     marginBottom: 6
   },
   urgencyTabs: {
     flexDirection: 'row',
-    height: 48,
+    height: 52,
     gap: 4
   },
   urgencyTab: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: THEME.colors.border,
-    borderRadius: THEME.borderRadius.md,
+    borderColor: THEME.colors.slate300,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: THEME.colors.card
+    backgroundColor: '#FFFFFF'
   },
   urgencyTabText: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
-    color: THEME.colors.textMuted
+    color: THEME.colors.slate600
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.urgentBg,
+    gap: 8,
+    backgroundColor: '#FFF1F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: THEME.borderRadius.md,
+    borderColor: '#FECDD3',
+    borderRadius: 12,
     padding: 12,
     marginBottom: 16
   },
   errorText: {
-    color: THEME.colors.urgent,
+    color: '#B91C1C',
     fontSize: 13,
-    marginLeft: 8,
     flex: 1,
-    fontWeight: '500'
+    fontWeight: '600'
   },
   modalOverlay: {
     flex: 1,
@@ -422,9 +437,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   modalCard: {
-    backgroundColor: THEME.colors.card,
-    borderTopLeftRadius: THEME.borderRadius.xl,
-    borderTopRightRadius: THEME.borderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 20
   },
   modalHeader: {
@@ -436,12 +451,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: THEME.colors.navy,
-    marginLeft: 8
+    color: THEME.colors.navy
   },
   modalDesc: {
     fontSize: 12,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.slate600,
     lineHeight: 17,
     marginBottom: 12
   },
@@ -450,4 +464,3 @@ const styles = StyleSheet.create({
     marginTop: 10
   }
 });
-

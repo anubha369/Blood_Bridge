@@ -16,6 +16,7 @@ interface InputProps extends TextInputProps {
   error?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   isPassword?: boolean;
+  rightElement?: React.ReactNode;
   containerStyle?: ViewStyle;
 }
 
@@ -24,6 +25,7 @@ export const Input: React.FC<InputProps> = ({
   error,
   icon,
   isPassword = false,
+  rightElement,
   containerStyle,
   ...props
 }) => {
@@ -43,14 +45,14 @@ export const Input: React.FC<InputProps> = ({
         {icon && (
           <Ionicons
             name={icon}
-            size={18}
-            color={isFocused ? THEME.colors.primary : THEME.colors.textMuted}
+            size={20}
+            color={isFocused ? THEME.colors.primary : THEME.colors.slate400}
             style={styles.icon}
           />
         )}
         <TextInput
           style={[styles.input, isPassword && { paddingRight: 40 }]}
-          placeholderTextColor={THEME.colors.textLight}
+          placeholderTextColor={THEME.colors.slate400}
           secureTextEntry={isPassword && !showPassword}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -60,14 +62,17 @@ export const Input: React.FC<InputProps> = ({
           <TouchableOpacity
             style={styles.eyeBtn}
             onPress={() => setShowPassword(!showPassword)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Ionicons
               name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={18}
-              color={THEME.colors.textMuted}
+              size={20}
+              color={THEME.colors.slate500}
             />
           </TouchableOpacity>
+        )}
+        {rightElement && !isPassword && (
+          <View style={styles.rightElementBox}>{rightElement}</View>
         )}
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -77,50 +82,54 @@ export const Input: React.FC<InputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: THEME.spacing.md
+    marginBottom: 16
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: THEME.colors.navy,
     marginBottom: 6,
-    letterSpacing: 0.2
+    letterSpacing: -0.1
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.card,
+    backgroundColor: THEME.colors.slate50,
     borderWidth: 1.5,
-    borderColor: THEME.colors.border,
+    borderColor: THEME.colors.slate300,
     borderRadius: THEME.borderRadius.md,
-    paddingHorizontal: 12,
-    height: 48
+    paddingHorizontal: 14,
+    height: 52
   },
   focused: {
     borderColor: THEME.colors.primary,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.8
   },
   hasError: {
-    borderColor: THEME.colors.urgent
+    borderColor: THEME.colors.urgent,
+    backgroundColor: '#FFF5F5'
   },
   icon: {
-    marginRight: 8
+    marginRight: 10
   },
   input: {
     flex: 1,
-    fontSize: 15,
-    color: THEME.colors.text,
-    height: '100%'
+    fontSize: 16,
+    color: THEME.colors.navy,
+    height: '100%',
+    fontWeight: '500'
   },
   eyeBtn: {
-    position: 'absolute',
-    right: 12
+    padding: 6
+  },
+  rightElementBox: {
+    paddingLeft: 6
   },
   errorText: {
     color: THEME.colors.urgent,
     fontSize: 12,
     marginTop: 4,
-    fontWeight: '500'
+    fontWeight: '600'
   }
 });
-

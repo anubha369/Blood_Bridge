@@ -34,19 +34,19 @@ export const Card: React.FC<CardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: THEME.colors.card,
-    borderRadius: THEME.borderRadius.lg,
+    borderRadius: THEME.borderRadius.lg, // 16px (rounded-2xl)
     borderWidth: 1,
-    borderColor: THEME.colors.borderLight,
+    borderColor: THEME.colors.border,
     marginBottom: THEME.spacing.md
   },
   outlined: {
-    borderColor: THEME.colors.border,
+    borderColor: THEME.colors.slate300,
     elevation: 0,
     shadowOpacity: 0
   },
   urgent: {
-    borderColor: '#FECACA',
-    backgroundColor: '#FFFBFB',
+    borderColor: '#FECDD3',
+    backgroundColor: '#FFF5F5',
     ...THEME.shadows.emergency
   }
 });

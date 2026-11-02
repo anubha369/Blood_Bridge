@@ -36,13 +36,15 @@ export const SplashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             resizeMode="contain"
           />
         </View>
-        <Text style={styles.brandTitle}>BloodBridge</Text>
+        <Text style={styles.brandTitle}>
+          Blood<Text style={styles.brandCrimson}>Bridge</Text>
+        </Text>
         <Text style={styles.visionText}>VISION-X</Text>
         <Text style={styles.tagline}>Emergency Blood Coordination & AI Dispatch</Text>
       </View>
 
       <View style={styles.footer}>
-        <ActivityIndicator color={THEME.colors.crimson} size="small" />
+        <ActivityIndicator color={THEME.colors.primary} size="small" />
         <Text style={styles.footerText}>Secure Healthcare Intelligence</Text>
       </View>
     </View>
@@ -64,38 +66,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   emblemContainer: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 77, 109, 0.4)',
+    width: 120,
+    height: 120,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     ...THEME.shadows.emergency
   },
   logo: {
-    width: 90,
-    height: 90
+    width: '100%',
+    height: '100%'
   },
   brandTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 0.5
+    letterSpacing: -0.6
+  },
+  brandCrimson: {
+    color: THEME.colors.primary
   },
   visionText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: THEME.colors.crimson,
+    fontSize: 13,
+    fontWeight: '900',
+    color: THEME.colors.primary,
     letterSpacing: 4,
     marginTop: 4,
-    marginBottom: 10
+    marginBottom: 8
   },
   tagline: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.75)',
     textAlign: 'center',
     fontWeight: '500'
   },
@@ -107,7 +111,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     marginTop: 8,
     letterSpacing: 0.5,
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    fontWeight: '600'
   }
 });
-
