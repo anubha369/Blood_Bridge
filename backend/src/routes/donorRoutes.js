@@ -6,6 +6,8 @@ const {
   isPostgresConnected,
   getPool,
   getDonorByUserId,
+  findUnclaimedGoogleFormDonor,
+  claimDonorRecord,
   getTelegramNotificationByRequestAndDonor,
   updateTelegramNotificationResponse
 } = require('../db/db');
@@ -288,10 +290,74 @@ router.get('/profile', authenticateUser, async (req, res) => {
   if (!donor) {
     donor = localStore.donors.find((d) => d.user_id === req.user.id);
   }
+
+  // Automatic account linking: if user has no donor record yet, search for unclaimed Google Form registration
+  if (!donor && (req.user.phone || req.user.email)) {
+    try {
+      const unclaimed = await findUnclaimedGoogleFormDonor({ phone: req.user.phone, email: req.user.email });
+      if (unclaimed) {
+        const claimResult = await claimDonorRecord(unclaimed.id, req.user.id);
+        if (claimResult.success) {
+          donor = claimResult.donor;
+          console.log(`[Auto-Link] Unclaimed Google Form donor ${unclaimed.id} linked to user ${req.user.id}`);
+        }
+      }
+    } catch (linkErr) {
+      console.warn('[Auto-Link Warning]:', linkErr.message);
+    }
+  }
+
   if (!donor) {
     return res.status(404).json({ success: false, error: 'No donor profile found for current user.' });
   }
   return res.json({ success: true, donor });
+});
+
+// POST /api/donors/claim-google-form-record
+router.post('/claim-google-form-record', authenticateUser, async (req, res) => {
+  try {
+    const existingDonor = await getDonorByUserId(req.user.id);
+    if (existingDonor) {
+      return res.status(400).json({
+        success: false,
+        error: 'You already have an active donor profile connected to this account.',
+        donor: existingDonor
+      });
+    }
+
+    const phoneToSearch = req.body.phone || req.user.phone;
+    const emailToSearch = req.body.email || req.user.email;
+
+    const candidate = await findUnclaimedGoogleFormDonor({ phone: phoneToSearch, email: emailToSearch });
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        error: 'No unclaimed Google Form registration found matching your verified mobile number.'
+      });
+    }
+
+    const claimRes = await claimDonorRecord(candidate.id, req.user.id);
+    if (!claimRes.success) {
+      if (claimRes.reason === 'already_claimed') {
+        return res.status(409).json({
+          success: false,
+          error: 'This donor registration record has already been linked to another account.'
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        error: claimRes.error || 'Failed to link donor record. Please contact coordination support.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Google Form donor registration successfully linked to your account.',
+      donor: claimRes.donor
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // PUT /api/donors/profile

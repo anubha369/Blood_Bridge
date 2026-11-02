@@ -1227,6 +1227,100 @@ async function getDonorById(donorId) {
   return (localStore.donors || []).find((d) => d.id === donorId) || null;
 }
 
+async function findUnclaimedGoogleFormDonor({ phone, email }) {
+  const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+  const cleanEmail = email ? String(email).trim().toLowerCase() : null;
+
+  // Never match by name alone, only by verified phone (10 digits) or verified email
+  const hasValidPhone = cleanPhone.length === 10 && /^[6-9]/.test(cleanPhone);
+  if (!hasValidPhone && !cleanEmail) {
+    return null;
+  }
+
+  if (isPostgres && pool) {
+    try {
+      let queryStr = `
+        SELECT * FROM public.donors
+        WHERE user_id IS NULL
+          AND source = 'google_forms'
+      `;
+      const params = [];
+
+      if (hasValidPhone && cleanEmail) {
+        params.push(cleanPhone, cleanEmail);
+        queryStr += ` AND (RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $1 OR (email IS NOT NULL AND LOWER(email) = $2))`;
+      } else if (hasValidPhone) {
+        params.push(cleanPhone);
+        queryStr += ` AND RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $1`;
+      } else {
+        params.push(cleanEmail);
+        queryStr += ` AND (email IS NOT NULL AND LOWER(email) = $1)`;
+      }
+
+      queryStr += ` ORDER BY created_at DESC LIMIT 1`;
+      const res = await pool.query(queryStr, params);
+      if (res.rows.length > 0) return res.rows[0];
+    } catch (err) {
+      console.warn('DB findUnclaimedGoogleFormDonor warning:', err.message);
+    }
+  }
+
+  // Fallback to localStore
+  return (localStore.donors || []).find((d) => {
+    if (d.user_id) return false;
+    if (d.source !== 'google_forms') return false;
+    if (hasValidPhone && d.phone) {
+      const dPhone = String(d.phone).replace(/\D/g, '').slice(-10);
+      if (dPhone === cleanPhone) return true;
+    }
+    if (cleanEmail && d.email && String(d.email).trim().toLowerCase() === cleanEmail) {
+      return true;
+    }
+    return false;
+  }) || null;
+}
+
+async function claimDonorRecord(donorId, userId) {
+  if (!donorId || !userId) return { success: false, reason: 'missing_params' };
+
+  if (isPostgres && pool) {
+    try {
+      const res = await pool.query(
+        `UPDATE public.donors
+         SET user_id = $1, updated_at = NOW()
+         WHERE id = $2 AND user_id IS NULL
+         RETURNING *`,
+        [userId, donorId]
+      );
+      if (res.rows.length > 0) {
+        const claimedDonor = res.rows[0];
+        const local = (localStore.donors || []).find((d) => d.id === donorId);
+        if (local) {
+          local.user_id = userId;
+          local.updated_at = claimedDonor.updated_at;
+        }
+        return { success: true, donor: claimedDonor };
+      }
+
+      const checkRes = await pool.query('SELECT user_id FROM public.donors WHERE id = $1', [donorId]);
+      if (checkRes.rows.length > 0 && checkRes.rows[0].user_id) {
+        return { success: false, reason: 'already_claimed', existing_user_id: checkRes.rows[0].user_id };
+      }
+      return { success: false, reason: 'donor_not_found' };
+    } catch (err) {
+      console.warn('DB claimDonorRecord warning:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  const local = (localStore.donors || []).find((d) => d.id === donorId);
+  if (!local) return { success: false, reason: 'donor_not_found' };
+  if (local.user_id) return { success: false, reason: 'already_claimed' };
+  local.user_id = userId;
+  local.updated_at = new Date().toISOString();
+  return { success: true, donor: local };
+}
+
 async function linkDonorTelegramAccount({ donor_id, telegram_chat_id, telegram_username }) {
   const now = new Date().toISOString();
   const numChatId = Number(telegram_chat_id);
@@ -1502,6 +1596,8 @@ module.exports = {
   getDonorByTelegramChatId,
   getDonorByUserId,
   getDonorById,
+  findUnclaimedGoogleFormDonor,
+  claimDonorRecord,
   linkDonorTelegramAccount,
   unlinkDonorTelegramAccount,
   setDonorTelegramConsent,

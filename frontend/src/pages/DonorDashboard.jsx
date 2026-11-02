@@ -52,6 +52,8 @@ export default function DonorDashboard() {
   // Incoming blood coordination requests
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [respondingToRequestId, setRespondingToRequestId] = useState(null);
+  const [claimingRecord, setClaimingRecord] = useState(false);
+  const [claimError, setClaimError] = useState(null);
 
   const fetchDonorData = async () => {
     setLoading(true);
@@ -264,6 +266,23 @@ export default function DonorDashboard() {
     );
   }
 
+  const handleClaimGoogleFormRecord = async () => {
+    setClaimingRecord(true);
+    setClaimError(null);
+    try {
+      const res = await api.donors.claimGoogleFormRecord();
+      if (res && res.success) {
+        await fetchDonorData();
+      } else {
+        setClaimError(res?.error || 'Could not find a Google Form record matching your verified phone number.');
+      }
+    } catch (err) {
+      setClaimError(err.message || 'Could not find an unclaimed registration matching your verified mobile number.');
+    } finally {
+      setClaimingRecord(false);
+    }
+  };
+
   if (!donor) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
@@ -274,12 +293,32 @@ export default function DonorDashboard() {
         <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
           You are currently registered as a general user. Complete your blood group and approximate location to help save lives during emergencies.
         </p>
-        <Link
-          to="/donor/registration"
-          className="inline-flex items-center gap-2 px-6 py-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all shadow-rose-200"
-        >
-          Register as Blood Donor
-        </Link>
+
+        {claimError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 max-w-md mx-auto">
+            {claimError}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <Link
+            to="/donor/registration"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all shadow-rose-200"
+          >
+            Register as Blood Donor
+          </Link>
+          <button
+            type="button"
+            onClick={handleClaimGoogleFormRecord}
+            disabled={claimingRecord}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all disabled:opacity-50"
+          >
+            <span>{claimingRecord ? 'Searching Records...' : 'Claim Google Form Record'}</span>
+          </button>
+        </div>
+        <p className="text-[11px] text-slate-400">
+          Already filled out our Google Form? Click "Claim Google Form Record" to automatically link it via your verified mobile number.
+        </p>
       </div>
     );
   }
@@ -300,6 +339,11 @@ export default function DonorDashboard() {
 
         {/* Verification Status Pill */}
         <div className="flex items-center gap-2">
+          {donor.source === 'google_forms' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-800 bg-blue-100 rounded-full border border-blue-300">
+              📋 Google Forms Linked
+            </span>
+          )}
           {donor.verification_status === 'verified' ? (
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 rounded-full border border-emerald-300">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -313,6 +357,38 @@ export default function DonorDashboard() {
           )}
         </div>
       </div>
+
+      {/* Google Forms Information Banner if source is google_forms */}
+      {donor.source === 'google_forms' && (
+        <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0 text-sm font-bold">
+            📋
+          </div>
+          <div className="space-y-1 text-xs text-blue-950">
+            <strong className="block text-sm font-bold text-blue-900">
+              Google Forms Donor Record Connected
+            </strong>
+            <p className="leading-relaxed text-blue-800">
+              Your donor registration was received via our community Google Form and is securely connected to your portal account. Your blood group ({donor.blood_group}) and response preferences are preserved.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Verification Status Banner if pending_verification */}
+      {donor.verification_status === 'pending_verification' && (
+        <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3">
+          <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1 text-xs text-amber-950">
+            <strong className="block text-sm font-bold text-amber-900">
+              Registration Status: Pending Clinical Verification
+            </strong>
+            <p className="leading-relaxed text-amber-800">
+              Your profile is active in preliminary emergency matching. Routine clinical verification by healthcare coordinators is underway.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Cooldown Status Alert Banner */}
       {cooldown && cooldown.in_cooldown ? (

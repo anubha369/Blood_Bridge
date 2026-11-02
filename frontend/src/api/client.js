@@ -145,6 +145,7 @@ export const api = {
     getCooldownStatus: () => request('/donors/cooldown-status'),
     withdrawConsent: () => request('/donors/consent/withdraw', { method: 'POST' }),
     grantConsent: () => request('/donors/consent/grant', { method: 'POST' }),
+    claimGoogleFormRecord: (payload = {}) => request('/donors/claim-google-form-record', { method: 'POST', body: JSON.stringify(payload) }),
     getContactRequests: () => request('/donors/contact-requests'),
     respondToContactRequest: (requestId, action) => request(`/donors/contact-requests/${requestId}/respond`, { method: 'POST', body: JSON.stringify({ action }) })
   },
