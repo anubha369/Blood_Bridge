@@ -1,9 +1,22 @@
-let activeApiBase = (import.meta.env.VITE_API_URL || import.meta.env.API_URL || '/api').replace(/\/$/, '');
+const CLOUDFLARE_TUNNEL_URL = 'https://tonight-restructuring-eden-executive.trycloudflare.com/api';
+const LOCAL_BACKEND_URL = 'http://localhost:5001/api';
+
+const isHttps = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:';
+
+let activeApiBase = (import.meta.env.VITE_API_URL || import.meta.env.API_URL || '').replace(/\/$/, '');
+
+// If running on HTTPS (e.g. Vercel deployment), prioritize secure HTTPS tunnel over plain HTTP
+if (isHttps && (!activeApiBase || activeApiBase.startsWith('http://'))) {
+  activeApiBase = CLOUDFLARE_TUNNEL_URL;
+} else if (!activeApiBase) {
+  activeApiBase = LOCAL_BACKEND_URL;
+}
 
 const CANDIDATE_API_URLS = [
   activeApiBase,
-  'https://impose-philip-flour-compared.trycloudflare.com/api',
-  'http://localhost:5001/api'
+  CLOUDFLARE_TUNNEL_URL,
+  LOCAL_BACKEND_URL,
+  '/api'
 ].filter((url, index, arr) => Boolean(url) && arr.indexOf(url) === index);
 
 /**
